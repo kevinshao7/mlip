@@ -1,6 +1,6 @@
 from ase.io import read
 from ase import units
-from ase.md.langevin import Langevin
+from ase.md.verlet import VelocityVerlet
 from ase.md.velocitydistribution import (
     Stationary,
     ZeroRotation,
@@ -20,7 +20,7 @@ def set_water_density(atoms, density_g_cm3):
     total_mass_g = total_mass_amu * 1.66053906660e-24
 
     volume_cm3 = total_mass_g / density_g_cm3
-    volume_A3 = volume_cm3 * 1e24
+    volume_A3 = volume_cm3 * 1e24 #volume in cubic anstroms
 
     L = volume_A3 ** (1 / 3)
 
@@ -29,18 +29,17 @@ def set_water_density(atoms, density_g_cm3):
     atoms.wrap()
 
     return L
-def simpleMD(init_conf, temp, calc, fname, s, T):
+def simpleMD(init_conf, temp, calc, fname, s, T): 
+    #s is save interval, T is total frames
     init_conf.calc = calc
 
     MaxwellBoltzmannDistribution(init_conf, temperature_K=temp)
     Stationary(init_conf)
     ZeroRotation(init_conf)
 
-    dyn = Langevin(
+    dyn = VelocityVerlet( #velocityverlet is NVE integration
         init_conf,
         timestep=0.1 * units.fs,
-        temperature_K=temp,
-        friction=0.01 / units.fs,
     )
 
     if os.path.exists(fname):
@@ -52,14 +51,13 @@ def simpleMD(init_conf, temp, calc, fname, s, T):
     pressures = []
     energies = []
 
-    pbar = tqdm(total=T, desc=f"Langevin MD {temp} K")
+    pbar = tqdm(total=T, desc=f"NVE MD initialized at {temp} K")
 
     def write_frame():
         atoms = dyn.atoms
         atoms.write(fname, append=True)
 
-        step = dyn.nsteps
-        t_fs = step * 0.5  # because timestep = 0.5 fs
+        t_fs = dyn.get_time() / units.fs
 
         E = atoms.get_potential_energy() / len(atoms)
         Tnow = atoms.get_temperature()
