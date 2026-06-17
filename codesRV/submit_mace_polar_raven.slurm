@@ -40,7 +40,7 @@ srun python train_mace.py \
   --name="polar_ft_1m_debug" \
   --model="PolarMACE" \
   --foundation_model="polar-1-s" \
-  --train_file="./ab-initio-thermodynamics-of-water/training-set/dataset_1593.xyz" \
+  --train_file="../ab-initio-thermodynamics-of-water/training-set/dataset_1593.xyz" \
   --valid_fraction=0.05 \
   --energy_key="TotEnergy" \
   --forces_key="force" \
