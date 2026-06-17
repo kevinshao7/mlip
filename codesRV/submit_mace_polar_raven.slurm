@@ -18,7 +18,7 @@ module load anaconda/3/2023.03
 module load git/2.50
 module load cuda/12.8
 
-source env/bin/activate
+source ../../env/bin/activate
 
 export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
 export CUDA_LAUNCH_BLOCKING=1
