@@ -1,12 +1,12 @@
-#!/bin/bash
-#SBATCH --job-name=mace_polar
-#SBATCH --partition=gpu
+#!/bin/bash -l
+#SBATCH --job-name=mace_polar_debug
+#SBATCH --partition=gpudev
 #SBATCH --constraint=gpu
 #SBATCH --gres=gpu:a100:1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=18
 #SBATCH --mem=125G
-#SBATCH --time=04:00:00
+#SBATCH --time=00:15:00
 #SBATCH --output=slurm-%x-%j.out
 #SBATCH --error=slurm-%x-%j.err
 
@@ -18,12 +18,28 @@ module purge
 module load gcc/10 impi/2021.2
 module load anaconda/3/2023.03
 module load git/2.50
-mmodule load cuda/12.8
+module load cuda/12.8
 
 source env/bin/activate
 
+export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
+export CUDA_LAUNCH_BLOCKING=1
+
+echo "Job started on $(hostname)"
+echo "CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
+nvidia-smi
+
+python - <<'PY'
+import torch
+print("torch:", torch.__version__)
+print("torch cuda:", torch.version.cuda)
+print("cuda available:", torch.cuda.is_available())
+if torch.cuda.is_available():
+    print("gpu:", torch.cuda.get_device_name(0))
+PY
+
 srun python ./trainmace.py \
-  --name="polar_ft_1m" \
+  --name="polar_ft_1m_debug" \
   --model="PolarMACE" \
   --foundation_model="polar-1-s" \
   --train_file="./ab-initio-thermodynamics-of-water/training-set/dataset_1593.xyz" \
@@ -38,5 +54,5 @@ srun python ./trainmace.py \
   --default_dtype="float32" \
   --device="cuda" \
   --batch_size=1 \
-  --max_num_epochs=20 \
+  --max_num_epochs=1 \
   --multiheads_finetuning=True
