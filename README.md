@@ -32,6 +32,8 @@ https://www.faccts.de/orca/
 
 This project depends on the following external repositories, which should be cloned separately into the project root:
 
+wget https://github.com/ACEsuit/mace-foundations/releases/download/mace_polar_1/MACE-POLAR-1-M.model
+
 ```bash
 git clone https://github.com/ACEsuit/mace.git
 git clone https://github.com/BingqingCheng/ab-initio-thermodynamics-of-water.git
