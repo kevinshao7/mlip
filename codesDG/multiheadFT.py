@@ -1,0 +1,12 @@
+python -m mace.cli.run_train \
+  --name mymodel_finetuned \
+  --train_file path/to/your_dataset.xyz \
+  --foundation_model ../MACE-POLAR-1-M.model \
+  --pt_train_file path/to/replay_dataset.xyz \
+  --num_samples_pt 10000 \
+  --filter_type_pt combinations \
+  --subselect_pt fps \
+  --weight_pt 1.0 \
+  --atomic_numbers "[1, 7, 8,16]" \
+  --multiheads_finetuning True \
+  --force_mh_ft_lr False
