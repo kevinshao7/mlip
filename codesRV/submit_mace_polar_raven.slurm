@@ -1,12 +1,12 @@
 #!/bin/bash -l
 #SBATCH --job-name=mace_polar_debug
-#SBATCH --partition=gpudev
+#SBATCH --partition=gpu
 #SBATCH --constraint=gpu
 #SBATCH --gres=gpu:a100:1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=18
 #SBATCH --mem=125G
-#SBATCH --time=00:15:00
+#SBATCH --time=12:00:00
 #SBATCH --output=slurm-%x-%j.out
 #SBATCH --error=slurm-%x-%j.err
 
@@ -52,5 +52,5 @@ srun python train_mace.py \
   --default_dtype="float32" \
   --device="cuda" \
   --batch_size=1 \
-  --max_num_epochs=1 \
+  --max_num_epochs=20 \
   --multiheads_finetuning=True
