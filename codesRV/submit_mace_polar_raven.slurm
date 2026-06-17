@@ -36,7 +36,7 @@ if torch.cuda.is_available():
     print("gpu:", torch.cuda.get_device_name(0))
 PY
 
-srun python ./trainmace.py \
+srun python train_mace.py \
   --name="polar_ft_1m_debug" \
   --model="PolarMACE" \
   --foundation_model="polar-1-s" \
