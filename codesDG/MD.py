@@ -140,8 +140,8 @@ def simpleMD(init_conf, temp, calc, fname, s, T):
 
 
 init_conf = read(
-    "MDresults/mace_1500K_density_1.0.xyz",
-    index=500,
+    "../MDresults/mace_1500K_density_1.0.xyz",
+    index=2000,
 ).copy()
 
 # Choose density corresponding to your guessed 10 GPa water state
@@ -167,6 +167,6 @@ simpleMD(
     temp=1500,
     calc=mace_calc,
     fname=os.path.join(MD_RESULTS_DIR, f"mace_1500K_density_{densitygcm3}.xyz"),
-    s=10,
-    T=20000,
+    s=100,
+    T=100000,
 )
