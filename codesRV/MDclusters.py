@@ -66,7 +66,7 @@ def simpleMD(init_conf, temp, calc, fname, s, T):
     # arrays for plotting
     times = []
     temperatures = []
-    pressures = []
+    # pressures = []
     energies = []
     kinetic_energies = []
     total_energies = []
@@ -84,11 +84,11 @@ def simpleMD(init_conf, temp, calc, fname, s, T):
         Etot = E + Ekin
         Tnow = atoms.get_temperature()
 
-        try:
-            stress = atoms.get_stress()
-            Pnow = -np.mean(stress[:3]) / units.GPa
-        except Exception:
-            Pnow = np.nan
+        # try:
+        #     stress = atoms.get_stress()
+        #     Pnow = -np.mean(stress[:3]) / units.GPa
+        # except Exception:
+        #     Pnow = np.nan
 
         density = (
             atoms.get_masses().sum()
@@ -98,7 +98,7 @@ def simpleMD(init_conf, temp, calc, fname, s, T):
 
         times.append(t_fs)
         temperatures.append(Tnow)
-        pressures.append(Pnow)
+        # pressures.append(Pnow)
         energies.append(E)
         kinetic_energies.append(Ekin)
         total_energies.append(Etot)
@@ -106,7 +106,7 @@ def simpleMD(init_conf, temp, calc, fname, s, T):
         pbar.update(s)
         pbar.set_postfix({
             "T(K)": f"{Tnow:.0f}",
-            "P(GPa)": f"{Pnow:.2f}",
+            # "P(GPa)": f"{Pnow:.2f}",
             "rho": f"{density:.3f}",
             "E(eV/a)": f"{E:.4f}",
             "Etot(eV/a)": f"{Etot:.4f}",
@@ -123,7 +123,7 @@ def simpleMD(init_conf, temp, calc, fname, s, T):
     data = np.column_stack([
         times,
         temperatures,
-        pressures,
+        # pressures,
         energies,
         kinetic_energies,
         total_energies,
