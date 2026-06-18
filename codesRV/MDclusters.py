@@ -103,7 +103,7 @@ def simpleMD(init_conf, temp, calc, fname, s, T):
         kinetic_energies.append(Ekin)
         total_energies.append(Etot)
 
-        pbar.update(s)
+        # pbar.update(s)
         pbar.set_postfix({
             "T(K)": f"{Tnow:.0f}",
             # "P(GPa)": f"{Pnow:.2f}",
@@ -111,7 +111,10 @@ def simpleMD(init_conf, temp, calc, fname, s, T):
             "E(eV/a)": f"{E:.4f}",
             "Etot(eV/a)": f"{Etot:.4f}",
         })
+    def update_progress():
+        pbar.update(1)
 
+    dyn.attach(update_progress, interval=1)
     dyn.attach(write_frame, interval=s)
 
     t0 = time.time()
