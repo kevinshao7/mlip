@@ -31,10 +31,6 @@ simbox.add_solvent(water,solute =[amm],nsolute=15, zdim=20, density=1.0)
 simbox.build(padding=0.5)
 
 atoms = simbox.to_ase()    
-densitygcm3 = 1.0
-L = set_water_density(init_conf, density_g_cm3=densitygcm3)
-print(f"Set cubic box length to {L:.3f} Å")
-print(f"Volume = {init_conf.get_volume():.3f} Å^3")
 init_conf =atoms
 
 # Choose density corresponding to your guessed 10 GPa water state
