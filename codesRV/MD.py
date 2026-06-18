@@ -27,7 +27,8 @@ water = Water()
 boxsize=20
 simbox = SimCell(xysize=[20, 20])
 amm = Specie("NH3", name="NH3")
-simbox.add_solvent(water,solute =[amm],nsolute=15, zdim=20, density=1.0)
+densitygcm3 = 1.0 #gcm3
+simbox.add_solvent(water,solute =[amm],nsolute=15, zdim=20, density=densitygcm3)
 simbox.build(padding=0.5)
 
 atoms = simbox.to_ase()    
