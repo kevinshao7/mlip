@@ -159,7 +159,7 @@ mace_calc = mace_polar(
 
 simpleMD(
     init_conf,
-    temp=1500,
+    temp=150,
     calc=mace_calc,
     fname=os.path.join(MD_RESULTS_DIR, f"mace_1500K_density_{densitygcm3}.xyz"),
     s=200,
