@@ -38,3 +38,4 @@ wget https://github.com/ACEsuit/mace-foundations/releases/download/mace_polar_1/
 git clone https://github.com/ACEsuit/mace.git
 git clone https://github.com/BingqingCheng/ab-initio-thermodynamics-of-water.git
 git clone https://github.com/imagdau/aseMolec.git
+git clone https://github.com/m3g/packmol.git
