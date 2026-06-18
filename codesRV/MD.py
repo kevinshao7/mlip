@@ -16,7 +16,7 @@ from mdinterface.database import Water
 from mdinterface.core.specie import Specie
 
 
-from mace.calculators import MACECalculator
+from mace.calculators import mace_polar
 
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -150,10 +150,10 @@ def simpleMD(init_conf, temp, calc, fname, s, T):
 
 
 
-mace_calc = MACECalculator(
-    model_paths=["../checkpoints/polar_ft_1m_run-123.model"],
-    device="cuda",
-    default_dtype="float32",
+mace_calc = mace_polar(
+    model="polar-1-s",
+    device="cpu",
+    default_dtype="float32",  # faster for MD
 )
 
 simpleMD(
