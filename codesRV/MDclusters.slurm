@@ -1,12 +1,9 @@
 #!/bin/bash -l
-#SBATCH --job-name=mace_polar_debug
-#SBATCH --partition=gpudev
-#SBATCH --constraint=gpu
-#SBATCH --gres=gpu:a100:1
+#SBATCH --job-name=mace_MD_clusters
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=18
-#SBATCH --mem=125G
-#SBATCH --time=00:15:00
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=64G
+#SBATCH --time=12:00:00
 #SBATCH --output=slurm-%x-%j.out
 #SBATCH --error=slurm-%x-%j.err
 
@@ -39,26 +36,5 @@ if torch.cuda.is_available():
     print("gpu:", torch.cuda.get_device_name(0))
 PY
 
-srun python MHFT.py \
-  --name="polar_mhft_1s" \
-  --foundation_model="polar-1-s" \
-  --train_file="../ab-initio-thermodynamics-of-water/training-set/dataset_1593.xyz" \
-  --pt_train_file path/to/replay_dataset.xyz \
-  --num_samples_pt 10000 \
-  --filter_type_pt combinations \
-  --subselect_pt fps \
-  --weight_pt 1.0 \
-  --atomic_numbers "[1, 7, 8,16]" \
-  --energy_key="REF_energy" \
-  --forces_key="REF_forces" \
-  --stress_key="REF_stress" \
-  --compute_forces True \
-  --E0s "estimated" \
-  --loss="weighted" \
-  --stress_weight=0.0 \
-  --default_dtype="float32" \
-  --device="cuda" \
-  --batch_size=1 \
-  --max_num_epochs=1 \
-  --multiheads_finetuning=True
+srun python MDclusters.py
 

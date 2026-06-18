@@ -24,11 +24,11 @@ MD_RESULTS_DIR = os.path.join(PROJECT_ROOT, "MDresults")
 
 #generate initial configuration
 water = Water()
-boxsize=20
-simbox = SimCell(xysize=[20, 20])
+boxsize=15
+simbox = SimCell(xysize=[boxsize, boxsize])
 amm = Specie("NH3", name="NH3")
 densitygcm3 = 1.0 #gcm3
-simbox.add_solvent([water,amm],ratio=[7,1], zdim=20, density=densitygcm3)
+simbox.add_solvent([water,amm],ratio=[7,1], zdim=boxsize, density=densitygcm3)
 simbox.build(padding=0.5)
 
 atoms = simbox.to_ase()    
