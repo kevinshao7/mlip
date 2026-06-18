@@ -162,6 +162,6 @@ simpleMD(
     temp=1500,
     calc=mace_calc,
     fname=os.path.join(MD_RESULTS_DIR, f"mace_1500K_density_{densitygcm3}.xyz"),
-    s=100,
-    T=10000,
+    s=200,
+    T=1000,
 )
