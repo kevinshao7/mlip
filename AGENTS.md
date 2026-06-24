@@ -124,6 +124,10 @@ project-root/
   * avoid catastrophic forgetting if preserving pretrained capabilities matters,
   * save checkpoints and logs,
   * record exact training commands.
+example codes/tutorials here:
+https://colab.research.google.com/drive/1oCSVfMhWrqHTeHbKgUSQN9hTKxLzoNyb
+https://colab.research.google.com/drive/1AlfjQETV_jZ0JQnV5M3FGwAM2SGCl2aU
+https://colab.research.google.com/drive/1ZrTuTvavXiCxTFyjBV4GqlARxgFwYAtX#scrollTo=L7l0qtOVw9cz
 
 ## DFT Guidelines
 
