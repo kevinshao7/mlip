@@ -25,4 +25,6 @@ export CUDA_LAUNCH_BLOCKING=1
 echo "Job started on $(hostname)"
 echo "CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
 nvidia-smi
+cd /ptmp/kshao/jax/jaxmd-cli
+source .venv/bin/activate
 jaxmd-run maceoff_water_npt.toml
