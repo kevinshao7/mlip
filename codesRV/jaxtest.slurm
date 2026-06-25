@@ -1,10 +1,13 @@
 #!/bin/bash -l
 #SBATCH --job-name=jax
-#SBATCH --nodes=2
+#SBATCH --partition=gpudev
+
+#SBATCH --nodes=1
+
 #SBATCH --constraint="gpu"
-#SBATCH --gres=gpu:a100:4
+#SBATCH --gres=gpu:a100:1
 #SBATCH --mem=125G
-#SBATCH --time=02:00:00
+#SBATCH --time=00:14:00
 #SBATCH --output=slurm-%x-%j.out
 #SBATCH --error=slurm-%x-%j.err
 
@@ -22,4 +25,4 @@ export CUDA_LAUNCH_BLOCKING=1
 echo "Job started on $(hostname)"
 echo "CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
 nvidia-smi
-
+jaxmd-run maceoff_water_npt.toml

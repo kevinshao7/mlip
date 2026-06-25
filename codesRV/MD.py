@@ -1,3 +1,5 @@
+#run samples to see what clusters form
+
 from ase.io import read
 from ase import units
 from ase.md.verlet import VelocityVerlet
