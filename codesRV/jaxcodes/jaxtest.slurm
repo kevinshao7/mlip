@@ -1,13 +1,12 @@
 #!/bin/bash -l
 #SBATCH --job-name=jax
-#SBATCH --partition=gpudev
 
 #SBATCH --nodes=1
 
 #SBATCH --constraint="gpu"
 #SBATCH --gres=gpu:a100:1
 #SBATCH --mem=125G
-#SBATCH --time=00:14:00
+#SBATCH --time=23:00:00
 #SBATCH --output=slurm-%x-%j.out
 #SBATCH --error=slurm-%x-%j.err
 
