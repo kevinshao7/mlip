@@ -179,3 +179,4 @@ When asked to modify the project:
    * any assumptions or unresolved issues.
 
 When uncertain about scientific details, state the uncertainty rather than inventing a confident answer.
+Always feel free to ask clarifying questions!
