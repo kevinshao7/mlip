@@ -27,4 +27,4 @@ echo "CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
 nvidia-smi
 cd /ptmp/kshao/jax/jaxmd-cli
 source .venv/bin/activate
-jaxmd-run /example_configs/maceoff_water_npt.toml
+jaxmd-run /ptmp/kshao/jax/jaxmd-cli/codes/maceoff_water_npt.toml
