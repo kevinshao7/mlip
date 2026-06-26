@@ -1,0 +1,59 @@
+[structure]
+# Path to input PDB. Leave blank when using [structure.generate] — the filename is derived
+# from the solute/solvent names automatically.
+path = ""
+
+# See README "Production defaults for MACE-OFF in liquids" for the rationale behind density, minimization settings, and dt.
+[structure.generate]
+enabled = true
+solute_smiles = "CO"             # one molecule, lands at resid 1 (resname MOL)
+# solute_resname = ""            # auto: MOL (HOH if smiles is water)
+solvent_smiles = "O"             # bulk water; count derived from density
+# solvent_resname = ""           # auto: HOH for water, MOL otherwise
+density = 0.95                   # g/cm^3; under-dense start gives L-BFGS slack on MACE-OFF stiff modes (see README)
+padding = 14.0                   # A; cubic box side = 2 * padding
+tolerance = 2.0                  # A, packmol min spacing
+seed = 42
+
+[simulation]
+steps = 1000000                  # 1 ns per replica at dt=1.0 fs
+timestep = 1.0                   # fs; validated for MC-barostat path (see README)
+
+[ensemble]
+type = "nvt_mc_barostat"
+temperature = 300.0              # K
+pressure = 1.0                   # bar
+gamma = 1.0                      # 1/ps; OpenMM-style Langevin friction
+# mc_frequency defaults to 25 (OpenMM-compatible).
+
+[potential]
+type = "nn"
+
+[potential.nn]
+checkpoint_path = "mace_models/astx_mace_v3.1_low_force_filter_freesolv_l1_128ch_r6_stagetwo"
+model_type = "mace_off"
+r_cutoff = 6.0
+
+[minimization]
+# L-BFGS (default method). All options inherit from MinimizationConfig
+# defaults in jax_md_cli/config.py; only `enabled` is set here.
+enabled = true
+
+# [thermalization] — post-minimization Langevin thermalization phase.
+# Defaults (enabled=true, steps=2000, gamma=100.0/ps, dt=simulation.timestep)
+# suppress the first-log-step temperature explosion seen in 24-replica
+# MACE-OFF runs. To disable: thermalization.enabled=false on the CLI.
+
+[parallel]
+enabled = true
+lambda_schedule = [0.0, 0.1, 0.163, 0.194, 0.225, 0.256, 0.288, 0.319, 0.35, 0.404, 0.458, 0.567, 0.675, 0.783, 0.892, 1.0]  # 16 replicas; reference schedule with 0.131 dropped (0→0.1 gap is fine at Δλ=0.1) and 0.404 added to split the worst overlap gap (0.35→0.458, overlap 0.15 empirically)
+exchange_interval = 500
+store_positions = false
+log_wandb = false
+wandb_project = "jax-md-pt-test"
+wandb_run_name = "methanol"
+decouple_selection = "resid 1"   # decouple the solute (resid 1)
+replica_mixing_scheme = "swap-neighbors"  # swap-none | swap-neighbors | swap-all
+
+[output]
+directory = "./pt_output"
