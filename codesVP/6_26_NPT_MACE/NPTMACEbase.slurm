@@ -2,7 +2,7 @@
 #SBATCH --job-name=NPT_MACE_base
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=24
-#SBATCH --mem=64G
+#SBATCH --mem=128G
 #SBATCH --time=12:00:00
 #SBATCH --output=slurm-%x-%j.out
 #SBATCH --error=slurm-%x-%j.err
