@@ -10,9 +10,7 @@
 set -e
 
 module purge
-module load gcc/10 impi/2021.2
 module load anaconda/3/2023.03
-module load git/2.50
 
 source /ptmp/kshao/envs/mlip_clean/bin/activate
 export PYTHONNOUSERSITE=1
