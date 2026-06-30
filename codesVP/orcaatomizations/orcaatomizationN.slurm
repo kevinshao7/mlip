@@ -12,4 +12,4 @@ set -e
 module purge
 module load orca
 
-orca /ptmp/kshao/mlip/codesVP/orcaatomizations/orcaatomizationN.inp > /ptmp/kshao/mlip/codesVP/orcaatomizations/expandorcaatomizationN.out
+/mpcdf/soft/RHEL_9/packages/x86_64/orca/6.1.1/bin/orca /ptmp/kshao/mlip/codesVP/orcaatomizations/orcaatomizationN.inp > /ptmp/kshao/mlip/codesVP/orcaatomizations/expandorcaatomizationN.out
