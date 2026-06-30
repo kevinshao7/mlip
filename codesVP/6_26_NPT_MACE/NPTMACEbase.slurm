@@ -23,5 +23,5 @@ export CUDA_VISIBLE_DEVICES=
 echo "Job started on $(hostname)"
 echo "CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-unset}"
 
-cd /ptmp/kshao/mlip/codesRV/6_26_NPT_MACE/expand
+cd /ptmp/kshao/mlip/codesVP/6_26_NPT_MACE/expand
 srun python NPTMACEbase.py
