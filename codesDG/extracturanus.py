@@ -5,6 +5,8 @@ Scheibe et al., MNRAS 487, 2653 (2019). It contains one pressure and density
 profile plus three temperature/composition profile cases. This script writes
 one wide CSV with shared pressure/density columns and one temperature column
 per case.
+
+https://academic.oup.com/mnras/article/487/2/2653/5505844?login=true
 """
 
 from __future__ import annotations

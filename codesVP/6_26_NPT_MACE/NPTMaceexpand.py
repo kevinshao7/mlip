@@ -114,6 +114,11 @@ def replace_once(text: str, pattern: str, replacement: str) -> str:
     return text
 
 
+def write_text_lf(path: Path, text: str) -> None:
+    with path.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write(text)
+
+
 def make_script(base_text: str, row: dict[str, float], temp_name: str, comp_name: str) -> str:
     run_id = f"r{int(row['row']):02d}_{temp_name}_{comp_name}"
     pressure = row["pressure_GPa"]
@@ -155,7 +160,7 @@ def make_script(base_text: str, row: dict[str, float], temp_name: str, comp_name
 def make_slurm(base_text: str, run_id: str, py_name: str) -> str:
     text = base_text
     text = replace_once(text, r"^#SBATCH --job-name=.*$", f"#SBATCH --job-name=npt_{run_id}")
-    text = replace_once(text, r"^cd .*$", "cd /ptmp/kshao/mlip/codesRV/6_26_NPT_MACE/expand")
+    text = replace_once(text, r"^cd .*$", "cd /ptmp/kshao/mlip/codesVP/6_26_NPT_MACE/expand")
     text = replace_once(text, r"^srun python .*$", f"srun python {py_name}")
     return text
 
@@ -176,16 +181,8 @@ def main() -> None:
                 py_path = OUT_DIR / py_name
                 slurm_path = OUT_DIR / slurm_name
 
-                py_path.write_text(
-                    make_script(base_text, row, temp_name, comp_name),
-                    encoding="utf-8",
-                    newline="\n",
-                )
-                slurm_path.write_text(
-                    make_slurm(base_slurm_text, run_id, py_name),
-                    encoding="utf-8",
-                    newline="\n",
-                )
+                write_text_lf(py_path, make_script(base_text, row, temp_name, comp_name))
+                write_text_lf(slurm_path, make_slurm(base_slurm_text, run_id, py_name))
 
                 print(f"wrote {py_path.relative_to(SCRIPT_DIR)}")
                 print(f"wrote {slurm_path.relative_to(SCRIPT_DIR)}")
