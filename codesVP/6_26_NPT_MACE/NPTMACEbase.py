@@ -71,8 +71,7 @@ init_conf.info["external_field"] = [0.0, 0.0, 0.0]
 
 # Berendsen NPT needs a compressibility.  This ambient-water value is only a
 # numerical barostat parameter here, not a claim about Uranus-interior water.
-WATER_COMPRESSIBILITY_BAR_INV = 4.6e-5
-WATER_COMPRESSIBILITY_AU = WATER_COMPRESSIBILITY_BAR_INV / (1e5 * units.Pascal)
+WATER_COMPRESSIBILITY_AU = 4.57e-5 / units.bar
 
 
 def simpleMD(init_conf, temp, pressure_gpa, calc, fname, s, T, T_thermo=100):
@@ -220,10 +219,10 @@ mace_calc = mace_polar(
 
 simpleMD(
     init_conf,
-    temp=150,
+    temp=temp,
     pressure_gpa=pressuregpa,
     calc=mace_calc,
     fname=os.path.join(MD_RESULTS_DIR, f"mace_1500K_density_{densitygcm3}.xyz"),
-    s=100,
-    T=10000,
+    s=10,
+    T=1000,
 )
