@@ -12,4 +12,4 @@ set -e
 module purge
 module load orca
 
-orca orcaatomizationO.inp > orcaatomizationO.out
+orca /ptmp/kshao/mlip/codesVP/orcaatomizations/orcaatomizationO.inp > /ptmp/kshao/mlip/codesVP/orcaatomizations/expandorcaatomizationO.out
