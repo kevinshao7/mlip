@@ -1,5 +1,5 @@
 #!/bin/bash -l
-#SBATCH --job-name=jax
+#SBATCH --job-name=jaxrepex
 #SBATCH --nodes=2
 
 #SBATCH --constraint="gpu"
