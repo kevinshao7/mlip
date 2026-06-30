@@ -5,7 +5,7 @@
 
 #SBATCH --constraint="gpu"
 #SBATCH --gres=gpu:a100:1
-#SBATCH --mem=24G
+#SBATCH --mem=256G
 #SBATCH --time=23:00:00
 #SBATCH --output=slurm-%x-%j.out
 #SBATCH --error=slurm-%x-%j.err
