@@ -520,8 +520,8 @@ def load_nn_potential(
             cell=cell_for_nl,
             assume_mic=False,
         )
-        max_neighbors = 
-        max_neighbors_per_atom=500
+        # max_neighbors = 20000
+        # max_neighbors_per_atom=500
         print(f'  max_neighbors={max_neighbors}, max_neighbors_per_atom={max_neighbors_per_atom}')
 
         max_total_cells = None
