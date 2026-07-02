@@ -919,6 +919,7 @@ def load_nn_potential(
             cell=cell_for_nl,
             assume_mic=False,
         )
+        max_neighbors = 150000
         max_neighbors_per_atom = 500
         max_neighbors = positions.shape[0]*max_neighbors_per_atom
         print(f'  max_neighbors={max_neighbors}, max_neighbors_per_atom={max_neighbors_per_atom}')

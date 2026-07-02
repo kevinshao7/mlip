@@ -64,7 +64,6 @@ This project depends on the following external repositories, which should be clo
 
 ```bash
 git clone https://github.com/ACEsuit/mace.git
-git clone https://github.com/BingqingCheng/ab-initio-thermodynamics-of-water.git
 git clone https://github.com/imagdau/aseMolec.git
 ```
 Visit github websites for relevant documentation
@@ -77,7 +76,6 @@ project-root/
   AGENTS.md
   README.md
   mace/
-  ab-initio-thermodynamics-of-water/
   aseMolec/
   reading/
   ...
