@@ -105,7 +105,7 @@ def simpleMD(init_conf, temp, pressure_gpa, calc, fname, s, T, T_thermo=100):
     pressure_au = pressure_gpa * units.GPa
     dyn = NPTBerendsen(
         init_conf,
-        timestep=0.1 * units.fs,
+        timestep=0.2 * units.fs,
         temperature_K=temp,
         pressure_au=pressure_au,
         taut=100 * units.fs,
@@ -213,7 +213,7 @@ def simpleMD(init_conf, temp, pressure_gpa, calc, fname, s, T, T_thermo=100):
 
 mace_calc = mace_polar(
     model="polar-1-s",
-    device="cpu",
+    device=os.environ.get("MLIP_MACE_DEVICE", "cpu"),
     default_dtype="float32",  # faster for MD
 )
 
@@ -223,6 +223,6 @@ simpleMD(
     pressure_gpa=pressuregpa,
     calc=mace_calc,
     fname=os.path.join(MD_RESULTS_DIR, f"mace_1500K_density_{densitygcm3}.xyz"),
-    s=10,
-    T=1000,
+    s=100,
+    T=10000,
 )

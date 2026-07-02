@@ -24,4 +24,5 @@ echo "Job started on $(hostname)"
 echo "CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-unset}"
 
 cd /ptmp/kshao/mlip/codesVP/6_26_NPT_MACE/expand
+# Local GPU campaign without Slurm: cd /home/kevinsh/mlip/codesVP/6_26_NPT_MACE && source ~/env/bin/activate && python NPTMaceexpand.py && cd expand && CUDA_VISIBLE_DEVICES=0 MLIP_MACE_DEVICE=cuda bash -lc 'for f in npt_*.py; do python "$f"; done'
 srun python NPTMACEbase.py

@@ -22,7 +22,6 @@ MD_STEPS = 10_000
 TEMPERATURES = {
     "hot": "hot_uranus_temperature_K",
     "cold": "cold_uranus_temperature_K",
-    "pref": "preferred_uranus_temperature_K",
 }
 
 COMPOSITIONS = {
@@ -38,7 +37,6 @@ PRESSURE_ROWS = [
         "density_g_cm3": 0.000449,
         "hot_uranus_temperature_K": 76,
         "cold_uranus_temperature_K": 76,
-        "preferred_uranus_temperature_K": 76,
     },
     {
         "row": 3,
@@ -46,7 +44,6 @@ PRESSURE_ROWS = [
         "density_g_cm3": 0.00281,
         "hot_uranus_temperature_K": 136,
         "cold_uranus_temperature_K": 156,
-        "preferred_uranus_temperature_K": 179,
     },
     {
         "row": 4,
@@ -54,7 +51,6 @@ PRESSURE_ROWS = [
         "density_g_cm3": 0.012,
         "hot_uranus_temperature_K": 269,
         "cold_uranus_temperature_K": 269,
-        "preferred_uranus_temperature_K": 398,
     },
     {
         "row": 5,
@@ -62,7 +58,6 @@ PRESSURE_ROWS = [
         "density_g_cm3": 0.0495,
         "hot_uranus_temperature_K": 537,
         "cold_uranus_temperature_K": 481,
-        "preferred_uranus_temperature_K": 759,
     },
     {
         "row": 6,
@@ -70,7 +65,6 @@ PRESSURE_ROWS = [
         "density_g_cm3": 0.14,
         "hot_uranus_temperature_K": 1020,
         "cold_uranus_temperature_K": 854,
-        "preferred_uranus_temperature_K": 1240,
     },
     {
         "row": 7,
@@ -78,7 +72,6 @@ PRESSURE_ROWS = [
         "density_g_cm3": 0.344,
         "hot_uranus_temperature_K": 2050,
         "cold_uranus_temperature_K": 1500,
-        "preferred_uranus_temperature_K": 1920,
     },
     {
         "row": 8,
@@ -86,7 +79,6 @@ PRESSURE_ROWS = [
         "density_g_cm3": 0.405,
         "hot_uranus_temperature_K": 2340,
         "cold_uranus_temperature_K": 1640,
-        "preferred_uranus_temperature_K": 2070,
     },
     {
         "row": 9,
@@ -94,7 +86,6 @@ PRESSURE_ROWS = [
         "density_g_cm3": 1.19,
         "hot_uranus_temperature_K": 2340,
         "cold_uranus_temperature_K": 1640,
-        "preferred_uranus_temperature_K": 2070,
     },
     {
         "row": 10,
@@ -102,7 +93,6 @@ PRESSURE_ROWS = [
         "density_g_cm3": 3.72,
         "hot_uranus_temperature_K": 5520,
         "cold_uranus_temperature_K": 1920,
-        "preferred_uranus_temperature_K": 2840,
     },
 ]
 
@@ -161,7 +151,18 @@ def make_slurm(base_text: str, run_id: str, py_name: str) -> str:
     text = base_text
     text = replace_once(text, r"^#SBATCH --job-name=.*$", f"#SBATCH --job-name=npt_{run_id}")
     text = replace_once(text, r"^cd .*$", "cd /ptmp/kshao/mlip/codesVP/6_26_NPT_MACE/expand")
-    text = replace_once(text, r"^srun python .*$", f"srun python {py_name}")
+    text = replace_once(
+        text,
+        r"^srun python .*$",
+        (
+            "# Local GPU campaign without Slurm: "
+            "cd /home/kevinsh/mlip/codesVP/6_26_NPT_MACE && "
+            "source ~/env/bin/activate && python NPTMaceexpand.py && cd expand && "
+            "CUDA_VISIBLE_DEVICES=0 MLIP_MACE_DEVICE=cuda bash -lc "
+            "'for f in npt_*.py; do python \"$f\"; done'\n"
+            f"srun python {py_name}"
+        ),
+    )
     return text
 
 
