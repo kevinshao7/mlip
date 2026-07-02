@@ -44,16 +44,16 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MD_RESULTS_DIR = os.path.join(PROJECT_ROOT, "MDresults")
 
 #generate initial configuration
-water = Water()
-simbox = SimCell(xysize=[boxsize, boxsize])
-amm = Specie("NH3", name="NH3")
+
 densitygcm3 = 1.0 #gcm3
 pressuregpa = 1.0 # GPa
 targetmolecules = 100
 moleculemass = 18 #grams per mol
 NA = 6.022e23
 boxsize=(((targetmolecules*moleculemass/NA)/densitygcm3)**(1/3))*1e8 #boxsize in angstroms
-
+water = Water()
+simbox = SimCell(xysize=[boxsize, boxsize])
+amm = Specie("NH3", name="NH3")
 
 simbox.add_solvent([water,amm],ratio=[7,1], zdim=boxsize, density=densitygcm3)
 simbox.build(padding=0.5)

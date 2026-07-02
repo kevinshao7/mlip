@@ -32,8 +32,8 @@ from ase.io import read
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-DEFAULT_RUN_DIR = SCRIPT_DIR / "expand" / "MDresults" / "r06_cold_w"
-DEFAULT_OUTPUT_DIR = SCRIPT_DIR / "npt_analysis" / "r06_cold_w"
+DEFAULT_RUN_DIR = SCRIPT_DIR / "expand" / "MDresults" / "r08_cold_w"
+DEFAULT_OUTPUT_DIR = SCRIPT_DIR / "npt_analysis" / "r08_cold_w"
 
 AMU_TO_G = 1.66053906660e-24
 ANGSTROM3_TO_CM3 = 1.0e-24
@@ -61,8 +61,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--xyz",
         type=Path,
-        default=DEFAULT_RUN_DIR / "r06_cold_w.xyz",
-        help="Trajectory to analyze. Defaults to expand/MDresults/r06_cold_w/r06_cold_w.xyz.",
+        default=DEFAULT_RUN_DIR / "r08_cold_w.xyz",
+        help="Trajectory to analyze. Defaults to expand/MDresults/r08_cold_w/r08_cold_w.xyz.",
     )
     parser.add_argument(
         "--output-dir",
