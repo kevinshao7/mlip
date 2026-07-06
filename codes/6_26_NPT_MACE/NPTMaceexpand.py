@@ -17,11 +17,13 @@ BASE_SLURM = SCRIPT_DIR / "NPTMACEbase.slurm"
 OUT_DIR = SCRIPT_DIR / "expand"
 
 SAVE_INTERVAL_STEPS = 100
-MD_STEPS = 10_000
+# Keep None to inherit the current production length from NPTMACEbase.py.
+MD_STEPS: int | None = None
 
 TEMPERATURES = {
     "hot": "hot_uranus_temperature_K",
     "cold": "cold_uranus_temperature_K",
+    "pref": "preferred_uranus_temperature_K",
 }
 
 COMPOSITIONS = {
@@ -37,6 +39,7 @@ PRESSURE_ROWS = [
         "density_g_cm3": 0.000449,
         "hot_uranus_temperature_K": 76,
         "cold_uranus_temperature_K": 76,
+        "preferred_uranus_temperature_K": 76,
     },
     {
         "row": 3,
@@ -44,6 +47,7 @@ PRESSURE_ROWS = [
         "density_g_cm3": 0.00281,
         "hot_uranus_temperature_K": 136,
         "cold_uranus_temperature_K": 156,
+        "preferred_uranus_temperature_K": 179,
     },
     {
         "row": 4,
@@ -51,6 +55,7 @@ PRESSURE_ROWS = [
         "density_g_cm3": 0.012,
         "hot_uranus_temperature_K": 269,
         "cold_uranus_temperature_K": 269,
+        "preferred_uranus_temperature_K": 398,
     },
     {
         "row": 5,
@@ -58,6 +63,7 @@ PRESSURE_ROWS = [
         "density_g_cm3": 0.0495,
         "hot_uranus_temperature_K": 537,
         "cold_uranus_temperature_K": 481,
+        "preferred_uranus_temperature_K": 759,
     },
     {
         "row": 6,
@@ -65,6 +71,7 @@ PRESSURE_ROWS = [
         "density_g_cm3": 0.14,
         "hot_uranus_temperature_K": 1020,
         "cold_uranus_temperature_K": 854,
+        "preferred_uranus_temperature_K": 1240,
     },
     {
         "row": 7,
@@ -72,6 +79,7 @@ PRESSURE_ROWS = [
         "density_g_cm3": 0.344,
         "hot_uranus_temperature_K": 2050,
         "cold_uranus_temperature_K": 1500,
+        "preferred_uranus_temperature_K": 1920,
     },
     {
         "row": 8,
@@ -79,6 +87,7 @@ PRESSURE_ROWS = [
         "density_g_cm3": 0.405,
         "hot_uranus_temperature_K": 2340,
         "cold_uranus_temperature_K": 1640,
+        "preferred_uranus_temperature_K": 2070,
     },
     {
         "row": 9,
@@ -86,6 +95,7 @@ PRESSURE_ROWS = [
         "density_g_cm3": 1.19,
         "hot_uranus_temperature_K": 2340,
         "cold_uranus_temperature_K": 1640,
+        "preferred_uranus_temperature_K": 2070,
     },
     {
         "row": 10,
@@ -93,6 +103,7 @@ PRESSURE_ROWS = [
         "density_g_cm3": 3.72,
         "hot_uranus_temperature_K": 5520,
         "cold_uranus_temperature_K": 1920,
+        "preferred_uranus_temperature_K": 2840,
     },
 ]
 
@@ -102,6 +113,14 @@ def replace_once(text: str, pattern: str, replacement: str) -> str:
     if count != 1:
         raise RuntimeError(f"Could not replace pattern: {pattern}")
     return text
+
+
+def replace_assignment(text: str, name: str, replacement: str) -> str:
+    return replace_once(text, rf"^{name}\s*=.*$", replacement)
+
+
+def replace_call_keyword(text: str, name: str, replacement_value: str) -> str:
+    return replace_once(text, rf"^(\s*){name}\s*=\s*[^,\n]+,", rf"\1{name}={replacement_value},")
 
 
 def write_text_lf(path: Path, text: str) -> None:
@@ -116,34 +135,24 @@ def make_script(base_text: str, row: dict[str, float], temp_name: str, comp_name
     temperature = row[TEMPERATURES[temp_name]]
 
     text = base_text
-    text = replace_once(
+    text = replace_assignment(text, "PROJECT_ROOT", 'SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))')
+    text = replace_assignment(
         text,
-        r"^PROJECT_ROOT\s*=.*\nMD_RESULTS_DIR\s*=.*$",
-        (
-            'SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))\n'
-            'MD_RESULTS_DIR = os.path.join(SCRIPT_DIR, "MDresults", '
-            f'"{run_id}")'
-        ),
+        "MD_RESULTS_DIR",
+        f'MD_RESULTS_DIR = os.path.join(SCRIPT_DIR, "MDresults", "{run_id}")',
     )
-    text = replace_once(
-        text,
-        r"^densitygcm3\s*=.*$",
-        f"densitygcm3 = {density:.12g} # g/cm^3",
-    )
-    text = replace_once(
-        text,
-        r"^pressuregpa\s*=.*$",
-        f"pressuregpa = {pressure:.12g} # GPa",
-    )
+    text = replace_assignment(text, "densitygcm3", f"densitygcm3 = {density:.12g} # g/cm^3")
+    text = replace_assignment(text, "pressuregpa", f"pressuregpa = {pressure:.12g} # GPa")
     text = replace_once(text, r"^simbox\.add_solvent\(.*$", COMPOSITIONS[comp_name])
-    text = replace_once(text, r"^\s*temp\s*=\s*[^,\n]+,", f"    temp={temperature:.12g},")
+    text = replace_call_keyword(text, "temp", f"{temperature:.12g}")
     text = replace_once(
         text,
         r'^\s*fname\s*=\s*os\.path\.join\(MD_RESULTS_DIR,.*$',
         f'    fname=os.path.join(MD_RESULTS_DIR, "{run_id}.xyz"),',
     )
-    text = replace_once(text, r"^\s*s\s*=\s*[^,\n]+,", f"    s={SAVE_INTERVAL_STEPS},")
-    text = replace_once(text, r"^\s*T\s*=\s*[^,\n]+,", f"    T={MD_STEPS},")
+    text = replace_call_keyword(text, "s", str(SAVE_INTERVAL_STEPS))
+    if MD_STEPS is not None:
+        text = replace_call_keyword(text, "T", str(MD_STEPS))
     return text
 
 

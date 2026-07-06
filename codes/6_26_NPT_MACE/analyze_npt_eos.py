@@ -34,6 +34,8 @@ from ase.io import read
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT_RUN_DIR = SCRIPT_DIR / "expand" / "MDresults" / "r08_cold_w"
 DEFAULT_OUTPUT_DIR = SCRIPT_DIR / "npt_analysis" / "r08_cold_w"
+FALLBACK_TIMESTEP_FS = 0.5
+FALLBACK_SAVE_INTERVAL = 100
 
 AMU_TO_G = 1.66053906660e-24
 ANGSTROM3_TO_CM3 = 1.0e-24
@@ -79,14 +81,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--timestep-fs",
         type=float,
-        default=0.1,
-        help="MD timestep in fs used by the production run.",
+        default=None,
+        help="MD timestep in fs used by the production run. Defaults to the generated script setting.",
     )
     parser.add_argument(
         "--save-interval",
         type=int,
-        default=100,
-        help="Number of MD steps between saved XYZ frames.",
+        default=None,
+        help="Number of MD steps between saved XYZ frames. Defaults to the generated script setting.",
     )
     return parser.parse_args()
 
@@ -112,12 +114,21 @@ def parse_run_settings(script_path: Path | None) -> dict[str, float | str]:
         "target_density_g_cm3": r"^densitygcm3\s*=\s*([0-9.eE+-]+)",
         "target_pressure_GPa": r"^pressuregpa\s*=\s*([0-9.eE+-]+)",
         "target_temperature_K": r"^\s*temp\s*=\s*([0-9.eE+-]+),",
+        "save_interval_steps": r"^\s*s\s*=\s*([0-9_]+),",
+        "production_steps": r"^\s*T\s*=\s*([0-9_]+),",
     }
     settings: dict[str, float | str] = {"generated_script": str(script_path)}
     for key, pattern in patterns.items():
         match = re.search(pattern, text, flags=re.MULTILINE)
         if match:
-            settings[key] = float(match.group(1))
+            settings[key] = float(match.group(1).replace("_", ""))
+    timestep_matches = re.findall(
+        r"^\s*timestep\s*=\s*([0-9.eE+-]+)\s*\*\s*units\.fs,",
+        text,
+        flags=re.MULTILINE,
+    )
+    if timestep_matches:
+        settings["production_timestep_fs"] = float(timestep_matches[-1])
     return settings
 
 
@@ -364,14 +375,27 @@ def main() -> None:
     if args.discard < 0:
         raise ValueError("--discard must be non-negative.")
 
-    rows = frame_table(xyz_path, args.timestep_fs, args.save_interval)
+    settings = parse_run_settings(generated_script_path(xyz_path))
+    timestep_fs = (
+        args.timestep_fs
+        if args.timestep_fs is not None
+        else float(settings.get("production_timestep_fs", FALLBACK_TIMESTEP_FS))
+    )
+    save_interval = (
+        args.save_interval
+        if args.save_interval is not None
+        else int(settings.get("save_interval_steps", FALLBACK_SAVE_INTERVAL))
+    )
+    settings["analysis_timestep_fs"] = timestep_fs
+    settings["analysis_save_interval_steps"] = save_interval
+
+    rows = frame_table(xyz_path, timestep_fs, save_interval)
     if args.discard >= len(rows):
         raise ValueError(f"--discard={args.discard} leaves no frames from {len(rows)} saved frames.")
 
     output_dir.mkdir(parents=True, exist_ok=True)
     run_id = run_id_from_path(xyz_path)
     used = rows[args.discard :]
-    settings = parse_run_settings(generated_script_path(xyz_path))
     estimates = {
         "pressure_GPa": estimate(row["pressure_GPa"] for row in used),
         "density_g_cm3": estimate(row["density_g_cm3"] for row in used),
