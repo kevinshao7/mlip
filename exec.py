@@ -1,6 +1,17 @@
 #!/usr/bin/env python3
 """Run a job folder from mlip/codes on pc, dart, dungeon, raven, or viper-cpu.
 
+Commands:
+    python exec.py --list-jobs
+    python exec.py -j 7_6_jaxoutputs -m pc
+    python exec.py -j 7_6_jaxoutputs -m viper-cpu --dry-run
+    python exec.py -j 6_26_NPT_MACE -m raven --entry NPTMACEbase.py --dry-run
+    python exec.py -j 6_26_NPT_MACE -m dungeon --entry expand/npt_r09_hot_w7n1.py --dry-run
+
+For non-PC machines, copy/sync the repo to that machine, then run the generated
+wrapper in outputsfull/<run_id>/. For dart/dungeon, run exec.py on that machine;
+those profiles execute the GPU command directly, even if --dry-run is present.
+
 Use machines.local.json to add/override machine profiles; machines.example.json
 contains a complete template.
 """
@@ -44,6 +55,7 @@ def fill_defaults(name: str, profile: dict) -> dict:
     return {
         "name": name,
         "root": str(profile["root"]),
+        "codes_dir": str(profile.get("codes_dir", "codes")),
         "venv_activate": profile.get("venv_activate"),
         "scheduler": scheduler,
         "python": str(profile.get("python", "python")),
@@ -113,12 +125,30 @@ def write_outputs(run_dir: Path, job: str, job_dir: Path, entry: Path, machine: 
         f'& "{Path(sys.executable)}" "{rel_entry}" 1> "{stdout}" 2> "{stderr}"\n',
         encoding="utf-8",
     )
-    write_remote(run_dir, job, rel_entry, machine)
+    if machine["scheduler"] == "slurm":
+        write_remote(run_dir, job, rel_entry, machine)
+
+
+def remote_paths(job: str, rel_entry: str, machine: dict) -> tuple[str, str]:
+    remote_job = f'{machine["root"]}/{machine["codes_dir"]}/{job}'
+    entry_path = Path(rel_entry)
+    remote_cwd = f"{remote_job}/{entry_path.parent.as_posix()}" if entry_path.parent.as_posix() != "." else remote_job
+    return remote_cwd, entry_path.name
+
+
+def gpu_command(job: str, rel_entry: str, machine: dict) -> str:
+    remote_cwd, remote_entry = remote_paths(job, rel_entry, machine)
+    setup = [f'source {machine["venv_activate"]}'] if machine["venv_activate"] else []
+    return " && ".join([
+        *setup,
+        f'cd "{remote_cwd}"',
+        f'CUDA_VISIBLE_DEVICES=0 MLIP_MACE_DEVICE=cuda {machine["python"]} "{remote_entry}"',
+    ])
 
 
 def write_remote(run_dir: Path, job: str, rel_entry: str, machine: dict) -> None:
-    slurm = machine["scheduler"] == "slurm"
     remote_out = f'{machine["root"]}/outputsfull/{run_dir.name}'
+    remote_cwd, remote_entry = remote_paths(job, rel_entry, machine)
     setup = [f'source {machine["venv_activate"]}'] if machine["venv_activate"] else []
     lines = [
         "set -euo pipefail",
@@ -130,18 +160,17 @@ def write_remote(run_dir: Path, job: str, rel_entry: str, machine: dict) -> None
         *setup,
         "export PYTHONNOUSERSITE=1",
         *machine["env_lines"],
-        f'cd "{machine["root"]}/codes/{job}"',
-        f'{machine["python"]} "{rel_entry}" > "$MLIP_OUTPUT_DIR/raw_stdout.txt" 2> "$MLIP_OUTPUT_DIR/raw_stderr.txt"',
+        f'cd "{remote_cwd}"',
+        f'{machine["python"]} "{remote_entry}" > "$MLIP_OUTPUT_DIR/raw_stdout.txt" 2> "$MLIP_OUTPUT_DIR/raw_stderr.txt"',
     ]
     header = ["#!/bin/bash -l"]
-    if slurm:
-        header += [
-            f"#SBATCH --job-name={job[:32]}", "#SBATCH --ntasks=1",
-            f'#SBATCH --cpus-per-task={machine["cpus"]}', f'#SBATCH --mem={machine["memory"]}',
-            f'#SBATCH --time={machine["walltime"]}', "#SBATCH --output=slurm-%x-%j.out",
-            "#SBATCH --error=slurm-%x-%j.err", "",
-        ]
-    (run_dir / ("submit.slurm" if slurm else "run_remote.sh")).write_text("\n".join([*header, *lines, ""]), encoding="utf-8")
+    header += [
+        f"#SBATCH --job-name={job[:32]}", "#SBATCH --ntasks=1",
+        f'#SBATCH --cpus-per-task={machine["cpus"]}', f'#SBATCH --mem={machine["memory"]}',
+        f'#SBATCH --time={machine["walltime"]}', "#SBATCH --output=slurm-%x-%j.out",
+        "#SBATCH --error=slurm-%x-%j.err", "",
+    ]
+    (run_dir / "submit.slurm").write_text("\n".join([*header, *lines, ""]), encoding="utf-8")
 
 
 def run_pc(run_dir: Path, job_dir: Path, entry: Path) -> int:
@@ -164,7 +193,11 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("-j", "--job", help="Job folder under mlip/codes/.")
     p.add_argument("-m", "--machine", choices=names, default="pc", help="Machine profile to use.")
     p.add_argument("--entry", help="Python file inside the job folder. Required for ambiguous folders.")
-    p.add_argument("--dry-run", action="store_true", help="Create manifest and wrappers without running.")
+    p.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="For pc/slurm, create wrappers without running. Dart/dungeon run directly.",
+    )
     p.add_argument("--list-jobs", action="store_true", help="List folders under mlip/codes and exit.")
     return p
 
@@ -186,7 +219,8 @@ def main(argv: list[str] | None = None) -> int:
     run_id = f"{datetime.now():%Y%m%d_%H%M%S}_{args.job.replace(' ', '_')}_{args.machine}"
     run_dir = OUT / run_id
     run_dir.mkdir(parents=True, exist_ok=False)
-    write_outputs(run_dir, args.job, job_dir, entry, machine, dry_run=args.dry_run)
+    direct_gpu = args.machine != "pc" and machine["scheduler"] == "local"
+    write_outputs(run_dir, args.job, job_dir, entry, machine, dry_run=args.dry_run and not direct_gpu)
 
     dry_wrapper, remote_name, remote_command = paths(run_dir, machine)
     print(f"Run id: {run_id}")
@@ -195,6 +229,11 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Machine: {machine['name']}")
     print(f"Output directory: {run_dir}")
     print(f"Manifest: {run_dir / 'manifest.json'}")
+
+    if direct_gpu:
+        command = gpu_command(args.job, entry.relative_to(job_dir).as_posix(), machine)
+        print(f"Running GPU command: {command}")
+        return subprocess.run(["bash", "-lc", command], check=False).returncode
 
     if args.dry_run:
         print(f"Dry run only. Wrapper: {dry_wrapper}")

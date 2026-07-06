@@ -18,7 +18,7 @@ os.environ["OMP_PLACES"] = "threads"
 from ase.io import read
 from ase import units
 from ase.md.langevin import Langevin
-from ase.md.nptberendsen import NPTBerendsen
+from ase.md.nose_hoover_chain import MTKNPT
 from ase.md.velocitydistribution import (
     Stationary,
     ZeroRotation,
@@ -86,7 +86,7 @@ def simpleMD(init_conf, temp, pressure_gpa, calc, fname, s, T, T_thermo=100):
     # ----------------------------
     thermo = Langevin(
         init_conf,
-        timestep=0.1 * units.fs,
+        timestep=0.5 * units.fs,
         temperature_K=temp,
         friction=0.01 / units.fs,   # damping time ~100 fs
     )
@@ -103,14 +103,13 @@ def simpleMD(init_conf, temp, pressure_gpa, calc, fname, s, T, T_thermo=100):
     # 2. NPT production run
     # ----------------------
     pressure_au = pressure_gpa * units.GPa
-    dyn = NPTBerendsen(
+    dyn = MTKNPT(
         init_conf,
-        timestep=0.2 * units.fs,
+        timestep=0.5 * units.fs,
         temperature_K=temp,
         pressure_au=pressure_au,
-        taut=100 * units.fs,
-        taup=1000 * units.fs,
-        compressibility_au=WATER_COMPRESSIBILITY_AU,
+        tdamp=100 * units.fs,
+        pdamp=1000 * units.fs
     )
 
     output_dir = os.path.dirname(fname)
@@ -223,6 +222,6 @@ simpleMD(
     pressure_gpa=pressuregpa,
     calc=mace_calc,
     fname=os.path.join(MD_RESULTS_DIR, f"mace_1500K_density_{densitygcm3}.xyz"),
-    s=100,
-    T=10000,
+    s=10,
+    T=100000,
 )
