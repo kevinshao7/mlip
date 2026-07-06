@@ -40,7 +40,7 @@ torch.set_num_interop_threads(1)
 from mace.calculators import mace_polar
 
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 MD_RESULTS_DIR = os.path.join(PROJECT_ROOT, "MDresults")
 
 #generate initial configuration

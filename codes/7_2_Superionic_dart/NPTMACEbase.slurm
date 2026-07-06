@@ -23,6 +23,6 @@ export CUDA_VISIBLE_DEVICES=
 echo "Job started on $(hostname)"
 echo "CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-unset}"
 
-cd /ptmp/kshao/mlip/codesVP/6_26_NPT_MACE/expand
-# Local GPU campaign without Slurm: source ~/env/bin/activate && cd ~/mlip/codesVP/6_26_NPT_MACE/expand && CUDA_VISIBLE_DEVICES=0 MLIP_MACE_DEVICE=cuda bash -lc 'for f in npt_*.py; do python "$f"; done'
+cd /ptmp/kshao/mlip/codes/7_2_Superionic_dart
+# Local GPU campaign without Slurm: source ~/env/bin/activate && cd ~/mlip/codes/7_2_Superionic_dart && CUDA_VISIBLE_DEVICES=0 MLIP_MACE_DEVICE=cuda python NPTMACEbase.py
 srun python NPTMACEbase.py

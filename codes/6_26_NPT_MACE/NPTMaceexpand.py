@@ -150,14 +150,14 @@ def make_script(base_text: str, row: dict[str, float], temp_name: str, comp_name
 def make_slurm(base_text: str, run_id: str, py_name: str) -> str:
     text = re.sub(r"^# Local GPU campaign without Slurm: .*\n", "", base_text, flags=re.MULTILINE)
     text = replace_once(text, r"^#SBATCH --job-name=.*$", f"#SBATCH --job-name=npt_{run_id}")
-    text = replace_once(text, r"^cd .*$", "cd /ptmp/kshao/mlip/codesVP/6_26_NPT_MACE/expand")
+    text = replace_once(text, r"^cd .*$", "cd /ptmp/kshao/mlip/codes/6_26_NPT_MACE/expand")
     text = replace_once(
         text,
         r"^srun python .*$",
         (
             "# Local GPU run without Slurm: "
             "source ~/env/bin/activate && "
-            "cd ~/mlip/codesVP/6_26_NPT_MACE/expand && "
+            "cd ~/mlip/codes/6_26_NPT_MACE/expand && "
             f"CUDA_VISIBLE_DEVICES=0 MLIP_MACE_DEVICE=cuda python {py_name}\n"
             f"srun python {py_name}"
         ),

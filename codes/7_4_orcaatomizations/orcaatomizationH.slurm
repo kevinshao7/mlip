@@ -12,4 +12,5 @@ set -e
 module purge
 module load orca
 
-C:\ORCA_6.1.1\orca.exe C:\Users\shaoq\Documents\Mainz\mlip\codesPC\orcaatomizations\orcaatomizationH.inp > C:\Users\shaoq\Documents\Mainz\mlip\codesPC\orcaatomizations\orcaatomizationH.out
+cd /ptmp/kshao/mlip/codes/7_4_orcaatomizations
+orca orcaatomizationH.inp > orcaatomizationH.out

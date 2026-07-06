@@ -8,7 +8,7 @@ This script:
 4. generates matching ORCA ``.inp`` and Slurm ``.slurm`` files.
 
 Default behavior is tuned for the current trajectories in
-``codesVP/6_26_NPT_MACE/expand/MDresults``:
+``codes/6_26_NPT_MACE/expand/MDresults``:
 - 100 clusters per run,
 - skip frame 0 and use frames 1..100 when available,
 - prefer N-containing components as cluster centers when present,
@@ -38,8 +38,8 @@ from aseMolec import anaAtoms  # noqa: E402
 
 
 ORCA_METHOD_LINE = "! wB97M-V def2-TZVPP TightSCF PAL8"
-DEFAULT_INPUT_ROOT = REPO_ROOT / "codesVP" / "6_26_NPT_MACE" / "expand" / "MDresults"
-DEFAULT_OUTPUT_ROOT = REPO_ROOT / "codesVP" / "clustervalidation"
+DEFAULT_INPUT_ROOT = REPO_ROOT / "codes" / "6_26_NPT_MACE" / "expand" / "MDresults"
+DEFAULT_OUTPUT_ROOT = REPO_ROOT / "codes" / "clustervalidation" / "expand"
 
 
 @dataclass(frozen=True)
