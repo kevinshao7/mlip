@@ -141,8 +141,10 @@ def gpu_command(job: str, rel_entry: str, machine: dict) -> str:
     setup = [f'source {machine["venv_activate"]}'] if machine["venv_activate"] else []
     return " && ".join([
         *setup,
+        "export PYTHONNOUSERSITE=1",
+        *machine["env_lines"],
         f'cd "{remote_cwd}"',
-        f'CUDA_VISIBLE_DEVICES=0 MLIP_MACE_DEVICE=cuda {machine["python"]} "{remote_entry}"',
+        f'{machine["python"]} "{remote_entry}"',
     ])
 
 
