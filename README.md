@@ -26,7 +26,23 @@ https://www.faccts.de/orca/
 
    - Want to run DFT of NH3, H2O, H2S over weekend, need to familiarize with rest of pipeloine
 
+## Useful Commands
+----------Agentic Coding-----------
+Careful of context limit
+Write and read own commits
+Separate planning and implementation
+Specify test cases
+Ask any clarifications first
+Dont use jupyter notebook
+Dont overengineer
 
+
+
+----------------------GIT-----------
+git commit -m "6/17b"
+git push
+
+ssh-keygen -t ed25519 -C "shaoqihen@gmail.com"
 
 ## Dependencies
 
