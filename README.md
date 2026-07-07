@@ -50,6 +50,7 @@ This project depends on the following external repositories, which should be clo
 
 wget https://github.com/ACEsuit/mace-foundations/releases/download/mace_polar_1/MACE-POLAR-1-M.model
 
+Need python 3.11!!!!
 ```bash
 git clone https://github.com/ACEsuit/mace.git
 cd mace
