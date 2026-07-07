@@ -109,7 +109,7 @@ def simpleMD(init_conf, temp, pressure_gpa, calc, fname, s, T, T_thermo=100):
         temperature_K=temp,
         pressure_au=pressure_au,
         tdamp=100 * units.fs,
-        pdamp=1000 * units.fs
+        pdamp=2000 * units.fs
     )
 
     output_dir = os.path.dirname(fname)
@@ -223,5 +223,5 @@ simpleMD(
     calc=mace_calc,
     fname=os.path.join(MD_RESULTS_DIR, f"mace_1500K_density_{densitygcm3}.xyz"),
     s=10,
-    T=100000,
+    T=500000,
 )
