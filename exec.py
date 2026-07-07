@@ -1,16 +1,22 @@
 #!/usr/bin/env python3
-"""Run a job folder from mlip/codes on pc, dart, dungeon, raven, or viper-cpu.
+"""Run a job folder from mlip/codes on local, direct-GPU, or Slurm profiles.
 
 Commands:
     python exec.py --list-jobs
     python exec.py -j 7_6_jaxoutputs -m pc
     python exec.py -j 7_6_jaxoutputs -m viper-cpu --dry-run
     python exec.py -j 6_26_NPT_MACE -m raven --entry NPTMACEbase.py --dry-run
-    python exec.py -j 6_26_NPT_MACE -m dungeon --entry expand/npt_r09_hot_w7n1.py --dry-run
+    python exec.py -j 6_26_NPT_MACE -m dungeon-gpu0 --entry expand/npt_r09_hot_w7n1.py
+    python exec.py -j 6_26_NPT_MACE -m stormy-gpu1 --entry expand/npt_r09_hot_w7n1.py
 
-For non-PC machines, copy/sync the repo to that machine, then run the generated
-wrapper in outputsfull/<run_id>/. For dart/dungeon, run exec.py on that machine;
-those profiles execute the GPU command directly, even if --dry-run is present.
+Profiles:
+    pc: run locally on this machine.
+    dart-gpu0/dart-gpu1, dungeon-gpu0/dungeon-gpu1, stormy-gpu0/stormy-gpu1:
+        run directly on that machine without Slurm, using CUDA_VISIBLE_DEVICES.
+    raven, viper-cpu: write a Slurm wrapper in outputsfull/<run_id>/.
+
+For non-PC machines, copy/sync the repo to that machine first. Direct-GPU profiles
+execute immediately on that machine, even if --dry-run is present.
 
 Use machines.local.json to add/override machine profiles; machines.example.json
 contains a complete template.
@@ -198,7 +204,7 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--dry-run",
         action="store_true",
-        help="For pc/slurm, create wrappers without running. Dart/dungeon run directly.",
+        help="For pc/slurm, create wrappers without running. Local GPU profiles run directly.",
     )
     p.add_argument("--list-jobs", action="store_true", help="List folders under mlip/codes and exit.")
     return p
