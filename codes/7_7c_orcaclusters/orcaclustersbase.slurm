@@ -1,5 +1,5 @@
 #!/bin/bash -l
-#SBATCH --job-name=orca_E0_S
+#SBATCH --job-name=__JOB_NAME__
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=64G
@@ -12,5 +12,5 @@ set -e
 module purge
 module load orca
 
-cd /ptmp/kshao/mlip/codes/7_7c_orcaclusters
-orca orcaatomizationS.inp > orcaatomizationS.out
+cd /ptmp/kshao/mlip/codes/7_7c_orcaclusters/expand
+orca __INPUT_FILE__ > __OUTPUT_FILE__
