@@ -2,12 +2,14 @@
 """Run a job folder from mlip/codes on local, direct-GPU, or Slurm profiles.
 
 Commands:
-    python exec.py --list-jobs
-    python exec.py -j 7_6_jaxoutputs -m pc
-    python exec.py -j 7_6_jaxoutputs -m viper-cpu --dry-run
-    python exec.py -j 6_26_NPT_MACE -m raven --entry NPTMACEbase.py --dry-run
-    python exec.py -j 6_26_NPT_MACE -m dungeon-gpu0 --entry expand/npt_r09_hot_w7n1.py
-    python exec.py -j 6_26_NPT_MACE -m stormy-gpu1 --entry expand/npt_r09_hot_w7n1.py
+    python ~/mlip/exec.py --list-jobs
+    python ~/mlip/exec.py -j 7_6_jaxoutputs -m pc
+    python ~/mlip/exec.py -j 7_6_jaxoutputs -m viper-cpu --dry-run
+    python ~/mlip/exec.py -j 6_26_NPT_MACE -m raven --entry NPTMACEbase.py --dry-run
+    python ~/mlip/exec.py -j 6_26_NPT_MACE -m dungeon-gpu0 --entry expand/npt_r09_hot_w7n1.py
+    python ~/mlip/exec.py -j 6_26_NPT_MACE -m stormy-gpu1 --entry expand/npt_r09_hot_w7n1.py
+
+Use the ~/mlip/exec.py path so the command works from any current directory.
 
 Profiles:
     pc: run locally on this machine.
@@ -142,11 +144,15 @@ def remote_paths(job: str, rel_entry: str, machine: dict) -> tuple[str, str]:
     return remote_cwd, entry_path.name
 
 
-def gpu_command(job: str, rel_entry: str, machine: dict) -> str:
+def gpu_command(run_dir: Path, job: str, rel_entry: str, machine: dict) -> str:
     remote_cwd, remote_entry = remote_paths(job, rel_entry, machine)
+    remote_out = f'{machine["root"]}/outputsfull/{run_dir.name}'
     setup = [f'source {machine["venv_activate"]}'] if machine["venv_activate"] else []
     return " && ".join([
         *setup,
+        f'export MLIP_ROOT="{machine["root"]}"',
+        f'export MLIP_OUTPUT_DIR="{remote_out}"',
+        'mkdir -p "$MLIP_OUTPUT_DIR"',
         "export PYTHONNOUSERSITE=1",
         *machine["env_lines"],
         f'cd "{remote_cwd}"',
@@ -239,7 +245,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Manifest: {run_dir / 'manifest.json'}")
 
     if direct_gpu:
-        command = gpu_command(args.job, entry.relative_to(job_dir).as_posix(), machine)
+        command = gpu_command(run_dir, args.job, entry.relative_to(job_dir).as_posix(), machine)
         print(f"Running GPU command: {command}")
         return subprocess.run(["bash", "-lc", command], check=False).returncode
 
