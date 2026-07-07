@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-DEFAULT_FOLDER = Path(r"C:\Users\shaoq\Documents\Mainz\mlip\outputsfull\r09_hot_w7n1")
+DEFAULT_FOLDER = Path(r"C:\Users\shaoq\Documents\Mainz\mlip\outputsfull\r09_hot_w")
 OUT_DIR = Path(__file__).resolve().parent
 AMU_TO_G = 1.66053906660e-24
 ANG3_TO_CM3 = 1e-24

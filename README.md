@@ -45,6 +45,14 @@ git push
 ssh-keygen -t ed25519 -C "shaoqihen@gmail.com"
 
 ## Dependencies
+For plots on PC, use 
+C:\Users\shaoq\AppData\Local\Programs\Python\Python312\python.exe
+Python 3.12.10
+pip 25.0.1
+numpy 2.5.0
+matplotlib 3.11.0
+
+
 
 This project depends on the following external repositories, which should be cloned separately into the project root:
 
