@@ -9,7 +9,6 @@ import numpy as np
 
 
 DEFAULT_FOLDER = Path(r"C:\Users\shaoq\Documents\Mainz\mlip\outputsfull\r09_hot_w")
-OUT_DIR = Path(__file__).resolve().parent
 AMU_TO_G = 1.66053906660e-24
 ANG3_TO_CM3 = 1e-24
 MASSES = {"H": 1.00784, "C": 12.011, "N": 14.0067, "O": 15.999, "S": 32.06}
@@ -95,7 +94,9 @@ def plot(folder: Path) -> Path:
     for ax in axes:
         ax.grid(alpha=0.25)
 
-    out = OUT_DIR / f"{txt.stem}_summary.png"
+    out_dir = txt.parent / "plots"
+    out_dir.mkdir(exist_ok=True)
+    out = out_dir / f"{txt.stem}_summary.png"
     fig.suptitle(txt.parent.name)
     fig.savefig(out, dpi=200)
     plt.close(fig)

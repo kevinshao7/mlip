@@ -9,7 +9,6 @@ import numpy as np
 
 
 DEFAULT_FOLDER = Path(r"C:\Users\shaoq\Documents\Mainz\mlip\outputsfull\r09_hot_w")
-OUT_DIR = Path(__file__).resolve().parent
 AMU_TO_G = 1.66053906660e-24
 ANG3_TO_CM3 = 1e-24
 MASSES = {"H": 1.00784, "C": 12.011, "N": 14.0067, "O": 15.999, "S": 32.06}
@@ -126,7 +125,9 @@ def plot_timeseries(txt: Path, data: dict[str, np.ndarray], cutoff_ps: float) ->
         ax.grid(alpha=0.25)
     axes[0].legend(loc="best", fontsize=8)
     axes[-1].set_xlabel("Time (ps)")
-    out = OUT_DIR / f"{txt.stem}_cutoff_timeseries.png"
+    out_dir = txt.parent / "plots"
+    out_dir.mkdir(exist_ok=True)
+    out = out_dir / f"{txt.stem}_cutoff_timeseries.png"
     fig.suptitle(f"{txt.parent.name}: production starts at {cutoff_ps:g} ps")
     fig.savefig(out, dpi=200)
     plt.close(fig)
@@ -154,7 +155,9 @@ def plot_blocks(txt: Path, data: dict[str, np.ndarray], cutoff_ps: float) -> Pat
         ax.grid(alpha=0.25)
     axes[0].legend(loc="best", fontsize=7)
     axes[-1].set_xlabel("Production time (ps)")
-    out = OUT_DIR / f"{txt.stem}_block_averages.png"
+    out_dir = txt.parent / "plots"
+    out_dir.mkdir(exist_ok=True)
+    out = out_dir / f"{txt.stem}_block_averages.png"
     fig.suptitle(f"Block averages after {cutoff_ps:g} ps cutoff")
     fig.savefig(out, dpi=200)
     plt.close(fig)
@@ -176,7 +179,9 @@ def plot_acf(txt: Path, data: dict[str, np.ndarray], cutoff_ps: float) -> Path:
         ax.set_ylabel(label)
         ax.grid(alpha=0.25)
     axes[-1].set_xlabel("Lag time (ps)")
-    out = OUT_DIR / f"{txt.stem}_autocorrelation.png"
+    out_dir = txt.parent / "plots"
+    out_dir.mkdir(exist_ok=True)
+    out = out_dir / f"{txt.stem}_autocorrelation.png"
     fig.suptitle(f"FFT autocorrelation after {cutoff_ps:g} ps cutoff")
     fig.savefig(out, dpi=200)
     plt.close(fig)

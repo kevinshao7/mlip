@@ -1,340 +1,293 @@
-#!/usr/bin/env python3
-"""Extract finite clusters from MD trajectories for ORCA validation.
-
-This script:
-1. wraps whole molecules/components with ``aseMolec.anaAtoms.wrap_molecs``,
-2. selects one cluster from each saved production frame,
-3. writes each cluster to its own ``.xyz`` file in vacuum,
-4. generates matching ORCA ``.inp`` and Slurm ``.slurm`` files.
-
-Default behavior is tuned for the current trajectories in
-``codes/6_26_NPT_MACE/expand/MDresults``:
-- 100 clusters per run,
-- skip frame 0 and use frames 1..100 when available,
-- prefer N-containing components as cluster centers when present,
-- otherwise choose the component nearest the box center,
-- include all wrapped components whose center-of-mass lies within 5.0 A of the
-  chosen center component COM.
-"""
-
 from __future__ import annotations
 
 import argparse
+import csv
 import sys
-from dataclasses import dataclass
+import types
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 from ase import Atoms
 from ase.io import read, write
 
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-ASEMOLEC_ROOT = REPO_ROOT / "aseMolec"
-if str(ASEMOLEC_ROOT) not in sys.path:
-    sys.path.insert(0, str(ASEMOLEC_ROOT))
-
-from aseMolec import anaAtoms  # noqa: E402
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parents[1]
+DEFAULT_RUN = REPO_ROOT / "outputsfull" / "r09_hot_w7n1"
 
 
-ORCA_METHOD_LINE = "! wB97M-V def2-TZVPP TightSCF PAL8"
-DEFAULT_INPUT_ROOT = REPO_ROOT / "codes" / "6_26_NPT_MACE" / "expand" / "MDresults"
-DEFAULT_OUTPUT_ROOT = REPO_ROOT / "codes" / "clustervalidation" / "expand"
+def import_anaatoms():
+    if "ase_ga.utilities" not in sys.modules:
+        ase_ga = types.ModuleType("ase_ga")
+        utilities = types.ModuleType("ase_ga.utilities")
+        utilities.get_rdf = lambda *args, **kwargs: None
+        ase_ga.utilities = utilities
+        sys.modules["ase_ga"] = ase_ga
+        sys.modules["ase_ga.utilities"] = utilities
+    sys.path.insert(0, str(REPO_ROOT / "aseMolec"))
+    from aseMolec import anaAtoms
+
+    return anaAtoms
 
 
-@dataclass(frozen=True)
-class MoleculeRecord:
-    mol_id: int
-    atom_indices: np.ndarray
-    com: np.ndarray
-    symbols: tuple[str, ...]
-
-    @property
-    def has_nitrogen(self) -> bool:
-        return "N" in self.symbols
+anaAtoms = import_anaatoms()
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--input-root",
-        type=Path,
-        default=DEFAULT_INPUT_ROOT,
-        help="Directory containing per-run MD trajectory subdirectories.",
-    )
-    parser.add_argument(
-        "--output-root",
-        type=Path,
-        default=DEFAULT_OUTPUT_ROOT,
-        help="Directory to create cluster validation files in.",
-    )
-    parser.add_argument(
-        "--clusters-per-run",
-        type=int,
-        default=100,
-        help="Number of clusters to extract from each run.",
-    )
-    parser.add_argument(
-        "--cluster-radius-angstrom",
-        type=float,
-        default=5.0,
-        help="Include wrapped molecular components whose COM is within this radius.",
-    )
-    parser.add_argument(
-        "--vacuum-box-angstrom",
-        type=float,
-        default=24.0,
-        help="Cubic non-periodic box size assigned to extracted clusters.",
-    )
-    return parser.parse_args()
+def find_xyz(run_dir: Path) -> Path:
+    files = sorted(run_dir.glob("*.xyz"), key=lambda p: (p.stat().st_mtime, p.name), reverse=True)
+    if not files:
+        raise FileNotFoundError(f"No .xyz trajectory found in {run_dir}")
+    return files[0]
 
 
-def list_runs(input_root: Path) -> list[tuple[str, Path]]:
-    runs: list[tuple[str, Path]] = []
-    for run_dir in sorted(path for path in input_root.iterdir() if path.is_dir()):
-        traj = run_dir / f"{run_dir.name}.xyz"
-        if traj.is_file():
-            runs.append((run_dir.name, traj))
-    if not runs:
-        raise FileNotFoundError(f"No run trajectories found in {input_root}")
-    return runs
+def default_output_dir(run_dir: Path) -> Path:
+    return run_dir / "cluster_validation"
 
 
-def choose_frame_indices(n_frames: int, n_clusters: int) -> np.ndarray:
-    if n_frames < 2:
-        raise ValueError("Need at least 2 frames to skip initialization and extract clusters.")
-    available = np.arange(1, n_frames, dtype=int)
-    if len(available) < n_clusters:
-        raise ValueError(
-            f"Requested {n_clusters} clusters but only {len(available)} post-initialization "
-            f"frames are available."
-        )
-    if len(available) == n_clusters:
-        return available
-    positions = np.linspace(0, len(available) - 1, num=n_clusters)
-    return available[np.round(positions).astype(int)]
+def frame_times_ps(run_dir: Path, n_frames: int) -> np.ndarray:
+    txts = sorted(run_dir.glob("*thermo*.txt"))
+    if txts:
+        header = txts[0].read_text(encoding="utf-8", errors="ignore").splitlines()[0].lstrip("#").split()
+        data = np.atleast_2d(np.loadtxt(txts[0]))
+        if "time_fs" in header and len(data) >= n_frames:
+            return data[:n_frames, header.index("time_fs")] / 1000.0
+    return np.arange(n_frames, dtype=float)
 
 
-def build_molecule_records(atoms: Atoms, mol_coms: Atoms) -> list[MoleculeRecord]:
+def production_indices(times_ps: np.ndarray, cutoff_ps: float, count: int, stride: int) -> np.ndarray:
+    available = np.flatnonzero(times_ps >= cutoff_ps)
+    if available.size == 0:
+        raise ValueError(f"Cutoff {cutoff_ps:g} ps leaves no frames.")
+    available = available[:: max(1, stride)]
+    if count > 0 and available.size > count:
+        available = available[np.round(np.linspace(0, available.size - 1, count)).astype(int)]
+    return available
+
+
+def minimum_image(delta: np.ndarray, lengths: np.ndarray) -> np.ndarray:
+    return delta - np.rint(delta / lengths) * lengths
+
+
+def wrapped_molecules(atoms: Atoms, bond_fct: float) -> tuple[Atoms, list[np.ndarray], np.ndarray]:
+    atoms = atoms.copy()
+    anaAtoms.find_molecs([atoms], fct=bond_fct)
     mol_ids = atoms.arrays["molID"]
-    records: list[MoleculeRecord] = []
+    indices: list[np.ndarray] = []
+    centers = []
     for mol_id in np.unique(mol_ids):
-        atom_indices = np.flatnonzero(mol_ids == mol_id)
-        mol = atoms[atom_indices]
-        records.append(
-            MoleculeRecord(
-                mol_id=int(mol_id),
-                atom_indices=atom_indices,
-                com=np.array(mol_coms.positions[int(mol_id)], dtype=float),
-                symbols=tuple(mol.get_chemical_symbols()),
-            )
-        )
-    return records
+        idx = np.flatnonzero(mol_ids == mol_id)
+        mol = atoms[idx]
+        center = anaAtoms.wrap_molec(mol, fct=bond_fct)
+        atoms.positions[idx] = mol.positions
+        indices.append(idx)
+        centers.append(center)
+    return atoms, indices, np.array(centers)
 
 
-def minimum_image_displacement(delta: np.ndarray, cell_lengths: np.ndarray) -> np.ndarray:
-    wrapped = np.array(delta, dtype=float, copy=True)
-    for axis in range(3):
-        length = cell_lengths[axis]
-        if length > 0.0:
-            wrapped[axis] -= np.rint(wrapped[axis] / length) * length
-    return wrapped
-
-
-def choose_center_record(records: list[MoleculeRecord], cell_lengths: np.ndarray) -> MoleculeRecord:
-    box_center = 0.5 * cell_lengths
-    candidates = [record for record in records if record.has_nitrogen]
-    if not candidates:
-        candidates = records
-    return min(
-        candidates,
-        key=lambda record: np.linalg.norm(
-            minimum_image_displacement(record.com - box_center, cell_lengths)
-        ),
-    )
-
-
-def extract_cluster(
+def cluster_for_center(
     atoms: Atoms,
-    radius_angstrom: float,
-    vacuum_box_angstrom: float,
-) -> tuple[Atoms, dict[str, object]]:
-    mol_coms = anaAtoms.wrap_molecs([atoms], returnMols=True)[0]
-    records = build_molecule_records(atoms, mol_coms)
-    cell_lengths = np.array(atoms.cell.lengths(), dtype=float)
-    center_record = choose_center_record(records, cell_lengths)
+    molecule_indices: list[np.ndarray],
+    centers: np.ndarray,
+    center_id: int,
+    cutoff: float,
+    vacuum: float,
+) -> tuple[Atoms, list[int]]:
+    lengths = atoms.cell.lengths()
+    center_pos = atoms.positions[molecule_indices[center_id]]
+    selected_positions = []
+    selected_symbols = []
+    selected_molecules = []
 
-    selected_atom_indices: list[int] = []
-    selected_mol_ids: list[int] = []
-    for record in records:
-        displacement = minimum_image_displacement(record.com - center_record.com, cell_lengths)
-        if np.linalg.norm(displacement) <= radius_angstrom:
-            selected_atom_indices.extend(record.atom_indices.tolist())
-            selected_mol_ids.append(record.mol_id)
+    for mol_id, idx in enumerate(molecule_indices):
+        shift = minimum_image(centers[mol_id] - centers[center_id], lengths)
+        pos = atoms.positions[idx] + (centers[center_id] + shift - centers[mol_id])
+        if np.linalg.norm(pos[:, None, :] - center_pos[None, :, :], axis=2).min() <= cutoff:
+            selected_positions.extend(pos.tolist())
+            selected_symbols.extend(np.array(atoms.get_chemical_symbols())[idx].tolist())
+            selected_molecules.append(mol_id)
 
-    selected_atom_indices = sorted(selected_atom_indices)
-    cluster = atoms[selected_atom_indices]
-    cluster.set_pbc(False)
-    cluster.set_cell([vacuum_box_angstrom] * 3)
-
-    center_mask = np.isin(selected_atom_indices, center_record.atom_indices)
-    center_positions = cluster.positions[np.asarray(center_mask, dtype=bool)]
-    center_symbols = np.array(cluster.get_chemical_symbols())[np.asarray(center_mask, dtype=bool)]
-    center_masses = Atoms(symbols=center_symbols).get_masses()
-    center_of_mass = np.average(center_positions, axis=0, weights=center_masses)
-    cluster.positions += 0.5 * vacuum_box_angstrom - center_of_mass
-
-    metadata = {
-        "center_mol_id": center_record.mol_id,
-        "center_formula": atoms[center_record.atom_indices].get_chemical_formula(),
-        "selected_molecule_ids": ",".join(str(mol_id) for mol_id in selected_mol_ids),
-        "cluster_radius_angstrom": radius_angstrom,
-        "source_charge": int(atoms.info.get("charge", 0)),
-        "source_multiplicity": int(atoms.info.get("spin", 1)),
-    }
-    cluster.info.update(metadata)
-    return cluster, metadata
+    cluster = Atoms(symbols=selected_symbols, positions=np.array(selected_positions), pbc=False)
+    cluster.set_cell([vacuum, vacuum, vacuum])
+    cluster.positions += 0.5 * vacuum - cluster.get_center_of_mass()
+    return cluster, selected_molecules
 
 
-def xyz_geometry_block(atoms: Atoms) -> str:
-    lines = []
-    for symbol, position in zip(atoms.get_chemical_symbols(), atoms.positions):
-        lines.append(
-            f"{symbol:2s} {position[0]: .10f} {position[1]: .10f} {position[2]: .10f}"
-        )
-    return "\n".join(lines)
+def choose_cluster(atoms: Atoms, cutoff: float, bond_fct: float, target: tuple[int, int], vacuum: float) -> tuple[Atoms, int]:
+    atoms, mol_indices, centers = wrapped_molecules(atoms, bond_fct)
+    lengths = atoms.cell.lengths()
+    order = np.argsort(np.linalg.norm(minimum_image(centers - 0.5 * lengths, lengths), axis=1))
+    best = None
+    best_score = float("inf")
+
+    for center_id in order:
+        cluster, selected_molecules = cluster_for_center(atoms, mol_indices, centers, int(center_id), cutoff, vacuum)
+        cluster.info["selected_molecules"] = ",".join(str(i) for i in selected_molecules)
+        natoms = len(cluster)
+        if target[0] <= natoms <= target[1]:
+            return cluster, int(center_id)
+        score = min(abs(natoms - target[0]), abs(natoms - target[1]))
+        if score < best_score:
+            best = (cluster, int(center_id))
+            best_score = score
+    if best is None:
+        raise RuntimeError("No cluster could be extracted.")
+    return best
 
 
-def write_orca_input(path: Path, xyz_path: Path, atoms: Atoms) -> None:
-    charge = int(atoms.info.get("source_charge", atoms.info.get("charge", 0)))
-    multiplicity = int(atoms.info.get("source_multiplicity", atoms.info.get("spin", 1)))
-    text = (
-        f"{ORCA_METHOD_LINE}\n\n"
-        "%pal\n"
-        "  nprocs 8\n"
-        "end\n\n"
-        f"* XYZ {charge} {multiplicity}\n"
-        f"{xyz_geometry_block(atoms)}\n"
-        "*\n"
-    )
-    path.write_text(text, encoding="utf-8")
+def rdf_pairs(frames: list[Atoms]) -> list[tuple[str, str]]:
+    symbols = sorted({symbol for atoms in frames for symbol in atoms.get_chemical_symbols()})
+    preferred = ["O", "N", "H"]
+    symbols = [sym for sym in preferred if sym in symbols] + [sym for sym in symbols if sym not in preferred]
+    return [(a, b) for i, a in enumerate(symbols) for b in symbols[i:]]
 
 
-def write_slurm_script(path: Path, job_name: str, inp_name: str, out_name: str) -> None:
-    text = f"""#!/bin/bash -l
-#SBATCH --job-name={job_name}
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=64G
-#SBATCH --time=1:00:00
-#SBATCH --output=slurm-%x-%j.out
-#SBATCH --error=slurm-%x-%j.err
+def rdf_for_frames(frames: list[Atoms], rmax: float, nbins: int, pairs: list[tuple[str, str]]) -> tuple[np.ndarray, dict[str, np.ndarray]]:
+    edges = np.linspace(0.0, rmax, nbins + 1)
+    r = 0.5 * (edges[:-1] + edges[1:])
+    shell = 4.0 * np.pi * r**2 * np.diff(edges)
+    accum = {f"{a}-{b}": np.zeros(nbins) for a, b in pairs}
 
-set -e
+    for atoms in frames:
+        symbols = np.array(atoms.get_chemical_symbols())
+        volume = atoms.get_volume()
+        distances = atoms.get_all_distances(mic=True)
+        for a, b in pairs:
+            ia = np.flatnonzero(symbols == a)
+            ib = np.flatnonzero(symbols == b)
+            if not len(ia) or not len(ib):
+                continue
+            if a == b:
+                d = distances[np.ix_(ia, ia)]
+                d = d[np.triu_indices_from(d, k=1)]
+                norm = 0.5 * len(ia) * (len(ib) / volume) * shell
+            else:
+                d = distances[np.ix_(ia, ib)].ravel()
+                norm = len(ia) * (len(ib) / volume) * shell
+            hist, _ = np.histogram(d[(d > 0.0) & (d < rmax)], bins=edges)
+            accum[f"{a}-{b}"] += hist / np.maximum(norm, 1e-30)
 
-module purge
-module load orca
-
-orca {inp_name} > {out_name}
-"""
-    path.write_text(text, encoding="utf-8")
-
-
-def write_submit_script(path: Path, slurm_paths: list[Path]) -> None:
-    lines = ["#!/bin/bash", "set -e"]
-    lines.extend(f"sbatch {slurm_path.name}" for slurm_path in slurm_paths)
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-
-
-def write_windows_run_script(path: Path, inp_paths: list[Path]) -> None:
-    lines = ["@echo off", "setlocal"]
-    total = len(inp_paths)
-    for index, inp_path in enumerate(inp_paths, start=1):
-        stem = inp_path.stem
-        lines.append(f"echo Running {index}/{total}: {inp_path.name}")
-        lines.append(f"orca {inp_path.name} > {stem}.out")
-        lines.append("if errorlevel 1 exit /b %errorlevel%")
-        lines.append(f"echo Finished {index}/{total}: {stem}.out")
-    lines.append("endlocal")
-    path.write_text("\r\n".join(lines) + "\r\n", encoding="utf-8")
+    for key in accum:
+        accum[key] /= len(frames)
+    return r, accum
 
 
-def process_run(
-    run_name: str,
-    trajectory_path: Path,
-    output_root: Path,
-    clusters_per_run: int,
-    cluster_radius_angstrom: float,
-    vacuum_box_angstrom: float,
-) -> None:
-    frames = read(trajectory_path, ":")
-    frame_indices = choose_frame_indices(len(frames), clusters_per_run)
-
-    run_output_dir = output_root / run_name
-    run_output_dir.mkdir(parents=True, exist_ok=True)
-
-    slurm_paths: list[Path] = []
-    inp_paths: list[Path] = []
-    manifest_lines = [
-        "# cluster_id frame_index natoms formula center_formula selected_molecule_ids"
-    ]
-
-    for cluster_number, frame_index in enumerate(frame_indices, start=1):
-        atoms = frames[int(frame_index)].copy()
-        cluster, metadata = extract_cluster(
-            atoms=atoms,
-            radius_angstrom=cluster_radius_angstrom,
-            vacuum_box_angstrom=vacuum_box_angstrom,
-        )
-        cluster.info["source_run"] = run_name
-        cluster.info["source_frame_index"] = int(frame_index)
-
-        stem = f"{run_name}_cluster_{cluster_number:03d}"
-        xyz_path = run_output_dir / f"{stem}.xyz"
-        inp_path = run_output_dir / f"{stem}.inp"
-        slurm_path = run_output_dir / f"{stem}.slurm"
-        out_name = f"{stem}.out"
-
-        write(xyz_path, cluster)
-        write_orca_input(inp_path, xyz_path, cluster)
-        write_slurm_script(slurm_path, job_name=stem, inp_name=inp_path.name, out_name=out_name)
-        slurm_paths.append(slurm_path)
-        inp_paths.append(inp_path)
-
-        manifest_lines.append(
-            " ".join(
-                [
-                    f"{cluster_number:03d}",
-                    str(int(frame_index)),
-                    str(len(cluster)),
-                    cluster.get_chemical_formula(),
-                    str(metadata["center_formula"]),
-                    str(metadata["selected_molecule_ids"]),
-                ]
-            )
-        )
-
-    write_submit_script(run_output_dir / "submit_all.sh", slurm_paths)
-    write_windows_run_script(run_output_dir / "run_all_windows.bat", inp_paths)
-    (run_output_dir / "manifest.txt").write_text(
-        "\n".join(manifest_lines) + "\n", encoding="utf-8"
-    )
+def plot_rdfs(path: Path, r: np.ndarray, rdfs: dict[str, np.ndarray], cutoff: float) -> None:
+    fig, ax = plt.subplots(figsize=(7.5, 4.8))
+    for key, rdf in rdfs.items():
+        ax.plot(r, rdf, label=key)
+    ax.axvline(cutoff, color="black", linestyle="--", linewidth=1.0, label=f"cluster cutoff {cutoff:g} A")
+    ax.set_xlabel("r (A)")
+    ax.set_ylabel("g(r)")
+    ax.grid(alpha=0.25)
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(path, dpi=200)
+    plt.close(fig)
 
 
 def main() -> None:
-    args = parse_args()
-    runs = list_runs(args.input_root)
-    args.output_root.mkdir(parents=True, exist_ok=True)
+    parser = argparse.ArgumentParser(description="Plot RDFs and extract DFT-sized water/NH3 clusters.")
+    parser.add_argument("--run-dir", type=Path, default=DEFAULT_RUN)
+    parser.add_argument("--output-dir", type=Path, default=None)
+    parser.add_argument("--cutoff-ps", type=float, default=25.0, help="Use frames at/after this time.")
+    parser.add_argument("--interaction-cutoff", type=float, default=2.0, help="Atom-atom cutoff for including whole molecules.")
+    parser.add_argument("--clusters", type=int, default=30)
+    parser.add_argument("--rdf-frames", type=int, default=80)
+    parser.add_argument("--stride", type=int, default=5)
+    parser.add_argument("--rmax", type=float, default=6.0)
+    parser.add_argument("--nbins", type=int, default=160)
+    parser.add_argument("--bond-fct", type=float, default=1.0, help="aseMolec molecular connectivity scale.")
+    parser.add_argument("--target-min-atoms", type=int, default=10)
+    parser.add_argument("--target-max-atoms", type=int, default=13)
+    parser.add_argument("--vacuum", type=float, default=24.0)
+    args = parser.parse_args()
+    if args.output_dir is None:
+        args.output_dir = default_output_dir(args.run_dir)
 
-    for run_name, trajectory_path in runs:
-        process_run(
-            run_name=run_name,
-            trajectory_path=trajectory_path,
-            output_root=args.output_root,
-            clusters_per_run=args.clusters_per_run,
-            cluster_radius_angstrom=args.cluster_radius_angstrom,
-            vacuum_box_angstrom=args.vacuum_box_angstrom,
+    xyz = find_xyz(args.run_dir)
+    frames = read(xyz, ":")
+    times_ps = frame_times_ps(args.run_dir, len(frames))
+    rdf_idx = production_indices(times_ps, args.cutoff_ps, args.rdf_frames, args.stride)
+    cluster_candidates = production_indices(times_ps, args.cutoff_ps, 0, args.stride)
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+    cluster_dir = args.output_dir / "clusters"
+    cluster_dir.mkdir(exist_ok=True)
+    run_name = args.run_dir.name
+    for old_cluster in cluster_dir.glob(f"{run_name}_cluster_*.xyz"):
+        old_cluster.unlink()
+
+    rdf_frames = [frames[int(i)] for i in rdf_idx]
+    pairs = rdf_pairs(rdf_frames)
+    r, rdfs = rdf_for_frames(rdf_frames, args.rmax, args.nbins, pairs)
+    rdf_path = args.output_dir / f"{run_name}_rdf.png"
+    plot_rdfs(rdf_path, r, rdfs, args.interaction_cutoff)
+
+    summary_path = args.output_dir / "cluster_summary.csv"
+    sizes = []
+    with summary_path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=[
+                "cluster_id", "frame", "time_ps", "natoms", "formula",
+                "n_O", "n_N", "n_H", "center_molecule", "selected_molecules", "good_size",
+            ],
         )
+        writer.writeheader()
+        cluster_no = 0
+        for frame_index in cluster_candidates:
+            cluster, center_id = choose_cluster(
+                frames[int(frame_index)],
+                args.interaction_cutoff,
+                args.bond_fct,
+                (args.target_min_atoms, args.target_max_atoms),
+                args.vacuum,
+            )
+            if not (args.target_min_atoms <= len(cluster) <= args.target_max_atoms):
+                continue
+            cluster_no += 1
+            sizes.append(len(cluster))
+            cluster.info.update({
+                "source_xyz": str(xyz),
+                "source_frame": int(frame_index),
+                "source_time_ps": float(times_ps[int(frame_index)]),
+                "interaction_cutoff_A": args.interaction_cutoff,
+                "center_molecule": center_id,
+            })
+            symbols = cluster.get_chemical_symbols()
+            out = cluster_dir / f"{run_name}_cluster_{cluster_no:03d}.xyz"
+            write(out, cluster)
+            writer.writerow({
+                "cluster_id": cluster_no,
+                "frame": int(frame_index),
+                "time_ps": f"{times_ps[int(frame_index)]:.6g}",
+                "natoms": len(cluster),
+                "formula": cluster.get_chemical_formula(),
+                "n_O": symbols.count("O"),
+                "n_N": symbols.count("N"),
+                "n_H": symbols.count("H"),
+                "center_molecule": center_id,
+                "selected_molecules": cluster.info.get("selected_molecules", ""),
+                "good_size": args.target_min_atoms <= len(cluster) <= args.target_max_atoms,
+            })
+            if cluster_no >= args.clusters:
+                break
+
+    sizes = np.array(sizes)
+    print(f"Input trajectory: {xyz}")
+    print(f"RDF frames: {len(rdf_frames)} after {args.cutoff_ps:g} ps")
+    print(f"RDF pairs: {', '.join(rdfs)}")
+    print(f"Saved RDF plot: {rdf_path}")
+    print(f"Saved clusters: {cluster_dir}")
+    if len(sizes) == 0:
+        raise RuntimeError(
+            f"No clusters found in the {args.target_min_atoms}-{args.target_max_atoms} atom target range. "
+            "Try increasing --interaction-cutoff or reducing --stride."
+        )
+    print(f"Cluster sizes: min={sizes.min()}, median={np.median(sizes):.0f}, max={sizes.max()}")
+    print(f"Good-size clusters ({args.target_min_atoms}-{args.target_max_atoms} atoms): "
+          f"{np.count_nonzero((sizes >= args.target_min_atoms) & (sizes <= args.target_max_atoms))}/{len(sizes)}")
+    print(f"Summary: {summary_path}")
 
 
 if __name__ == "__main__":
