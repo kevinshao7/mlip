@@ -18,7 +18,7 @@ os.environ["OMP_PLACES"] = "threads"
 from ase.io import read
 from ase import units
 from ase.md.langevin import Langevin
-from ase.md.nose_hoover_chain import MTKNPT
+from ase.md.nose_hoover_chain import IsotropicMTKNPT
 from ase.md.velocitydistribution import (
     Stationary,
     ZeroRotation,
@@ -103,7 +103,7 @@ def simpleMD(init_conf, temp, pressure_gpa, calc, fname, s, T, T_thermo=100):
     # 2. NPT production run
     # ----------------------
     pressure_au = pressure_gpa * units.GPa
-    dyn = MTKNPT(
+    dyn = IsotropicMTKNPT(
         init_conf,
         timestep=0.5 * units.fs,
         temperature_K=temp,
