@@ -2,7 +2,7 @@
 #SBATCH --job-name=jax
 
 #SBATCH --nodes=1
-
+#SBATCH --partition=gpudev
 #SBATCH --constraint="gpu"
 #SBATCH --gres=gpu:a100:4
 #SBATCH --mem=125G
@@ -25,4 +25,4 @@ echo "CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
 nvidia-smi
 cd /ptmp/kshao/jax/jaxmd-cli
 source .venv/bin/activate
-jaxmd-run /ptmp/kshao/jax/jaxmd-cli/codes/maceoff_water_npt.toml
+jaxmd-run /ptmp/kshao/jax/jaxmd-cli/codes/maceoff_npt.toml

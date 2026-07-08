@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-DEFAULT_FOLDER = Path(r"C:\Users\shaoq\Documents\Mainz\mlip\outputsfull\r09_hot_w")
+DEFAULT_FOLDER = Path(r"C:\Users\shaoq\Documents\Mainz\mlip\outputsfull\r09_hot_w7n1")
 AMU_TO_G = 1.66053906660e-24
 ANG3_TO_CM3 = 1e-24
 MASSES = {"H": 1.00784, "C": 12.011, "N": 14.0067, "O": 15.999, "S": 32.06}
@@ -41,8 +41,7 @@ def xyz_densities(path: Path) -> np.ndarray:
                 natoms = int(line.strip())
             except ValueError:
                 break
-            comment = fh.readline()
-            match = lattice_re.search(comment)
+            match = lattice_re.search(fh.readline())
             symbols = [fh.readline().split()[0] for _ in range(natoms)]
             if not match:
                 densities.append(np.nan)
@@ -62,34 +61,41 @@ def plot(folder: Path) -> Path:
     thermo = load_thermo(txt)
     time = thermo.get("time_fs", np.arange(len(next(iter(thermo.values())))))
     xyz = find_one(folder, f"{txt.stem.replace('_thermo', '')}*.xyz") or find_one(folder, "*.xyz")
-    density = xyz_densities(xyz) if xyz else np.array([])
-
-    fig, axes = plt.subplots(4, 1, figsize=(10, 11), sharex=True, constrained_layout=True)
-    axes[0].plot(time, thermo["temperature_K"])
-    axes[0].set_ylabel("Temperature (K)")
-
-    axes[1].plot(time, thermo["pressure_GPa"])
-    axes[1].set_ylabel("Pressure (GPa)")
-
-    if density.size:
+    if xyz:
+        density = xyz_densities(xyz)
         n = min(len(time), len(density))
-        axes[2].plot(time[:n], density[:n])
-    else:
-        axes[2].text(0.5, 0.5, "No XYZ lattice data found", ha="center", va="center",
-                     transform=axes[2].transAxes)
-    axes[2].set_ylabel("Density (g/cm^3)")
+        thermo["density_g_cm3"] = density[:n]
+        time = time[:n]
+        thermo = {key: val[:n] for key, val in thermo.items()}
+    panels = [
+        ("temperature_K", "Temperature (K)", False),
+        ("pressure_GPa", "Pressure (GPa)", False),
+        ("density_g_cm3", "Density (g/cm^3)", False),
+    ]
+    panels = [panel for panel in panels if panel[0] in thermo]
+    if any(col in thermo for col in ("energy_eV_per_atom", "kinetic_energy_eV_per_atom", "total_energy_eV_per_atom")):
+        panels.append(("energies", "Energy change (eV/atom)", True))
 
-    for col, label in [
-        ("energy_eV_per_atom", "Potential"),
-        ("kinetic_energy_eV_per_atom", "Kinetic"),
-        ("total_energy_eV_per_atom", "Total"),
-    ]:
-        if col in thermo:
-            y = thermo[col] - thermo[col][0]
-            axes[3].plot(time, y, label=label)
-    axes[3].set_ylabel("Energy change (eV/atom)")
-    axes[3].set_xlabel("Time (fs)")
-    axes[3].legend()
+    fig, axes = plt.subplots(len(panels), 1, figsize=(10, 2.7 * len(panels)), sharex=True, constrained_layout=True)
+    axes = np.atleast_1d(axes)
+
+    for ax, (col, ylabel, is_energy_panel) in zip(axes, panels):
+        if not is_energy_panel:
+            ax.plot(time, thermo[col])
+            ax.set_ylabel(ylabel)
+            continue
+        for energy_col, label in [
+            ("energy_eV_per_atom", "Potential"),
+            ("kinetic_energy_eV_per_atom", "Kinetic"),
+            ("total_energy_eV_per_atom", "Total"),
+        ]:
+            if energy_col in thermo:
+                y = thermo[energy_col] - thermo[energy_col][0]
+                ax.plot(time, y, label=label)
+        ax.set_ylabel(ylabel)
+        ax.legend()
+
+    axes[-1].set_xlabel("Time (fs)")
 
     for ax in axes:
         ax.grid(alpha=0.25)
