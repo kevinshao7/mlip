@@ -3,8 +3,9 @@
 
 #SBATCH --nodes=1
 #SBATCH --partition=gpudev
-#SBATCH --constraint="gpu"
-#SBATCH --mem=25G
+#SBATCH --gres=gpu:a100:1
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=30G
 #SBATCH --time=00:14:00
 #SBATCH --output=slurm-%x-%j.out
 #SBATCH --error=slurm-%x-%j.err
