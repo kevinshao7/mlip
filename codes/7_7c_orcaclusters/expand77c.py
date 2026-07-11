@@ -3,6 +3,10 @@
 
 Run from anywhere.  The generated .inp and .slurm files are written to the
 expand folder next to this script.
+
+Submit all generated Slurm files from the expand folder:
+    cd expand
+    for f in *.slurm; do sbatch "$f"; done
 """
 
 from __future__ import annotations

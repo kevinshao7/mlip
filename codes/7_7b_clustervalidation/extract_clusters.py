@@ -7,7 +7,6 @@ import sys
 import types
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import numpy as np
 from ase import Atoms
 from ase.io import read, write
@@ -47,7 +46,7 @@ def find_xyz(run_dir: Path) -> Path:
 
 
 def default_output_dir(run_dir: Path) -> Path:
-    return run_dir / "cluster_validation"
+    return run_dir
 
 
 def frame_times_ps(run_dir: Path, n_frames: int) -> np.ndarray:
@@ -140,76 +139,6 @@ def choose_cluster(atoms: Atoms, cutoff: float, bond_fct: float, target: tuple[i
     return best
 
 
-def rdf_pairs(frames: list[Atoms]) -> list[tuple[str, str]]:
-    symbols = sorted({symbol for atoms in frames for symbol in atoms.get_chemical_symbols()})
-    preferred = ["O", "N", "H"]
-    symbols = [sym for sym in preferred if sym in symbols] + [sym for sym in symbols if sym not in preferred]
-    return [(a, b) for i, a in enumerate(symbols) for b in symbols[i:]]
-
-
-def rdf_for_frame(task: tuple[Atoms, float, int, list[tuple[str, str]]]) -> dict[str, np.ndarray]:
-    atoms, rmax, nbins, pairs = task
-    edges = np.linspace(0.0, rmax, nbins + 1)
-    radii = 0.5 * (edges[:-1] + edges[1:])
-    shell = 4.0 * np.pi * radii**2 * np.diff(edges)
-    accum = {f"{a}-{b}": np.zeros(nbins) for a, b in pairs}
-
-    symbols = np.array(atoms.get_chemical_symbols())
-    volume = atoms.get_volume()
-    distances = atoms.get_all_distances(mic=True)
-    for a, b in pairs:
-        ia = np.flatnonzero(symbols == a)
-        ib = np.flatnonzero(symbols == b)
-        if not len(ia) or not len(ib):
-            continue
-        if a == b:
-            d = distances[np.ix_(ia, ia)]
-            d = d[np.triu_indices_from(d, k=1)]
-            norm = 0.5 * len(ia) * (len(ib) / volume) * shell
-        else:
-            d = distances[np.ix_(ia, ib)].ravel()
-            norm = len(ia) * (len(ib) / volume) * shell
-        hist, _ = np.histogram(d[(d > 0.0) & (d < rmax)], bins=edges)
-        accum[f"{a}-{b}"] += hist / np.maximum(norm, 1e-30)
-
-    return accum
-
-
-def rdf_for_frames(
-    frames: list[Atoms],
-    rmax: float,
-    nbins: int,
-    pairs: list[tuple[str, str]],
-    workers: int,
-) -> tuple[np.ndarray, dict[str, np.ndarray]]:
-    edges = np.linspace(0.0, rmax, nbins + 1)
-    r = 0.5 * (edges[:-1] + edges[1:])
-    accum = {f"{a}-{b}": np.zeros(nbins) for a, b in pairs}
-    total = len(frames)
-    progress_step = max(1, total // 20)
-
-    if workers <= 1 or total <= 1:
-        for done, atoms in enumerate(frames, start=1):
-            frame_rdfs = rdf_for_frame((atoms, rmax, nbins, pairs))
-            for key, rdf in frame_rdfs.items():
-                accum[key] += rdf
-            if done == total or done % progress_step == 0:
-                status(f"RDF progress: {done}/{total} frames")
-    else:
-        chunksize = max(1, total // (workers * 8))
-        with ProcessPoolExecutor(max_workers=workers) as executor:
-            tasks = ((atoms, rmax, nbins, pairs) for atoms in frames)
-            for done, frame_rdfs in enumerate(executor.map(rdf_for_frame, tasks, chunksize=chunksize), start=1):
-                for key, rdf in frame_rdfs.items():
-                    accum[key] += rdf
-                if done == total or done % progress_step == 0:
-                    status(f"RDF progress: {done}/{total} frames")
-
-    for key in accum:
-        accum[key] /= total
-    return r, accum
-
-
 def cluster_candidate(task: tuple[int, Atoms, float, float, tuple[int, int], float]) -> tuple[int, Atoms | None, int | None]:
     frame_index, atoms, cutoff, bond_fct, target, vacuum = task
     cluster, center_id = choose_cluster(atoms, cutoff, bond_fct, target, vacuum)
@@ -218,31 +147,14 @@ def cluster_candidate(task: tuple[int, Atoms, float, float, tuple[int, int], flo
     return frame_index, cluster, center_id
 
 
-def plot_rdfs(path: Path, r: np.ndarray, rdfs: dict[str, np.ndarray], cutoff: float) -> None:
-    fig, ax = plt.subplots(figsize=(7.5, 4.8))
-    for key, rdf in rdfs.items():
-        ax.plot(r, rdf, label=key)
-    ax.axvline(cutoff, color="black", linestyle="--", linewidth=1.0, label=f"cluster cutoff {cutoff:g} A")
-    ax.set_xlabel("r (A)")
-    ax.set_ylabel("g(r)")
-    ax.grid(alpha=0.25)
-    ax.legend()
-    fig.tight_layout()
-    fig.savefig(path, dpi=200)
-    plt.close(fig)
-
-
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Plot RDFs and extract DFT-sized water/NH3 clusters.")
+    parser = argparse.ArgumentParser(description="Extract DFT-sized water/NH3 clusters.")
     parser.add_argument("--run-dir", type=Path, default=DEFAULT_RUN)
     parser.add_argument("--output-dir", type=Path, default=None)
     parser.add_argument("--cutoff-ps", type=float, default=25.0, help="Use frames at/after this time.")
     parser.add_argument("--interaction-cutoff", type=float, default=2.0, help="Atom-atom cutoff for including whole molecules.")
     parser.add_argument("--clusters", type=int, default=30)
-    parser.add_argument("--rdf-frames", type=int, default=0, help="Maximum RDF frames to use after cutoff; 0 uses all.")
     parser.add_argument("--stride", type=int, default=2, help="Frame stride for cluster extraction candidates.")
-    parser.add_argument("--rmax", type=float, default=6.0)
-    parser.add_argument("--nbins", type=int, default=160)
     parser.add_argument("--bond-fct", type=float, default=1.0, help="aseMolec molecular connectivity scale.")
     parser.add_argument("--target-min-atoms", type=int, default=10)
     parser.add_argument("--target-max-atoms", type=int, default=13)
@@ -260,11 +172,10 @@ def main() -> None:
     status(f"Loaded {len(frames)} frames")
     status("Reading frame times")
     times_ps = frame_times_ps(args.run_dir, len(frames))
-    rdf_idx = production_indices(times_ps, args.cutoff_ps, args.rdf_frames)
-    cluster_candidates = production_indices(times_ps, args.cutoff_ps, 0, args.stride)
+    cluster_candidates = production_indices(times_ps, args.cutoff_ps, args.clusters, args.stride)
     status(
-        f"Selected {len(rdf_idx)} RDF frames after {args.cutoff_ps:g} ps "
-        f"and {len(cluster_candidates)} cluster candidates with stride {args.stride}"
+        f"Selected {len(cluster_candidates)} cluster candidates from "
+        f"{times_ps[int(cluster_candidates[0])]:.6g} to {times_ps[int(cluster_candidates[-1])]:.6g} ps"
     )
     args.output_dir.mkdir(parents=True, exist_ok=True)
     cluster_dir = args.output_dir / "clusters"
@@ -275,14 +186,6 @@ def main() -> None:
         status(f"Removing {len(stale_clusters)} existing cluster files for {run_name}")
     for old_cluster in cluster_dir.glob(f"{run_name}_cluster_*.xyz"):
         old_cluster.unlink()
-
-    rdf_frames = [frames[int(i)] for i in rdf_idx]
-    pairs = rdf_pairs(rdf_frames)
-    status(f"Computing RDFs for pairs {', '.join(f'{a}-{b}' for a, b in pairs)} using {workers} workers")
-    r, rdfs = rdf_for_frames(rdf_frames, args.rmax, args.nbins, pairs, workers)
-    rdf_path = args.output_dir / f"{run_name}_rdf.png"
-    status(f"Saving RDF plot: {rdf_path}")
-    plot_rdfs(rdf_path, r, rdfs, args.interaction_cutoff)
 
     summary_path = args.output_dir / "cluster_summary.csv"
     sizes = []
@@ -364,9 +267,6 @@ def main() -> None:
 
     sizes = np.array(sizes)
     print(f"Input trajectory: {xyz}")
-    print(f"RDF frames: {len(rdf_frames)} after {args.cutoff_ps:g} ps")
-    print(f"RDF pairs: {', '.join(rdfs)}")
-    print(f"Saved RDF plot: {rdf_path}")
     print(f"Saved clusters: {cluster_dir}")
     if len(sizes) == 0:
         raise RuntimeError(
