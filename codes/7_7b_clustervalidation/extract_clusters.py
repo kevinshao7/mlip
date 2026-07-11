@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ProcessPoolExecutor
 import csv
 import sys
 import types
@@ -34,6 +35,10 @@ def import_anaatoms():
 anaAtoms = import_anaatoms()
 
 
+def status(message: str) -> None:
+    print(message, flush=True)
+
+
 def find_xyz(run_dir: Path) -> Path:
     files = sorted(run_dir.glob("*.xyz"), key=lambda p: (p.stat().st_mtime, p.name), reverse=True)
     if not files:
@@ -55,7 +60,7 @@ def frame_times_ps(run_dir: Path, n_frames: int) -> np.ndarray:
     return np.arange(n_frames, dtype=float)
 
 
-def production_indices(times_ps: np.ndarray, cutoff_ps: float, count: int, stride: int) -> np.ndarray:
+def production_indices(times_ps: np.ndarray, cutoff_ps: float, count: int, stride: int = 1) -> np.ndarray:
     available = np.flatnonzero(times_ps >= cutoff_ps)
     if available.size == 0:
         raise ValueError(f"Cutoff {cutoff_ps:g} ps leaves no frames.")
@@ -142,34 +147,75 @@ def rdf_pairs(frames: list[Atoms]) -> list[tuple[str, str]]:
     return [(a, b) for i, a in enumerate(symbols) for b in symbols[i:]]
 
 
-def rdf_for_frames(frames: list[Atoms], rmax: float, nbins: int, pairs: list[tuple[str, str]]) -> tuple[np.ndarray, dict[str, np.ndarray]]:
+def rdf_for_frame(task: tuple[Atoms, float, int, list[tuple[str, str]]]) -> dict[str, np.ndarray]:
+    atoms, rmax, nbins, pairs = task
     edges = np.linspace(0.0, rmax, nbins + 1)
-    r = 0.5 * (edges[:-1] + edges[1:])
-    shell = 4.0 * np.pi * r**2 * np.diff(edges)
+    radii = 0.5 * (edges[:-1] + edges[1:])
+    shell = 4.0 * np.pi * radii**2 * np.diff(edges)
     accum = {f"{a}-{b}": np.zeros(nbins) for a, b in pairs}
 
-    for atoms in frames:
-        symbols = np.array(atoms.get_chemical_symbols())
-        volume = atoms.get_volume()
-        distances = atoms.get_all_distances(mic=True)
-        for a, b in pairs:
-            ia = np.flatnonzero(symbols == a)
-            ib = np.flatnonzero(symbols == b)
-            if not len(ia) or not len(ib):
-                continue
-            if a == b:
-                d = distances[np.ix_(ia, ia)]
-                d = d[np.triu_indices_from(d, k=1)]
-                norm = 0.5 * len(ia) * (len(ib) / volume) * shell
-            else:
-                d = distances[np.ix_(ia, ib)].ravel()
-                norm = len(ia) * (len(ib) / volume) * shell
-            hist, _ = np.histogram(d[(d > 0.0) & (d < rmax)], bins=edges)
-            accum[f"{a}-{b}"] += hist / np.maximum(norm, 1e-30)
+    symbols = np.array(atoms.get_chemical_symbols())
+    volume = atoms.get_volume()
+    distances = atoms.get_all_distances(mic=True)
+    for a, b in pairs:
+        ia = np.flatnonzero(symbols == a)
+        ib = np.flatnonzero(symbols == b)
+        if not len(ia) or not len(ib):
+            continue
+        if a == b:
+            d = distances[np.ix_(ia, ia)]
+            d = d[np.triu_indices_from(d, k=1)]
+            norm = 0.5 * len(ia) * (len(ib) / volume) * shell
+        else:
+            d = distances[np.ix_(ia, ib)].ravel()
+            norm = len(ia) * (len(ib) / volume) * shell
+        hist, _ = np.histogram(d[(d > 0.0) & (d < rmax)], bins=edges)
+        accum[f"{a}-{b}"] += hist / np.maximum(norm, 1e-30)
+
+    return accum
+
+
+def rdf_for_frames(
+    frames: list[Atoms],
+    rmax: float,
+    nbins: int,
+    pairs: list[tuple[str, str]],
+    workers: int,
+) -> tuple[np.ndarray, dict[str, np.ndarray]]:
+    edges = np.linspace(0.0, rmax, nbins + 1)
+    r = 0.5 * (edges[:-1] + edges[1:])
+    accum = {f"{a}-{b}": np.zeros(nbins) for a, b in pairs}
+    total = len(frames)
+    progress_step = max(1, total // 20)
+
+    if workers <= 1 or total <= 1:
+        for done, atoms in enumerate(frames, start=1):
+            frame_rdfs = rdf_for_frame((atoms, rmax, nbins, pairs))
+            for key, rdf in frame_rdfs.items():
+                accum[key] += rdf
+            if done == total or done % progress_step == 0:
+                status(f"RDF progress: {done}/{total} frames")
+    else:
+        chunksize = max(1, total // (workers * 8))
+        with ProcessPoolExecutor(max_workers=workers) as executor:
+            tasks = ((atoms, rmax, nbins, pairs) for atoms in frames)
+            for done, frame_rdfs in enumerate(executor.map(rdf_for_frame, tasks, chunksize=chunksize), start=1):
+                for key, rdf in frame_rdfs.items():
+                    accum[key] += rdf
+                if done == total or done % progress_step == 0:
+                    status(f"RDF progress: {done}/{total} frames")
 
     for key in accum:
-        accum[key] /= len(frames)
+        accum[key] /= total
     return r, accum
+
+
+def cluster_candidate(task: tuple[int, Atoms, float, float, tuple[int, int], float]) -> tuple[int, Atoms | None, int | None]:
+    frame_index, atoms, cutoff, bond_fct, target, vacuum = task
+    cluster, center_id = choose_cluster(atoms, cutoff, bond_fct, target, vacuum)
+    if not (target[0] <= len(cluster) <= target[1]):
+        return frame_index, None, None
+    return frame_index, cluster, center_id
 
 
 def plot_rdfs(path: Path, r: np.ndarray, rdfs: dict[str, np.ndarray], cutoff: float) -> None:
@@ -193,38 +239,56 @@ def main() -> None:
     parser.add_argument("--cutoff-ps", type=float, default=25.0, help="Use frames at/after this time.")
     parser.add_argument("--interaction-cutoff", type=float, default=2.0, help="Atom-atom cutoff for including whole molecules.")
     parser.add_argument("--clusters", type=int, default=30)
-    parser.add_argument("--rdf-frames", type=int, default=80)
-    parser.add_argument("--stride", type=int, default=5)
+    parser.add_argument("--rdf-frames", type=int, default=0, help="Maximum RDF frames to use after cutoff; 0 uses all.")
+    parser.add_argument("--stride", type=int, default=2, help="Frame stride for cluster extraction candidates.")
     parser.add_argument("--rmax", type=float, default=6.0)
     parser.add_argument("--nbins", type=int, default=160)
     parser.add_argument("--bond-fct", type=float, default=1.0, help="aseMolec molecular connectivity scale.")
     parser.add_argument("--target-min-atoms", type=int, default=10)
     parser.add_argument("--target-max-atoms", type=int, default=13)
     parser.add_argument("--vacuum", type=float, default=24.0)
+    parser.add_argument("--workers", type=int, default=8, help="CPU workers for RDF and cluster extraction.")
     args = parser.parse_args()
     if args.output_dir is None:
         args.output_dir = default_output_dir(args.run_dir)
+    workers = max(1, args.workers)
 
+    status(f"Finding trajectory in {args.run_dir}")
     xyz = find_xyz(args.run_dir)
+    status(f"Reading trajectory: {xyz}")
     frames = read(xyz, ":")
+    status(f"Loaded {len(frames)} frames")
+    status("Reading frame times")
     times_ps = frame_times_ps(args.run_dir, len(frames))
-    rdf_idx = production_indices(times_ps, args.cutoff_ps, args.rdf_frames, args.stride)
+    rdf_idx = production_indices(times_ps, args.cutoff_ps, args.rdf_frames)
     cluster_candidates = production_indices(times_ps, args.cutoff_ps, 0, args.stride)
+    status(
+        f"Selected {len(rdf_idx)} RDF frames after {args.cutoff_ps:g} ps "
+        f"and {len(cluster_candidates)} cluster candidates with stride {args.stride}"
+    )
     args.output_dir.mkdir(parents=True, exist_ok=True)
     cluster_dir = args.output_dir / "clusters"
     cluster_dir.mkdir(exist_ok=True)
     run_name = args.run_dir.name
+    stale_clusters = list(cluster_dir.glob(f"{run_name}_cluster_*.xyz"))
+    if stale_clusters:
+        status(f"Removing {len(stale_clusters)} existing cluster files for {run_name}")
     for old_cluster in cluster_dir.glob(f"{run_name}_cluster_*.xyz"):
         old_cluster.unlink()
 
     rdf_frames = [frames[int(i)] for i in rdf_idx]
     pairs = rdf_pairs(rdf_frames)
-    r, rdfs = rdf_for_frames(rdf_frames, args.rmax, args.nbins, pairs)
+    status(f"Computing RDFs for pairs {', '.join(f'{a}-{b}' for a, b in pairs)} using {workers} workers")
+    r, rdfs = rdf_for_frames(rdf_frames, args.rmax, args.nbins, pairs, workers)
     rdf_path = args.output_dir / f"{run_name}_rdf.png"
+    status(f"Saving RDF plot: {rdf_path}")
     plot_rdfs(rdf_path, r, rdfs, args.interaction_cutoff)
 
     summary_path = args.output_dir / "cluster_summary.csv"
     sizes = []
+    target = (args.target_min_atoms, args.target_max_atoms)
+    cluster_progress_step = max(1, len(cluster_candidates) // 20)
+    status(f"Extracting up to {args.clusters} clusters using {workers} workers")
     with summary_path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(
             handle,
@@ -235,43 +299,68 @@ def main() -> None:
         )
         writer.writeheader()
         cluster_no = 0
-        for frame_index in cluster_candidates:
-            cluster, center_id = choose_cluster(
+
+        cluster_tasks = (
+            (
+                int(frame_index),
                 frames[int(frame_index)],
                 args.interaction_cutoff,
                 args.bond_fct,
-                (args.target_min_atoms, args.target_max_atoms),
+                target,
                 args.vacuum,
             )
-            if not (args.target_min_atoms <= len(cluster) <= args.target_max_atoms):
-                continue
-            cluster_no += 1
-            sizes.append(len(cluster))
-            cluster.info.update({
-                "source_xyz": str(xyz),
-                "source_frame": int(frame_index),
-                "source_time_ps": float(times_ps[int(frame_index)]),
-                "interaction_cutoff_A": args.interaction_cutoff,
-                "center_molecule": center_id,
-            })
-            symbols = cluster.get_chemical_symbols()
-            out = cluster_dir / f"{run_name}_cluster_{cluster_no:03d}.xyz"
-            write(out, cluster)
-            writer.writerow({
-                "cluster_id": cluster_no,
-                "frame": int(frame_index),
-                "time_ps": f"{times_ps[int(frame_index)]:.6g}",
-                "natoms": len(cluster),
-                "formula": cluster.get_chemical_formula(),
-                "n_O": symbols.count("O"),
-                "n_N": symbols.count("N"),
-                "n_H": symbols.count("H"),
-                "center_molecule": center_id,
-                "selected_molecules": cluster.info.get("selected_molecules", ""),
-                "good_size": args.target_min_atoms <= len(cluster) <= args.target_max_atoms,
-            })
-            if cluster_no >= args.clusters:
-                break
+            for frame_index in cluster_candidates
+        )
+        if workers <= 1 or len(cluster_candidates) <= 1:
+            cluster_results = map(cluster_candidate, cluster_tasks)
+            executor = None
+        else:
+            chunksize = max(1, len(cluster_candidates) // (workers * 8))
+            executor = ProcessPoolExecutor(max_workers=workers)
+            cluster_results = executor.map(cluster_candidate, cluster_tasks, chunksize=chunksize)
+
+        found_enough = False
+        try:
+            for checked, (frame_index, cluster, center_id) in enumerate(cluster_results, start=1):
+                if checked == len(cluster_candidates) or checked % cluster_progress_step == 0:
+                    status(
+                        f"Cluster progress: {checked}/{len(cluster_candidates)} candidates, "
+                        f"{cluster_no}/{args.clusters} accepted"
+                    )
+                if cluster is None or center_id is None:
+                    continue
+                cluster_no += 1
+                sizes.append(len(cluster))
+                cluster.info.update({
+                    "source_xyz": str(xyz),
+                    "source_frame": int(frame_index),
+                    "source_time_ps": float(times_ps[int(frame_index)]),
+                    "interaction_cutoff_A": args.interaction_cutoff,
+                    "center_molecule": center_id,
+                })
+                symbols = cluster.get_chemical_symbols()
+                out = cluster_dir / f"{run_name}_cluster_{cluster_no:03d}.xyz"
+                write(out, cluster)
+                writer.writerow({
+                    "cluster_id": cluster_no,
+                    "frame": int(frame_index),
+                    "time_ps": f"{times_ps[int(frame_index)]:.6g}",
+                    "natoms": len(cluster),
+                    "formula": cluster.get_chemical_formula(),
+                    "n_O": symbols.count("O"),
+                    "n_N": symbols.count("N"),
+                    "n_H": symbols.count("H"),
+                    "center_molecule": center_id,
+                    "selected_molecules": cluster.info.get("selected_molecules", ""),
+                    "good_size": args.target_min_atoms <= len(cluster) <= args.target_max_atoms,
+                })
+                status(f"Accepted cluster {cluster_no}/{args.clusters} from frame {frame_index}")
+                if cluster_no >= args.clusters:
+                    found_enough = True
+                    break
+        finally:
+            if executor is not None:
+                executor.shutdown(wait=True, cancel_futures=found_enough)
 
     sizes = np.array(sizes)
     print(f"Input trajectory: {xyz}")
