@@ -25,4 +25,4 @@ echo "CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
 nvidia-smi
 cd /ptmp/kshao/jax/jaxmd-cli
 source .venv/bin/activate
-jaxmd-run /ptmp/kshao/jax/jaxmd-cli/codes/maceoff_repex.toml
+jaxmd-run /ptmp/kshao/jax/jaxmd-cli/codes/maceo_top_pot.toml

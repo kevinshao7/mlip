@@ -1,0 +1,61 @@
+# Example: MACE-OFF NVT run of solvated caffeine with a topology (bonded)
+# restraint potential layered on top of the NN energy.
+#
+# The topology potential adds a per-bond penalty that grows as bonds stretch
+# beyond their expected length (derived from a short MACE simulation of the
+# isolated ligand, see smooth_mace.sampling.topology_potential). This keeps the
+# molecular topology intact during long unbiased sampling.
+#
+# Tip: set weight = 0.0 to leave the dynamics untouched while still logging the
+# topology potential value and the number of violated bonds every log_interval —
+# a cheap way to detect topology violations without perturbing the trajectory.
+
+[structure]
+path = "test_systems/caffeine_solv.pdb"
+
+[simulation]
+steps = 10000
+timestep = 1.0
+
+[ensemble]
+type = "nvt_nose_hoover"
+temperature = 300.0
+
+[potential]
+type = "nn"
+
+[potential.nn]
+checkpoint_path = "mace_models/lambda_mace_v2_l1_128_ch_r6_nonsparse_stagetwo_new"
+model_type = "mace_off"
+r_cutoff = 6.0
+
+[topology_potential]
+enabled = true
+# 'truncated_gaussian' (one-sided harmonic penalty past the mean bond length)
+# or 'log_logistic' (negative-log-logistic turning on between low/high thresholds).
+type = "truncated_gaussian"
+# Weight (eV) multiplying the topology potential added to the NN energy.
+# Use 0.0 to only monitor/log topology violations without changing the forces.
+# The truncated Gaussian is a dimensionless log-density, 0.5 * ((L - mean)+ / std)^2,
+# so this weight sets the whole energy scale: the per-bond stiffness is
+# weight / std^2. At weight = 1.0 that is ~900 eV/A^2 for a water O-H bond, far
+# above the NN forces themselves, and since the penalty switches on at the mean
+# bond length it would fight ordinary thermal stretching. 0.01 keeps the restraint
+# a small correction to the MACE forces while still opposing bond breaking.
+weight = 0.01
+# ligand_resname is omitted: it is inferred as the unique non-water residue
+# ("UNK" in test_systems/caffeine_solv.pdb). Only set it if the PDB has more
+# than one non-water residue.
+# The ligand bond-length-statistics temperature is taken from ensemble.temperature.
+sigma_noise_angstrom = 0.0
+
+# Optional: extra kwargs forwarded to estimate_bond_length_statistics when
+# computing the ligand bond-length statistics (smaller = faster, less accurate).
+[topology_potential.ligand_sampling_kwargs]
+n_iterations = 100
+batch_size = 64
+
+[output]
+directory = "./run_caffeine_topology"
+log_interval = 100
+trajectory_interval = 500
