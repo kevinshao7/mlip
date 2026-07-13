@@ -21,9 +21,16 @@ CLUSTER_DIR = OUTPUTS_ROOT / "r09_hot_w7n1" / "clusters"
 OUT_DIR = SCRIPT_DIR / "expand"
 BASE_INP = SCRIPT_DIR / "orcaclustersbase.inp"
 BASE_SLURM = SCRIPT_DIR / "orcaclustersbase.slurm"
+ATOMIC_NUMBERS = {
+    "H": 1,
+    "C": 6,
+    "N": 7,
+    "O": 8,
+    "S": 16,
+}
 
 
-def read_xyz_geometry(path: Path) -> str:
+def read_xyz_atoms(path: Path) -> list[tuple[str, float, float, float]]:
     lines = path.read_text(encoding="utf-8").splitlines()
     if len(lines) < 3:
         raise ValueError(f"XYZ file is too short: {path}")
@@ -35,15 +42,29 @@ def read_xyz_geometry(path: Path) -> str:
     if len(atom_lines) != natoms:
         raise ValueError(f"Expected {natoms} atom lines in {path}, found {len(atom_lines)}")
 
-    geometry = []
+    atoms = []
     for line in atom_lines:
         parts = line.split()
         if len(parts) < 4:
             raise ValueError(f"Malformed atom line in {path}: {line}")
         symbol = parts[0]
+        if symbol not in ATOMIC_NUMBERS:
+            raise ValueError(f"No atomic number configured for {symbol!r} in {path}")
         x, y, z = (float(parts[1]), float(parts[2]), float(parts[3]))
-        geometry.append(f"{symbol:2s} {x: .10f} {y: .10f} {z: .10f}")
-    return "\n".join(geometry)
+        atoms.append((symbol, x, y, z))
+    return atoms
+
+
+def format_geometry(atoms: list[tuple[str, float, float, float]]) -> str:
+    return "\n".join(f"{symbol:2s} {x: .10f} {y: .10f} {z: .10f}" for symbol, x, y, z in atoms)
+
+
+def neutral_multiplicity(atoms: list[tuple[str, float, float, float]]) -> int:
+    electrons = sum(ATOMIC_NUMBERS[symbol] for symbol, *_ in atoms)
+    multiplicity = 2 if electrons % 2 else 1
+    if multiplicity not in (1, 2):
+        raise ValueError(f"Unsupported multiplicity {multiplicity}; expected 1 or 2")
+    return multiplicity
 
 
 def write_text_lf(path: Path, text: str) -> None:
@@ -52,7 +73,11 @@ def write_text_lf(path: Path, text: str) -> None:
 
 
 def make_input(base: str, cluster_xyz: Path) -> str:
-    return base.replace("__GEOMETRY__", read_xyz_geometry(cluster_xyz))
+    atoms = read_xyz_atoms(cluster_xyz)
+    return (
+        base.replace("* XYZ 0 1", f"* XYZ 0 {neutral_multiplicity(atoms)}")
+        .replace("__GEOMETRY__", format_geometry(atoms))
+    )
 
 
 def make_slurm(base: str, stem: str) -> str:
