@@ -12,6 +12,7 @@ set -e
 module purge
 module load orca
 
-mkdir -p /ptmp/kshao/mlip/outputsfull/7_7c_orcaclusters
-cd /ptmp/kshao/mlip/outputsfull/7_7c_orcaclusters
-orca /ptmp/kshao/mlip/codes/7_7c_orcaclusters/expand/__INPUT_FILE__ > __OUTPUT_FILE__
+OUTPUT_DIR=/ptmp/kshao/mlip/outputsfull/7_7c_orcaclusters
+mkdir -p "$OUTPUT_DIR"
+cd "$OUTPUT_DIR"
+orca /ptmp/kshao/mlip/codes/7_7c_orcaclusters/expand/__INPUT_FILE__ > "$OUTPUT_DIR/__OUTPUT_FILE__"
