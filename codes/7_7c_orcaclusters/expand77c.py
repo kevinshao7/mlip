@@ -15,9 +15,7 @@ from pathlib import Path
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-REPO_ROOT = SCRIPT_DIR.parents[1]
-OUTPUTS_ROOT = REPO_ROOT / "outputsfull"
-CLUSTER_DIR = OUTPUTS_ROOT / "r09_hot_w7n1" / "clusters"
+CLUSTER_DIR = SCRIPT_DIR / "clusters"
 OUT_DIR = SCRIPT_DIR / "expand"
 BASE_INP = SCRIPT_DIR / "orcaclustersbase.inp"
 BASE_SLURM = SCRIPT_DIR / "orcaclustersbase.slurm"
