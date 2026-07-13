@@ -1,180 +1,88 @@
 # AGENTS.md
 
-## Project Overview
+## Project
 
-This project investigates the solubility of NH3 and H2S in superionic water, motivated by the mystery of excess free H2S clouds in Uranus's atmosphere. Under simple solar-abundance chemistry, excess NH3 should react with H2S to form NH4SH, so free atmospheric H2S suggests missing physics or chemistry.
+This repository supports molecular simulation, ORCA DFT, and MACE-POLAR workflows for NH3/H2S solubility in superionic water, motivated by Uranus atmospheric chemistry.
 
-The broad goal is to use molecular simulation, DFT, and machine-learned interatomic potentials (MLIPs) to estimate the free energy of mixing and solubility of NH3 and H2S in water under relevant conditions.
+Use the local code and generated data as the source of truth. The project has moved beyond initial onboarding; avoid reviving old June planning notes unless they are directly relevant.
 
-## Scientific Plan
-
-1. Build practical experience with molecular dynamics and MLIPs.
-
-   * Fine-tune MACE-POLAR using Bingqing Chen's water data.
-   * The relevant external repository is `ab-initio-thermodynamics-of-water`.
-
-2. Generate DFT data for aqueous NH3 and H2S mixtures.
-
-   * Use these calculations to fine-tune an MLIP suitable for NH3/H2S/water mixtures.
-
-3. Use alchemical free energy methods.
-
-   * Gradually turn on water-solute interactions.
-   * Estimate free energies of mixing and solubilities for NH3 and H2S.
-
-Useful scientific reading is stored in the `reading/` folder.
-
-## Current Project Status
-
-As of Monday June 16:
-
-* Work has been organized into one GitHub repository intended to be interpretable by a Codex agent.
-* Naive fine-tuning of MACE-POLAR is working.
-* Molecular dynamics simulations of water can be run.
-* Current understanding: isolated atom energies are not available in the training data, and `E0 = "estimate"` appears better than `"average"` for fine-tuning.
-
-## Immediate Next Steps
-
-Prioritize the following:
-
-1. Understand how to use autocorrelation to estimate statistical errors from MD trajectories.
-
-   * Do not assume MD frames are independent.
-   * Prefer block averaging or autocorrelation-based error estimates where appropriate.
-
-2. Understand MACE-POLAR multihead fine-tuning.
-
-   * Compare multihead fine-tuning with naive fine-tuning.
-   * Avoid overwriting or degrading pretrained water behavior unless this is intentional.
-
-3. Become familiar with DFT workflows for NH3, H2O, and H2S.
-
-   * Relevant resources:
-
-     * ORCA manual: Density Functional Theory section.
-     * ORCA / FACCTs documentation.
-     * OMol25 dataset.
-   * Goal: be able to run DFT calculations for NH3, H2O, and H2S over the weekend.
-
-4. Familiarize with the rest of the pipeline from DFT data generation to MLIP training and free energy calculation.
-
-## External Dependencies
-
-This project depends on the following external repositories, which should be cloned separately into the project root:
-
-```bash
-git clone https://github.com/ACEsuit/mace.git
-git clone https://github.com/imagdau/aseMolec.git
-```
-Visit github websites for relevant documentation
-
-python environment is source ~/env/bin/activate
-Expected layout:
+## Layout
 
 ```text
-project-root/
-  AGENTS.md
-  README.md
-  mace/
-  aseMolec/
-  reading/
-  ...
+codes/                  dated workflow scripts
+codes/7_7b_clustervalidation/
+  extract_clusters.py   extracts roughly 18-20 atom clusters
+  extract_small_clusters.py extracts roughly 10-13 atom clusters
+  compareclusters.py    compares MACE-POLAR energies to ORCA DFT outputs
+codes/7_13a_orcaclusterssmall/
+  clusters/             small cluster xyz files
+  expand/               ORCA inputs and outputs for those clusters
+outputsfull/            generated trajectories, analyses, plots, caches
+mace/                   local ACEsuit MACE checkout
+aseMolec/               local aseMolec checkout
 ```
+
+Large generated files belong under `outputsfull/` or dated workflow folders, not in new source locations.
+
+## Environment
+
+The Windows Python used for recent local checks is:
+
+```text
+C:\Users\shaoq\AppData\Local\Programs\Python\Python312\python.exe
+```
+
+The local MACE checkout is imported from `mlip/mace`. MACE-POLAR model downloads should cache inside `outputsfull/.cache` by setting `XDG_CACHE_HOME` rather than writing to the user home directory.
+
+## Scientific Rules
+
+Be explicit about units, thermodynamic ensemble, cutoffs, periodic boundary conditions, charge, spin multiplicity, and reference energies.
+
+Do not silently change simulation settings such as temperature, pressure, timestep, ensemble, cutoff length, model checkpoint, functional, basis, charge, or multiplicity.
+
+For MD analysis, do not treat correlated frames as independent. Prefer block averaging, autocorrelation estimates, or clearly labelled exploratory statistics.
+
+## Energy References
+
+MACE-POLAR cluster energies are compared to DFT cluster energies after subtracting DFT atomic reference energies from `codes/7_7b_clustervalidation/atomizationenergies.txt`.
+
+ORCA `FINAL SINGLE POINT ENERGY` values are in Hartree and must be converted to eV before comparison.
+
+For a cluster:
+
+```text
+DFT relative energy = ORCA total energy in eV - sum(DFT atomic reference energies)
+```
+
+Compare that value to the MACE-POLAR predicted cluster energy.
+
+## ORCA Workflow
+
+Preserve ORCA `.inp`, `.out`, `.property.txt`, and related generated files for reproducibility.
+
+For ORCA outputs, verify both:
+
+```text
+FINAL SINGLE POINT ENERGY
+ORCA TERMINATED NORMALLY
+```
+
+Generated Slurm output and ORCA stdout should go under `mlip/outputsfull`, not the source tree, unless the user explicitly asks for local interactive runs.
 
 ## Coding Guidelines
 
-* Prefer clear, explicit scientific code over clever abstractions.
-* Use small, testable functions.
-* Add comments for physical assumptions, units, and ensemble choices.
-* Be explicit about units in variable names or comments.
-* Avoid hard-coded absolute paths.
-* Do not silently change simulation settings such as temperature, pressure, timestep, ensemble, periodic boundary conditions, or cutoffs.
-* When modifying training or MD scripts, preserve reproducibility: record random seeds, input files, model checkpoints, and command-line arguments where possible.
+Prefer small, explicit functions and conservative edits. Add comments only for non-obvious physical assumptions, units, reference-energy conventions, or workflow traps.
 
-## Molecular Simulation Guidelines
+Avoid hard-coded absolute paths in new Python code. Existing cluster/ORCA scripts may contain machine-specific HPC paths; keep them centralized in templates.
 
-* Use ASE `Atoms` objects where appropriate.
-* Be careful with:
+Do not commit unless explicitly asked. Do not delete or rewrite generated data unless the user asks or the workflow clearly regenerates that exact output.
 
-  * periodic boundary conditions,
-  * cell definitions,
-  * units,
-  * temperature and pressure conventions,
-  * timestep stability,
-  * thermostat/barostat choices,
-  * whether the simulation is NVE, NVT, or NPT.
-* For production MD analysis, account for autocorrelation.
-* Do not report naive standard errors over frames unless clearly labelled as naive and likely over-optimistic.
-* For correlated trajectories, prefer:
+## Validation
 
-  * integrated autocorrelation time estimates,
-  * block averaging,
-  * or another justified correlated-sampling error estimate.
-
-## MLIP / MACE-POLAR Guidelines
-
-* Before changing training code, inspect the existing MACE and MACE-POLAR conventions.
-* Be careful with energy references, especially isolated atom energies.
-* Current note: for the water fine-tuning data, isolated atom energies appear unavailable, and `E0 = "estimate"` may be preferable to `"average"`.
-* When fine-tuning:
-
-  * distinguish naive fine-tuning from multihead fine-tuning,
-  * avoid catastrophic forgetting if preserving pretrained capabilities matters,
-  * save checkpoints and logs,
-  * record exact training commands.
-example codes/tutorials here:
-https://colab.research.google.com/drive/1oCSVfMhWrqHTeHbKgUSQN9hTKxLzoNyb
-https://colab.research.google.com/drive/1AlfjQETV_jZ0JQnV5M3FGwAM2SGCl2aU
-https://colab.research.google.com/drive/1ZrTuTvavXiCxTFyjBV4GqlARxgFwYAtX#scrollTo=L7l0qtOVw9cz
-
-## DFT Guidelines
-
-* Treat DFT data generation as part of a reproducible pipeline.
-* Preserve input files, output files, geometries, functional/basis settings, charge, multiplicity, and convergence settings.
-* For ORCA calculations, check the ORCA manual and FACCTs documentation rather than guessing syntax.
-* For NH3, H2O, and H2S calculations, verify molecular charge and spin multiplicity before running.
-
-## Testing and Validation
-
-Before finishing code changes, run relevant checks when available:
+Before finishing code changes, run the narrowest useful check:
 
 ```bash
-pytest
-python -m compileall .
+python -m py_compile path/to/script.py
 ```
 
-For scripts, prefer running a small smoke test with minimal data.
-
-For MD or ML workflows, a useful smoke test should check that:
-
-* the script starts correctly,
-* input structures load,
-* model checkpoints load,
-* one or a few MD/training steps can run,
-* outputs are written to the expected location.
-
-## Git Guidelines
-
-* Do not commit unless explicitly asked.
-* Keep changes focused and easy to review.
-* Explain what changed and how it was tested.
-* Do not add large generated files, trajectories, model checkpoints, or DFT outputs to git unless explicitly requested.
-* Prefer adding large-output directories to `.gitignore`.
-
-## How Codex Should Help
-
-When asked to modify the project:
-
-1. First inspect the relevant files.
-2. Identify the intended workflow before editing.
-3. Make the smallest useful change.
-4. Preserve scientific reproducibility.
-5. Report:
-
-   * files changed,
-   * commands run,
-   * tests or smoke tests performed,
-   * any assumptions or unresolved issues.
-
-When uncertain about scientific details, state the uncertainty rather than inventing a confident answer.
-Always feel free to ask clarifying questions!
+For workflow scripts, prefer a small smoke test that confirms inputs load and outputs are written to the expected directory. Report any dependency, network, or model-cache blockers directly.

@@ -1,71 +1,84 @@
-## Overview
-The goal of this project is to investigate solubility of NH3 and H2S in superionized water, with application to the mystery of excess free H2S clouds in Uranus's atmosphere, where solar abudance ratios would imply all H2S reacts with excess NH3 to form NH4SH.
+# MLIP / ORCA Solubility Workflows
 
-Plan:
+This repository contains scripts and local dependencies for NH3/H2S-in-water simulation workflows using molecular dynamics, ORCA DFT, and MACE-POLAR.
 
-1. Get practice with MD and MLIP (Machine Learned Interatomic Potentials) by fine tuning MACE-POLAR with Binqqing Chen's water data (repo is called ab-initio-thermodynamics-of-water)
+## Current Focus
 
-2. Perform DFT simulations of aqueous NH3 and H2S mixtures to fine tune MLIP
+The active cluster-validation workflow is:
 
-3. Use alchemical free energy methodology (gradually turn on water-solute interactions) to determine free energy of mixing and solubility for NH3 and H2S respectively
+1. Extract representative clusters from `outputsfull/r09_hot_w7n1`.
+2. Generate ORCA input files from those clusters.
+3. Run ORCA single-point calculations.
+4. Compare MACE-POLAR cluster energies against ORCA DFT energies after subtracting DFT atomic reference energies.
 
-Some useful reading is in the "reading/" folder
+Relevant scripts:
 
-## Journal
-Monday June 16th
- - Organized work into one github repo, interpretable to codex agent
- - so far, able to run naive fine tuning of mace-polar and run molecular dynamics simulations of water
- - Understand energy reference of training data (isolated atom energies not available, -E0 = "estimate" setting better than "average" for fine tuning)
+```text
+codes/7_7b_clustervalidation/extract_clusters.py
+codes/7_7b_clustervalidation/extract_small_clusters.py
+codes/7_7b_clustervalidation/compareclusters.py
+codes/7_13a_orcaclusterssmall/expand77c.py
+```
 
-Next Steps:
- - Understand how to use autocorrelation to determine errors
-  - Understand how to use multihead fine tuning rather than naive fine tuning
-   - familiarize with DFT, Omol25 dataset,
-https://orca-manual.mpi-muelheim.mpg.de/contents/modelchemistries/DensityFunctionalTheory.html,
-https://www.faccts.de/orca/
+## Energy Convention
 
-   - Want to run DFT of NH3, H2O, H2S over weekend, need to familiarize with rest of pipeloine
+ORCA total energies are read from `FINAL SINGLE POINT ENERGY` in Hartree and converted to eV.
 
-## Useful Commands
-----------Agentic Coding-----------
-Careful of context limit
-Write and read own commits
-Separate planning and implementation
-Specify test cases
-Ask any clarifications first
-Dont use jupyter notebook
-Dont overengineer
+MACE-POLAR energies are compared to:
 
+```text
+DFT relative energy = ORCA total energy in eV - sum(DFT atomic reference energies)
+```
 
+The atomic reference energies are stored in:
 
-----------------------GIT-----------
-git commit -m "6/17b"
-git push
+```text
+codes/7_7b_clustervalidation/atomizationenergies.txt
+```
 
-ssh-keygen -t ed25519 -C "shaoqihen@gmail.com"
+## Local Dependencies
 
-## Dependencies
-For plots on PC, use 
+Expected local checkouts:
+
+```text
+mlip/mace/
+mlip/aseMolec/
+```
+
+The recent Windows Python used for local checks is:
+
+```text
 C:\Users\shaoq\AppData\Local\Programs\Python\Python312\python.exe
-Python 3.12.10
-pip 25.0.1
-numpy 2.5.0
-matplotlib 3.11.0
+```
 
+MACE-POLAR may download its model on first use. Cache it inside the repository output area, for example by setting:
 
+```powershell
+$env:XDG_CACHE_HOME="C:\Users\shaoq\Documents\Mainz\mlip\outputsfull\.cache"
+```
 
-This project depends on the following external repositories, which should be cloned separately into the project root:
+## Generated Data
 
-wget https://github.com/ACEsuit/mace-foundations/releases/download/mace_polar_1/MACE-POLAR-1-M.model
+Use `outputsfull/` for generated trajectories, summaries, plots, model caches, and analysis outputs.
 
-Need python 3.11!!!!
-```bash
-git clone https://github.com/ACEsuit/mace.git
-cd mace
-python -m pip install -e .
-cd ..
+Keep source scripts under `codes/`. Avoid adding large trajectories, checkpoints, ORCA scratch files, or cached model files to git.
 
-git clone https://github.com/imagdau/aseMolec.git
-cd aseMolec
-python -m pip install -e .
-cd ..
+## Useful Checks
+
+Compile a modified script:
+
+```powershell
+python -m py_compile .\codes\7_7b_clustervalidation\compareclusters.py
+```
+
+Run the small-cluster ORCA/MACE comparison:
+
+```powershell
+python .\codes\7_7b_clustervalidation\compareclusters.py
+```
+
+Run ORCA locally over all generated small-cluster inputs, sequentially with 8 threads each:
+
+```powershell
+$env:OMP_NUM_THREADS=8; $env:MKL_NUM_THREADS=8; $env:OPENBLAS_NUM_THREADS=8; Get-ChildItem .\codes\7_13a_orcaclusterssmall\expand\*.inp | Sort-Object Name | ForEach-Object { orca $_.FullName | Tee-Object -FilePath ($_.DirectoryName + "\" + $_.BaseName + ".out") }
+```
