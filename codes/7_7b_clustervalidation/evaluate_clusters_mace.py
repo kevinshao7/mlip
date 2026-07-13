@@ -28,18 +28,24 @@ torch.set_num_interop_threads(1)
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parents[1]
+OUTPUTS_ROOT = REPO_ROOT / "outputsfull"
+OUTPUT_DIR = OUTPUTS_ROOT / "cluster_mace_energies"
 
 
 def run_directories(root: Path) -> list[Path]:
     return sorted(
         path
         for path in root.iterdir()
-        if path.is_dir() and any(path.glob("*_cluster_*.xyz"))
+        if path.is_dir()
+        and (any(path.glob("*_cluster_*.xyz")) or any((path / "clusters").glob("*_cluster_*.xyz")))
     )
 
 
 def cluster_paths(run_dir: Path) -> list[Path]:
-    return sorted(run_dir.glob(f"{run_dir.name}_cluster_*.xyz"))
+    paths = sorted(run_dir.glob(f"{run_dir.name}_cluster_*.xyz"))
+    paths.extend(sorted((run_dir / "clusters").glob(f"{run_dir.name}_cluster_*.xyz")))
+    return paths
 
 
 def build_calculator():
@@ -87,10 +93,11 @@ def evaluate_run(run_dir: Path, calc) -> np.ndarray:
 def main() -> None:
     calc = build_calculator()
     combined: dict[str, np.ndarray] = {}
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    for run_dir in run_directories(SCRIPT_DIR):
+    for run_dir in run_directories(OUTPUTS_ROOT):
         result = evaluate_run(run_dir, calc)
-        np.save(SCRIPT_DIR / f"{run_dir.name}_mace_energies.npy", result)
+        np.save(OUTPUT_DIR / f"{run_dir.name}_mace_energies.npy", result)
         combined[run_dir.name] = result
         print(
             run_dir.name,
@@ -98,7 +105,7 @@ def main() -> None:
             f"E[min,max]=({result['energy_eV'].min():.6f}, {result['energy_eV'].max():.6f}) eV",
         )
 
-    np.save(SCRIPT_DIR / "cluster_mace_energies.npy", combined, allow_pickle=True)
+    np.save(OUTPUT_DIR / "cluster_mace_energies.npy", combined, allow_pickle=True)
 
 
 if __name__ == "__main__":

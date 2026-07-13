@@ -10,6 +10,8 @@ from pathlib import Path
 
 HARTREE_TO_EV = 27.211386245988
 ENERGY_RE = re.compile(r"FINAL SINGLE POINT ENERGY\s+(-?\d+\.\d+)")
+SCRIPT_DIR = Path(__file__).resolve().parent
+DEFAULT_OUTPUT_DIR = SCRIPT_DIR.parents[1] / "outputsfull" / "7_4_orcaatomizations"
 
 
 def parse_energy_hartree(path: Path) -> float:
@@ -31,8 +33,8 @@ def parse_args() -> argparse.Namespace:
         "outputs",
         nargs="*",
         type=Path,
-        default=sorted(Path(".").glob("orcaatomization*.out")),
-        help="ORCA output files. Defaults to orcaatomization*.out in cwd.",
+        default=sorted(DEFAULT_OUTPUT_DIR.glob("orcaatomization*.out")),
+        help="ORCA output files. Defaults to mlip/outputsfull/7_4_orcaatomizations/orcaatomization*.out.",
     )
     return parser.parse_args()
 

@@ -4,8 +4,8 @@
 #SBATCH --cpus-per-task=24
 #SBATCH --mem=128G
 #SBATCH --time=12:00:00
-#SBATCH --output=slurm-%x-%j.out
-#SBATCH --error=slurm-%x-%j.err
+#SBATCH --output=/ptmp/kshao/mlip/outputsfull/slurm/slurm-%x-%j.out
+#SBATCH --error=/ptmp/kshao/mlip/outputsfull/slurm/slurm-%x-%j.err
 
 set -e
 

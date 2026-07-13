@@ -135,11 +135,15 @@ def make_script(base_text: str, row: dict[str, float], temp_name: str, comp_name
     temperature = row[TEMPERATURES[temp_name]]
 
     text = base_text
-    text = replace_assignment(text, "PROJECT_ROOT", 'SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))')
+    text = replace_assignment(
+        text,
+        "PROJECT_ROOT",
+        "PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))",
+    )
     text = replace_assignment(
         text,
         "MD_RESULTS_DIR",
-        f'MD_RESULTS_DIR = os.path.join(SCRIPT_DIR, "MDresults", "{run_id}")',
+        f'MD_RESULTS_DIR = os.path.join(PROJECT_ROOT, "outputsfull", "{run_id}")',
     )
     text = replace_assignment(text, "densitygcm3", f"densitygcm3 = {density:.12g} # g/cm^3")
     text = replace_assignment(text, "pressuregpa", f"pressuregpa = {pressure:.12g} # GPa")

@@ -4,13 +4,14 @@
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=64G
 #SBATCH --time=1:00:00
-#SBATCH --output=slurm-%x-%j.out
-#SBATCH --error=slurm-%x-%j.err
+#SBATCH --output=/ptmp/kshao/mlip/outputsfull/slurm/slurm-%x-%j.out
+#SBATCH --error=/ptmp/kshao/mlip/outputsfull/slurm/slurm-%x-%j.err
 
 set -e
 
 module purge
 module load orca
 
-cd /ptmp/kshao/mlip/codes/7_7c_orcaclusters/expand
-orca __INPUT_FILE__ > __OUTPUT_FILE__
+mkdir -p /ptmp/kshao/mlip/outputsfull/7_7c_orcaclusters
+cd /ptmp/kshao/mlip/outputsfull/7_7c_orcaclusters
+orca /ptmp/kshao/mlip/codes/7_7c_orcaclusters/expand/__INPUT_FILE__ > __OUTPUT_FILE__

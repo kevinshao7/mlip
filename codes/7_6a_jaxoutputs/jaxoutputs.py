@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 THERMO_CSV = SCRIPT_DIR.parents[1] / "outputsfull" / "jaxequil" / "thermo.csv"
+OUTPUT_DIR = THERMO_CSV.parent / "plots"
 
 
 def read_thermo_csv(path: Path) -> dict[str, list[float]]:
@@ -51,7 +52,8 @@ def save_plot(
         plt.legend()
     plt.grid(alpha=0.3)
     plt.tight_layout()
-    plt.savefig(SCRIPT_DIR / filename, dpi=300)
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    plt.savefig(OUTPUT_DIR / filename, dpi=300)
     plt.close()
 
 

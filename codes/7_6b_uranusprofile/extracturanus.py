@@ -101,6 +101,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         description="Extract P-rho-T profiles for the three Uranus Table 4 cases."
     )
     default_dir = Path(__file__).resolve().parent
+    outputs_dir = default_dir.parents[1] / "outputsfull" / "uranusprofile"
     parser.add_argument(
         "--input",
         type=Path,
@@ -110,7 +111,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--output",
         type=Path,
-        default=default_dir / "uranus_profiles.csv",
+        default=outputs_dir / "uranus_profiles.csv",
         help="Wide CSV output containing all three temperature cases.",
     )
     return parser

@@ -41,7 +41,7 @@ from mace.calculators import mace_polar
 
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-MD_RESULTS_DIR = os.path.join(PROJECT_ROOT, "MDresults")
+MD_RESULTS_DIR = os.path.join(PROJECT_ROOT, "outputsfull")
 
 #generate initial configuration
 
