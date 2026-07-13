@@ -15,6 +15,9 @@ from ase.io import read, write
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[1]
 DEFAULT_RUN = REPO_ROOT / "outputsfull" / "r09_hot_w7n1"
+DEFAULT_INTERACTION_CUTOFF = 2.2
+DEFAULT_BOND_FCT = 1.0
+DEFAULT_PREFERRED_ATOMS = 19
 
 
 def import_anaatoms():
@@ -117,7 +120,13 @@ def cluster_for_center(
     return cluster, selected_molecules
 
 
-def choose_cluster(atoms: Atoms, cutoff: float, bond_fct: float, target: tuple[int, int], vacuum: float) -> tuple[Atoms, int]:
+def choose_cluster(
+    atoms: Atoms,
+    cutoff: float,
+    bond_fct: float,
+    preferred_atoms: int,
+    vacuum: float,
+) -> tuple[Atoms, int]:
     atoms, mol_indices, centers = wrapped_molecules(atoms, bond_fct)
     lengths = atoms.cell.lengths()
     order = np.argsort(np.linalg.norm(minimum_image(centers - 0.5 * lengths, lengths), axis=1))
@@ -127,10 +136,8 @@ def choose_cluster(atoms: Atoms, cutoff: float, bond_fct: float, target: tuple[i
     for center_id in order:
         cluster, selected_molecules = cluster_for_center(atoms, mol_indices, centers, int(center_id), cutoff, vacuum)
         cluster.info["selected_molecules"] = ",".join(str(i) for i in selected_molecules)
-        natoms = len(cluster)
-        if target[0] <= natoms <= target[1]:
-            return cluster, int(center_id)
-        score = min(abs(natoms - target[0]), abs(natoms - target[1]))
+        cluster.info["interaction_cutoff_A"] = cutoff
+        score = abs(len(cluster) - preferred_atoms)
         if score < best_score:
             best = (cluster, int(center_id))
             best_score = score
@@ -139,11 +146,11 @@ def choose_cluster(atoms: Atoms, cutoff: float, bond_fct: float, target: tuple[i
     return best
 
 
-def cluster_candidate(task: tuple[int, Atoms, float, float, tuple[int, int], float]) -> tuple[int, Atoms | None, int | None]:
-    frame_index, atoms, cutoff, bond_fct, target, vacuum = task
-    cluster, center_id = choose_cluster(atoms, cutoff, bond_fct, target, vacuum)
-    if not (target[0] <= len(cluster) <= target[1]):
-        return frame_index, None, None
+def cluster_candidate(
+    task: tuple[int, Atoms, float, float, int, float],
+) -> tuple[int, Atoms, int]:
+    frame_index, atoms, cutoff, bond_fct, preferred_atoms, vacuum = task
+    cluster, center_id = choose_cluster(atoms, cutoff, bond_fct, preferred_atoms, vacuum)
     return frame_index, cluster, center_id
 
 
@@ -152,12 +159,21 @@ def main() -> None:
     parser.add_argument("--run-dir", type=Path, default=DEFAULT_RUN)
     parser.add_argument("--output-dir", type=Path, default=None)
     parser.add_argument("--cutoff-ps", type=float, default=25.0, help="Use frames at/after this time.")
-    parser.add_argument("--interaction-cutoff", type=float, default=2.0, help="Atom-atom cutoff for including whole molecules.")
+    parser.add_argument(
+        "--interaction-cutoff",
+        type=float,
+        default=DEFAULT_INTERACTION_CUTOFF,
+        help="Atom-atom cutoff for including whole molecules.",
+    )
     parser.add_argument("--clusters", type=int, default=30)
     parser.add_argument("--stride", type=int, default=2, help="Frame stride for cluster extraction candidates.")
-    parser.add_argument("--bond-fct", type=float, default=1.0, help="aseMolec molecular connectivity scale.")
-    parser.add_argument("--target-min-atoms", type=int, default=10)
-    parser.add_argument("--target-max-atoms", type=int, default=13)
+    parser.add_argument("--bond-fct", type=float, default=DEFAULT_BOND_FCT, help="aseMolec molecular connectivity scale.")
+    parser.add_argument(
+        "--preferred-atoms",
+        type=int,
+        default=DEFAULT_PREFERRED_ATOMS,
+        help="Preferred cluster size used only to choose the center molecule; clusters are not rejected by size.",
+    )
     parser.add_argument("--vacuum", type=float, default=24.0)
     parser.add_argument("--workers", type=int, default=8, help="CPU workers for RDF and cluster extraction.")
     args = parser.parse_args()
@@ -189,15 +205,15 @@ def main() -> None:
 
     summary_path = args.output_dir / "cluster_summary.csv"
     sizes = []
-    target = (args.target_min_atoms, args.target_max_atoms)
     cluster_progress_step = max(1, len(cluster_candidates) // 20)
-    status(f"Extracting up to {args.clusters} clusters using {workers} workers")
+    status(f"Extracting {len(cluster_candidates)} clusters using {workers} workers")
     with summary_path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(
             handle,
             fieldnames=[
                 "cluster_id", "frame", "time_ps", "natoms", "formula",
-                "n_O", "n_N", "n_H", "center_molecule", "selected_molecules", "good_size",
+                "n_O", "n_N", "n_H", "center_molecule", "interaction_cutoff_A",
+                "selected_molecules",
             ],
         )
         writer.writeheader()
@@ -209,7 +225,7 @@ def main() -> None:
                 frames[int(frame_index)],
                 args.interaction_cutoff,
                 args.bond_fct,
-                target,
+                args.preferred_atoms,
                 args.vacuum,
             )
             for frame_index in cluster_candidates
@@ -222,23 +238,19 @@ def main() -> None:
             executor = ProcessPoolExecutor(max_workers=workers)
             cluster_results = executor.map(cluster_candidate, cluster_tasks, chunksize=chunksize)
 
-        found_enough = False
         try:
             for checked, (frame_index, cluster, center_id) in enumerate(cluster_results, start=1):
                 if checked == len(cluster_candidates) or checked % cluster_progress_step == 0:
                     status(
                         f"Cluster progress: {checked}/{len(cluster_candidates)} candidates, "
-                        f"{cluster_no}/{args.clusters} accepted"
+                        f"{cluster_no}/{args.clusters} saved"
                     )
-                if cluster is None or center_id is None:
-                    continue
                 cluster_no += 1
                 sizes.append(len(cluster))
                 cluster.info.update({
                     "source_xyz": str(xyz),
                     "source_frame": int(frame_index),
                     "source_time_ps": float(times_ps[int(frame_index)]),
-                    "interaction_cutoff_A": args.interaction_cutoff,
                     "center_molecule": center_id,
                 })
                 symbols = cluster.get_chemical_symbols()
@@ -254,28 +266,23 @@ def main() -> None:
                     "n_N": symbols.count("N"),
                     "n_H": symbols.count("H"),
                     "center_molecule": center_id,
+                    "interaction_cutoff_A": (
+                        f"{cluster.info.get('interaction_cutoff_A', args.interaction_cutoff):.6g}"
+                    ),
                     "selected_molecules": cluster.info.get("selected_molecules", ""),
-                    "good_size": args.target_min_atoms <= len(cluster) <= args.target_max_atoms,
                 })
-                status(f"Accepted cluster {cluster_no}/{args.clusters} from frame {frame_index}")
-                if cluster_no >= args.clusters:
-                    found_enough = True
-                    break
+                status(f"Saved cluster {cluster_no}/{args.clusters} from frame {frame_index}")
         finally:
             if executor is not None:
-                executor.shutdown(wait=True, cancel_futures=found_enough)
+                executor.shutdown(wait=True)
 
     sizes = np.array(sizes)
     print(f"Input trajectory: {xyz}")
     print(f"Saved clusters: {cluster_dir}")
     if len(sizes) == 0:
-        raise RuntimeError(
-            f"No clusters found in the {args.target_min_atoms}-{args.target_max_atoms} atom target range. "
-            "Try increasing --interaction-cutoff or reducing --stride."
-        )
+        raise RuntimeError("No clusters were extracted.")
     print(f"Cluster sizes: min={sizes.min()}, median={np.median(sizes):.0f}, max={sizes.max()}")
-    print(f"Good-size clusters ({args.target_min_atoms}-{args.target_max_atoms} atoms): "
-          f"{np.count_nonzero((sizes >= args.target_min_atoms) & (sizes <= args.target_max_atoms))}/{len(sizes)}")
+    print(f"Clusters with 18-20 atoms: {np.count_nonzero((sizes >= 18) & (sizes <= 20))}/{len(sizes)}")
     print(f"Summary: {summary_path}")
 
 
