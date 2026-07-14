@@ -12,4 +12,4 @@
 
 source /dais/fs/scratch/kshao/jaxmd-cli/.venv/bin/activate
 cd /dais/fs/scratch/kshao/jaxmd-cli/
-jaxmd-run /dais/fs/scratch/kshao/mlip/jaxcodes/mace_top_pot.toml
+jaxmd-run /dais/fs/scratch/kshao/jaxmd-cli/example_configs/maceoff_topology_potential.toml
