@@ -222,6 +222,6 @@ simpleMD(
     pressure_gpa=pressuregpa,
     calc=mace_calc,
     fname=os.path.join(MD_RESULTS_DIR, f"mace_1500K_density_{densitygcm3}.xyz"),
-    s=10,
-    T=500000,
+    s=100,
+    T=2000000,
 )

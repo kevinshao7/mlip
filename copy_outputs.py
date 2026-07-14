@@ -1,1 +1,1 @@
-scp -r "kevinsh@dart9.engin.umich.edu:/home/kevinsh/mlip/outputsfull/6_26_NPT_MACE/r09_hot_w7n1" "C:/Users/shaoq/Documents/Mainz/mlip/outputsfull/"
+scp -r "raven:/ptmp/kshao/jax/jaxmd-cli/equil/" "C:\Users\shaoq\Documents\Mainz\mlip\outputsfull\jaxequil"
