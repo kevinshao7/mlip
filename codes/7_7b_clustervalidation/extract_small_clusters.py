@@ -13,15 +13,25 @@ import extract_clusters as base
 
 DEFAULT_INTERACTION_CUTOFF = 1.7
 DEFAULT_BOND_FCT = 1.0
-DEFAULT_PREFERRED_ATOMS = 12
 
 
 def default_output_dir(run_dir: Path) -> Path:
     return run_dir / "small_clusters"
 
 
+def small_cluster_candidate(task):
+    frame_index, atoms, cutoff, bond_fct, vacuum = task
+    atoms, mol_indices, centers = base.wrapped_molecules(atoms, bond_fct)
+    lengths = atoms.cell.lengths()
+    center_id = int(np.argmin(np.linalg.norm(base.minimum_image(centers - 0.5 * lengths, lengths), axis=1)))
+    cluster, selected_molecules = base.cluster_for_center(atoms, mol_indices, centers, center_id, cutoff, vacuum)
+    cluster.info["selected_molecules"] = ",".join(str(i) for i in selected_molecules)
+    cluster.info["interaction_cutoff_A"] = cutoff
+    return frame_index, cluster, center_id
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Extract small DFT-sized water/NH3 clusters.")
+    parser = argparse.ArgumentParser(description="Extract cutoff-defined water/NH3 clusters.")
     parser.add_argument("--run-dir", type=Path, default=base.DEFAULT_RUN)
     parser.add_argument("--output-dir", type=Path, default=None)
     parser.add_argument("--cutoff-ps", type=float, default=25.0, help="Use frames at/after this time.")
@@ -34,12 +44,6 @@ def main() -> None:
     parser.add_argument("--clusters", type=int, default=30)
     parser.add_argument("--stride", type=int, default=2, help="Frame stride for cluster extraction candidates.")
     parser.add_argument("--bond-fct", type=float, default=DEFAULT_BOND_FCT, help="aseMolec molecular connectivity scale.")
-    parser.add_argument(
-        "--preferred-atoms",
-        type=int,
-        default=DEFAULT_PREFERRED_ATOMS,
-        help="Preferred cluster size used only to choose the center molecule; clusters are not rejected by size.",
-    )
     parser.add_argument("--vacuum", type=float, default=24.0)
     parser.add_argument("--workers", type=int, default=8, help="CPU workers for cluster extraction.")
     args = parser.parse_args()
@@ -92,18 +96,17 @@ def main() -> None:
                 frames[int(frame_index)],
                 args.interaction_cutoff,
                 args.bond_fct,
-                args.preferred_atoms,
                 args.vacuum,
             )
             for frame_index in cluster_candidates
         )
         if workers <= 1 or len(cluster_candidates) <= 1:
-            results = map(base.cluster_candidate, tasks)
+            results = map(small_cluster_candidate, tasks)
             executor = None
         else:
             chunksize = max(1, len(cluster_candidates) // (workers * 8))
             executor = ProcessPoolExecutor(max_workers=workers)
-            results = executor.map(base.cluster_candidate, tasks, chunksize=chunksize)
+            results = executor.map(small_cluster_candidate, tasks, chunksize=chunksize)
 
         try:
             for cluster_no, (frame_index, cluster, center_id) in enumerate(results, start=1):
@@ -144,7 +147,6 @@ def main() -> None:
     if len(sizes) == 0:
         raise RuntimeError("No small clusters were extracted.")
     print(f"Cluster sizes: min={sizes.min()}, median={np.median(sizes):.0f}, max={sizes.max()}")
-    print(f"Clusters with 10-13 atoms: {np.count_nonzero((sizes >= 10) & (sizes <= 13))}/{len(sizes)}")
     print(f"Summary: {summary_path}")
 
 
