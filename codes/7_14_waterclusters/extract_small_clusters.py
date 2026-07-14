@@ -38,8 +38,10 @@ def water_cluster_candidates(task):
     lengths = atoms.cell.lengths()
     center_distances = np.linalg.norm(base.minimum_image(centers - 0.5 * lengths, lengths), axis=1)
     candidates = []
+    centers_checked = 0
 
     for center_id in np.argsort(center_distances):
+        centers_checked += 1
         cluster, selected_molecules = base.cluster_for_center(
             atoms, mol_indices, centers, int(center_id), cutoff, vacuum
         )
@@ -58,7 +60,12 @@ def water_cluster_candidates(task):
         )
 
     candidates.sort(key=lambda item: (item[0], item[1]))
-    return [(frame_index, cluster, center_id) for _, _, frame_index, cluster, center_id in candidates]
+    return {
+        "frame_index": frame_index,
+        "centers_checked": centers_checked,
+        "water_candidates": len(candidates),
+        "clusters": [(frame_index, cluster, center_id) for _, _, frame_index, cluster, center_id in candidates],
+    }
 
 
 def main() -> None:
@@ -80,6 +87,12 @@ def main() -> None:
     parser.add_argument("--max-atoms", type=int, default=DEFAULT_MAX_ATOMS)
     parser.add_argument("--vacuum", type=float, default=24.0)
     parser.add_argument("--workers", type=int, default=8, help="CPU workers for cluster extraction.")
+    parser.add_argument(
+        "--progress-every",
+        type=int,
+        default=1,
+        help="Print search progress every N completed frames.",
+    )
     args = parser.parse_args()
     if args.min_atoms > args.max_atoms:
         raise ValueError("--min-atoms cannot exceed --max-atoms")
@@ -114,7 +127,7 @@ def main() -> None:
 
     summary_path = args.output_dir / "small_cluster_summary.csv"
     sizes = []
-    progress_step = max(1, len(cluster_candidates) // 20)
+    progress_step = max(1, args.progress_every)
     base.status(
         f"Searching for {args.clusters} complete cutoff-defined H/O-only clusters "
         f"with {args.min_atoms}-{args.max_atoms} atoms using {workers} workers"
@@ -148,18 +161,25 @@ def main() -> None:
             results = map(water_cluster_candidates, tasks)
             executor = None
         else:
-            chunksize = max(1, len(cluster_candidates) // (workers * 8))
             executor = ProcessPoolExecutor(max_workers=workers)
-            results = executor.map(water_cluster_candidates, tasks, chunksize=chunksize)
+            results = executor.map(water_cluster_candidates, tasks, chunksize=1)
 
+        found_enough = False
         try:
             cluster_no = 0
             checked_frames = 0
             saved_keys = set()
-            for checked_frames, frame_results in enumerate(results, start=1):
+            centers_checked_total = 0
+            water_candidates_total = 0
+            for checked_frames, frame_result in enumerate(results, start=1):
+                frame_results = frame_result["clusters"]
+                centers_checked_total += frame_result["centers_checked"]
+                water_candidates_total += frame_result["water_candidates"]
                 if checked_frames == len(cluster_candidates) or checked_frames % progress_step == 0:
                     base.status(
                         f"Water cluster search: {checked_frames}/{len(cluster_candidates)} frames checked, "
+                        f"{centers_checked_total} centers tested, "
+                        f"{water_candidates_total} H/O-only candidates found, "
                         f"{cluster_no}/{args.clusters} saved"
                     )
                 for frame_index, cluster, center_id in frame_results:
@@ -198,11 +218,16 @@ def main() -> None:
                         "max_atoms": args.max_atoms,
                         "selected_molecules": cluster.info.get("selected_molecules", ""),
                     })
+                    base.status(
+                        f"Saved H/O cluster {cluster_no}/{args.clusters}: "
+                        f"frame {frame_index}, {len(cluster)} atoms, {cluster.get_chemical_formula()}"
+                    )
                 if cluster_no >= args.clusters:
+                    found_enough = True
                     break
         finally:
             if executor is not None:
-                executor.shutdown(wait=True)
+                executor.shutdown(wait=True, cancel_futures=found_enough)
 
     sizes = np.array(sizes)
     print(f"Input trajectory: {xyz}")
