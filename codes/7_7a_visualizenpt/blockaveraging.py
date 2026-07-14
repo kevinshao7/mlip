@@ -164,7 +164,7 @@ def plot_blocks(txt: Path, data: dict[str, np.ndarray], cutoff_ps: float) -> Pat
     return out
 
 
-def plot_acf(txt: Path, data: dict[str, np.ndarray], cutoff_ps: float) -> Path:
+def plot_acf(txt: Path, data: dict[str, np.ndarray], cutoff_ps: float, max_lag_ps: float) -> Path:
     time_ps, mask = production_slice(data, cutoff_ps)
     dt_ps = float(np.nanmean(np.diff(time_ps[mask]))) if np.count_nonzero(mask) > 1 else 1.0
     keys = [(key, label) for key, label in PLOT_KEYS if key in data]
@@ -175,14 +175,15 @@ def plot_acf(txt: Path, data: dict[str, np.ndarray], cutoff_ps: float) -> Path:
         acf = autocorr_fft(np.asarray(data[key], dtype=float)[mask])
         lag_ps = np.arange(len(acf)) * dt_ps
         ax.plot(lag_ps, acf, linewidth=1.1)
+        ax.set_xlim(0.0, max_lag_ps)
         ax.axhline(0.0, color="black", linewidth=0.8)
         ax.set_ylabel(label)
         ax.grid(alpha=0.25)
     axes[-1].set_xlabel("Lag time (ps)")
     out_dir = txt.parent / "plots"
     out_dir.mkdir(exist_ok=True)
-    out = out_dir / f"{txt.stem}_autocorrelation.png"
-    fig.suptitle(f"FFT autocorrelation after {cutoff_ps:g} ps cutoff")
+    out = out_dir / f"{txt.stem}_autocorrelation_lag_{max_lag_ps:g}ps.png"
+    fig.suptitle(f"FFT autocorrelation after {cutoff_ps:g} ps cutoff, shown to {max_lag_ps:g} ps lag")
     fig.savefig(out, dpi=200)
     plt.close(fig)
     return out
@@ -192,13 +193,19 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Block-average NPT thermo output after an initial cutoff.")
     parser.add_argument("folder", nargs="?", type=Path, default=DEFAULT_FOLDER)
     parser.add_argument("--cutoff-ps", type=float, default=25.0, help="Initial transient cutoff in ps.")
+    parser.add_argument(
+        "--acf-max-lag-ps",
+        type=float,
+        default=3.0,
+        help="Maximum lag time shown in the autocorrelation plot.",
+    )
     args = parser.parse_args()
 
     txt, data = load_run(args.folder)
     outputs = [
         plot_timeseries(txt, data, args.cutoff_ps),
         plot_blocks(txt, data, args.cutoff_ps),
-        plot_acf(txt, data, args.cutoff_ps),
+        plot_acf(txt, data, args.cutoff_ps, args.acf_max_lag_ps),
     ]
     for out in outputs:
         print(f"Saved {out}")

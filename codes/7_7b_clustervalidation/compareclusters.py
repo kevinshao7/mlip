@@ -63,10 +63,28 @@ def read_atomization_energies(path: Path) -> dict[str, float]:
     return energies
 
 
+def resolve_cluster_dirs(cluster_root: Path) -> tuple[Path, Path]:
+    """Return the XYZ cluster directory and ORCA output directory.
+
+    The validation inputs are split between sibling directories:
+    ``clusters/*.xyz`` for geometries and ``expand/*.out`` for ORCA results.
+    Accept either the calculation root or the ``expand`` directory itself.
+    """
+    root = cluster_root.resolve()
+    if root.name == "expand":
+        out_dir = root
+        xyz_dir = root.parent / "clusters"
+    else:
+        xyz_dir = root / "clusters"
+        out_dir = root / "expand"
+    return xyz_dir, out_dir
+
+
 def cluster_paths(cluster_root: Path) -> list[Path]:
-    paths = sorted((cluster_root / "clusters").glob("*.xyz"))
+    xyz_dir, _ = resolve_cluster_dirs(cluster_root)
+    paths = sorted(xyz_dir.glob("*.xyz"))
     if not paths:
-        raise FileNotFoundError(f"No cluster .xyz files found in {cluster_root / 'clusters'}")
+        raise FileNotFoundError(f"No cluster .xyz files found in {xyz_dir}")
     return paths
 
 
@@ -93,22 +111,39 @@ def atomization_reference_energy(atoms: Atoms, atomization: dict[str, float]) ->
 def build_calculator():
     os.environ.setdefault("XDG_CACHE_HOME", str(DEFAULT_CACHE_DIR))
     sys.path.insert(0, str(REPO_ROOT / "mace"))
-    from mace.calculators import mace_polar
+    try:
+        from mace.calculators import mace_polar
+    except ModuleNotFoundError as exc:
+        if exc.name == "graph_longrange":
+            raise ModuleNotFoundError(
+                "MACE-Polar requires graph_longrange/graph_electrostatics. "
+                "Install that dependency or run in the environment used for MACE-Polar MLIP evaluation."
+            ) from exc
+        raise
 
-    return mace_polar(
-        model="polar-1-s",
-        device=os.environ.get("MLIP_MACE_DEVICE", "cpu"),
-        default_dtype="float32",
-    )
+    try:
+        return mace_polar(
+            model="polar-1-s",
+            device=os.environ.get("MLIP_MACE_DEVICE", "cpu"),
+            default_dtype="float32",
+        )
+    except ModuleNotFoundError as exc:
+        if exc.name == "graph_longrange":
+            raise ModuleNotFoundError(
+                "MACE-Polar requires graph_longrange/graph_electrostatics. "
+                "Install that dependency or run in the environment used for MACE-Polar MLIP evaluation."
+            ) from exc
+        raise
 
 
 def compare_clusters(cluster_root: Path, atomization_path: Path) -> list[dict[str, object]]:
     atomization = read_atomization_energies(atomization_path)
     calc = build_calculator()
     records: list[dict[str, object]] = []
+    _, out_dir = resolve_cluster_dirs(cluster_root)
 
     for index, xyz_path in enumerate(cluster_paths(cluster_root), start=1):
-        out_path = cluster_root / "expand" / f"{xyz_path.stem}.out"
+        out_path = out_dir / f"{xyz_path.stem}.out"
         if not out_path.exists():
             raise FileNotFoundError(f"Missing ORCA output for {xyz_path.name}: {out_path}")
 
@@ -119,7 +154,8 @@ def compare_clusters(cluster_root: Path, atomization_path: Path) -> list[dict[st
         dft_total_ev = parse_orca_energy_hartree(out_path) * HARTREE_TO_EV
         atomic_reference_ev = atomization_reference_energy(atoms, atomization)
         dft_relative_ev = dft_total_ev - atomic_reference_ev
-        error_ev = mace_ev - dft_relative_ev
+        mace_relative_ev = mace_ev - atomic_reference_ev
+        error_ev = mace_relative_ev - dft_relative_ev
 
         records.append(
             {
@@ -128,7 +164,8 @@ def compare_clusters(cluster_root: Path, atomization_path: Path) -> list[dict[st
                 "out_file": out_path.name,
                 "natoms": len(atoms),
                 "formula": atoms.get_chemical_formula(),
-                "mace_polar_energy_eV": mace_ev,
+                "mace_polar_total_energy_eV": mace_ev,
+                "mace_polar_relative_energy_eV": mace_relative_ev,
                 "dft_total_energy_eV": dft_total_ev,
                 "dft_atomic_reference_eV": atomic_reference_ev,
                 "dft_relative_energy_eV": dft_relative_ev,
@@ -138,7 +175,7 @@ def compare_clusters(cluster_root: Path, atomization_path: Path) -> list[dict[st
         )
         status(
             f"{index:03d} {xyz_path.name}: "
-            f"MACE={mace_ev:.6f} eV, DFT-relative={dft_relative_ev:.6f} eV, "
+            f"MACE-relative={mace_relative_ev:.6f} eV, DFT-relative={dft_relative_ev:.6f} eV, "
             f"error={error_ev:.6f} eV"
         )
 
@@ -154,7 +191,7 @@ def write_csv(path: Path, records: list[dict[str, object]]) -> None:
 
 def plot_comparison(path: Path, records: list[dict[str, object]]) -> Path:
     dft = np.array([float(record["dft_relative_energy_eV"]) for record in records])
-    mace = np.array([float(record["mace_polar_energy_eV"]) for record in records])
+    mace = np.array([float(record["mace_polar_relative_energy_eV"]) for record in records])
     errors = mace - dft
     try:
         import matplotlib.pyplot as plt
@@ -173,7 +210,7 @@ def plot_comparison(path: Path, records: list[dict[str, object]]) -> Path:
     ax.set_xlim(lo - pad, hi + pad)
     ax.set_ylim(lo - pad, hi + pad)
     ax.set_xlabel("DFT ORCA energy minus atomic references (eV)")
-    ax.set_ylabel("MACE-POLAR predicted energy (eV)")
+    ax.set_ylabel("MACE-POLAR energy minus atomic references (eV)")
     ax.set_title("Small cluster energy comparison")
     ax.grid(alpha=0.25)
     ax.legend()
@@ -243,7 +280,7 @@ def write_svg_plot(path: Path, dft: np.ndarray, mace: np.ndarray, errors: np.nda
 {x_labels}
 {y_labels}
 <text x="{width / 2}" y="{height - 18}" text-anchor="middle" font-size="14" font-family="Arial">DFT ORCA energy minus atomic references (eV)</text>
-<text x="20" y="{height / 2}" text-anchor="middle" transform="rotate(-90 20 {height / 2})" font-size="14" font-family="Arial">MACE-POLAR predicted energy (eV)</text>
+<text x="20" y="{height / 2}" text-anchor="middle" transform="rotate(-90 20 {height / 2})" font-size="14" font-family="Arial">MACE-POLAR energy minus atomic references (eV)</text>
 <rect x="{margin_left + 15}" y="{margin_top + 12}" width="155" height="54" fill="white" stroke="#bbb"/>
 <text x="{margin_left + 25}" y="{margin_top + 34}" font-size="13" font-family="Arial">MAE = {mae:.4f} eV</text>
 <text x="{margin_left + 25}" y="{margin_top + 54}" font-size="13" font-family="Arial">RMSE = {rmse:.4f} eV</text>
@@ -260,7 +297,12 @@ def main() -> None:
     args = parser.parse_args()
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    records = compare_clusters(args.cluster_root, args.atomization)
+    try:
+        records = compare_clusters(args.cluster_root, args.atomization)
+    except ModuleNotFoundError as exc:
+        if str(exc).startswith("MACE-Polar requires"):
+            raise SystemExit(str(exc)) from None
+        raise
     if not records:
         raise RuntimeError("No cluster comparisons were produced.")
 
