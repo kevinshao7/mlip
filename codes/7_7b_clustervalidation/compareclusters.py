@@ -18,7 +18,9 @@ from ase.io import read
 HARTREE_TO_EV = 27.211386245988
 BOHR_TO_ANGSTROM = 0.529177210903
 HARTREE_PER_BOHR_TO_EV_PER_ANGSTROM = HARTREE_TO_EV / BOHR_TO_ANGSTROM
-FINAL_ENERGY_RE = re.compile(r"FINAL SINGLE POINT ENERGY\s+(-?\d+(?:\.\d+)?)")
+FINAL_ENERGY_RE = re.compile(r"FINAL SINGLE POINT ENERGY\s+(-?\d+(?:\.\d+)?(?:[Ee][+-]?\d+)?)")
+ORCA_NORMAL_TERMINATION = "ORCA TERMINATED NORMALLY"
+CLUSTER_INDEX_RE = re.compile(r"_(\d+)$")
 GRADIENT_LINE_RE = re.compile(
     r"^\s*(\d+)\s+([A-Za-z]+)\s+:\s+"
     r"(-?\d+(?:\.\d+)?(?:[Ee][+-]?\d+)?)\s+"
@@ -80,6 +82,17 @@ def resolve_cluster_dirs(cluster_root: Path) -> tuple[Path, Path]:
     return xyz_dir, out_dir
 
 
+def is_completed_orca_output(path: Path) -> tuple[bool, str]:
+    text = path.read_text(encoding="utf-8", errors="ignore")
+    if ORCA_NORMAL_TERMINATION not in text:
+        return False, "ORCA did not terminate normally"
+    if not FINAL_ENERGY_RE.search(text):
+        return False, "missing FINAL SINGLE POINT ENERGY"
+    if "CARTESIAN GRADIENT" not in text:
+        return False, "missing CARTESIAN GRADIENT"
+    return True, ""
+
+
 def completed_orca_output_paths(out_dir: Path) -> list[Path]:
     paths = sorted(out_dir.glob("*.out"))
     if not paths:
@@ -87,7 +100,28 @@ def completed_orca_output_paths(out_dir: Path) -> list[Path]:
             f"No ORCA .out files found in {out_dir}. "
             "Run the generated ORCA inputs first or pass --orca-output-dir."
         )
-    return paths
+    completed: list[Path] = []
+    skipped: list[tuple[Path, str]] = []
+    for path in paths:
+        is_complete, reason = is_completed_orca_output(path)
+        if is_complete:
+            completed.append(path)
+        else:
+            skipped.append((path, reason))
+
+    status(f"Found {len(completed)} completed ORCA outputs out of {len(paths)} .out files.")
+    for path, reason in skipped:
+        status(f"Skipping unfinished DFT output {path.name}: {reason}.")
+    if not completed:
+        raise RuntimeError(f"No completed ORCA outputs found in {out_dir}.")
+    return completed
+
+
+def cluster_index_from_output_name(path: Path, fallback: int) -> int:
+    match = CLUSTER_INDEX_RE.search(path.stem)
+    if not match:
+        return fallback
+    return int(match.group(1))
 
 
 def parse_orca_energy_hartree(path: Path) -> float:
@@ -177,7 +211,8 @@ def compare_clusters(
     force_records: list[dict[str, object]] = []
     xyz_dir, _ = resolve_cluster_dirs(cluster_root)
 
-    for index, out_path in enumerate(completed_orca_output_paths(orca_output_dir), start=1):
+    for comparison_index, out_path in enumerate(completed_orca_output_paths(orca_output_dir), start=1):
+        index = cluster_index_from_output_name(out_path, comparison_index)
         xyz_path = xyz_dir / f"{out_path.stem}.xyz"
         if not xyz_path.exists():
             raise FileNotFoundError(f"Missing cluster geometry for {out_path.name}: {xyz_path}")
@@ -200,6 +235,7 @@ def compare_clusters(
         records.append(
             {
                 "cluster_index": index,
+                "comparison_index": comparison_index,
                 "xyz_file": xyz_path.name,
                 "out_file": out_path.name,
                 "natoms": len(atoms),
@@ -219,6 +255,7 @@ def compare_clusters(
                 force_records.append(
                     {
                         "cluster_index": index,
+                        "comparison_index": comparison_index,
                         "xyz_file": xyz_path.name,
                         "out_file": out_path.name,
                         "atom_index": atom_index,

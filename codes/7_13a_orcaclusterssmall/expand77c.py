@@ -14,14 +14,21 @@ $env:OMP_NUM_THREADS=8; $env:MKL_NUM_THREADS=8; $env:OPENBLAS_NUM_THREADS=8; Get
 
 from __future__ import annotations
 
+import importlib
+import importlib.util
+import shutil
+import sys
 from pathlib import Path
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 CLUSTER_DIR = SCRIPT_DIR / "clusters"
 OUT_DIR = SCRIPT_DIR / "expand"
-BASE_INP = SCRIPT_DIR / "orcaclustersbase.inp"
 BASE_SLURM = SCRIPT_DIR / "orcaclustersbase.slurm"
+MLIP_DIR = SCRIPT_DIR.parents[1]
+FAIRCHEM_ORCA_CALC = MLIP_DIR / "fairchem" / "src" / "fairchem" / "data" / "omol" / "orca" / "calc.py"
+FAIRCHEM_SRC = MLIP_DIR / "fairchem" / "src"
+FAIRCHEM_ORCA_BASIS = MLIP_DIR / "fairchem" / "src" / "fairchem" / "data" / "omol" / "orca" / "basis" / "def2-tzvpd.bas"
 ATOMIC_NUMBERS = {
     "H": 1,
     "C": 6,
@@ -29,6 +36,12 @@ ATOMIC_NUMBERS = {
     "O": 8,
     "S": 16,
 }
+FORMAL_CHARGES = {
+    "H": 1,
+    "N": -3,
+    "O": -2,
+}
+MULTIPLICITY = 1
 
 
 def read_xyz_atoms(path: Path) -> list[tuple[str, float, float, float]]:
@@ -56,16 +69,14 @@ def read_xyz_atoms(path: Path) -> list[tuple[str, float, float, float]]:
     return atoms
 
 
-def format_geometry(atoms: list[tuple[str, float, float, float]]) -> str:
-    return "\n".join(f"{symbol:2s} {x: .10f} {y: .10f} {z: .10f}" for symbol, x, y, z in atoms)
-
-
-def neutral_multiplicity(atoms: list[tuple[str, float, float, float]]) -> int:
-    electrons = sum(ATOMIC_NUMBERS[symbol] for symbol, *_ in atoms)
-    multiplicity = 2 if electrons % 2 else 1
-    if multiplicity not in (1, 2):
-        raise ValueError(f"Unsupported multiplicity {multiplicity}; expected 1 or 2")
-    return multiplicity
+def formal_charge(atoms: list[tuple[str, float, float, float]]) -> int:
+    charge = 0
+    for symbol, *_ in atoms:
+        try:
+            charge += FORMAL_CHARGES[symbol]
+        except KeyError as exc:
+            raise ValueError(f"No formal charge configured for {symbol!r}") from exc
+    return charge
 
 
 def write_text_lf(path: Path, text: str) -> None:
@@ -73,12 +84,66 @@ def write_text_lf(path: Path, text: str) -> None:
         handle.write(text)
 
 
-def make_input(base: str, cluster_xyz: Path) -> str:
-    atoms = read_xyz_atoms(cluster_xyz)
-    return (
-        base.replace("* XYZ 0 1", f"* XYZ 0 {neutral_multiplicity(atoms)}")
-        .replace("__GEOMETRY__", format_geometry(atoms))
+def load_fairchem_orca_calc():
+    if FAIRCHEM_SRC.exists():
+        sys.path.insert(0, str(FAIRCHEM_SRC))
+
+    try:
+        return importlib.import_module("fairchem.data.omol.orca.calc")
+    except ImportError:
+        pass
+
+    if not FAIRCHEM_ORCA_CALC.exists():
+        return None
+
+    spec = importlib.util.spec_from_file_location("fairchem_omol_orca_calc", FAIRCHEM_ORCA_CALC)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Could not load fairchem ORCA calc module from {FAIRCHEM_ORCA_CALC}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def make_input_with_fairchem(cluster_xyz: Path, atoms: list[tuple[str, float, float, float]]) -> str:
+    orca_calc = load_fairchem_orca_calc()
+    if orca_calc is None:
+        raise RuntimeError(
+            "Could not import fairchem.data.omol.orca.calc and could not load it from "
+            f"{FAIRCHEM_ORCA_CALC}"
+        )
+
+    charge = formal_charge(atoms)
+    from ase.calculators.orca import OrcaProfile
+    from ase.io import read
+
+    ase_atoms = read(cluster_xyz)
+
+    def compatible_orca_profile(command):
+        if isinstance(command, list):
+            command = command[0] or "orca"
+        return OrcaProfile(command)
+
+    orca_calc.OrcaProfile = compatible_orca_profile
+    OUT_DIR.mkdir(exist_ok=True)
+    transient_input = OUT_DIR / "orca.inp"
+    orcasimpleinput = orca_calc.ORCA_ASE_SIMPLE_INPUT
+    if "PAL8" not in orcasimpleinput.split():
+        orcasimpleinput = f"{orcasimpleinput} PAL8"
+    orca_calc.write_orca_inputs(
+        ase_atoms,
+        OUT_DIR,
+        charge=charge,
+        mult=MULTIPLICITY,
+        orcasimpleinput=orcasimpleinput,
     )
+    text = transient_input.read_text(encoding="utf-8")
+    transient_input.unlink()
+    return text
+
+
+def make_input(cluster_xyz: Path) -> str:
+    atoms = read_xyz_atoms(cluster_xyz)
+    return make_input_with_fairchem(cluster_xyz, atoms)
 
 
 def make_slurm(base: str, stem: str) -> str:
@@ -94,15 +159,16 @@ def main() -> None:
     if not clusters:
         raise FileNotFoundError(f"No cluster .xyz files found in {CLUSTER_DIR}")
 
-    base_inp = BASE_INP.read_text(encoding="utf-8")
     base_slurm = BASE_SLURM.read_text(encoding="utf-8")
     OUT_DIR.mkdir(exist_ok=True)
+    if FAIRCHEM_ORCA_BASIS.exists():
+        shutil.copy2(FAIRCHEM_ORCA_BASIS, OUT_DIR / FAIRCHEM_ORCA_BASIS.name)
 
     for cluster_xyz in clusters:
         stem = cluster_xyz.stem
         inp_path = OUT_DIR / f"{stem}.inp"
         slurm_path = OUT_DIR / f"{stem}.slurm"
-        write_text_lf(inp_path, make_input(base_inp, cluster_xyz))
+        write_text_lf(inp_path, make_input(cluster_xyz))
         write_text_lf(slurm_path, make_slurm(base_slurm, stem))
         print(f"wrote {inp_path.relative_to(SCRIPT_DIR)}")
         print(f"wrote {slurm_path.relative_to(SCRIPT_DIR)}")
