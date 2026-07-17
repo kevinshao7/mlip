@@ -42,13 +42,27 @@ from mace.calculators import mace_polar
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 MD_RESULTS_DIR = os.path.join(PROJECT_ROOT, "outputsfull")
+os.environ.setdefault("XDG_CACHE_HOME", os.path.join(PROJECT_ROOT, "outputsfull", ".cache"))
 
 #generate initial configuration
 
-densitygcm3 = 1.0 #gcm3
+densitygcm3 = 0.2 #gcm3, always 0.2 and allow NPT to naturally bring up pressure
 pressuregpa = 1.0 # GPa
 targetmolecules = 100
 moleculemass = 18 #grams per mol
+tempramptime = 200*1000*units.fs
+MDtimestep = 0.5*units.fs
+totaltimesteps = 2000000
+saveinterval =100
+updateinterval = 20
+T_initial=300
+T_final = 2500
+
+
+rampsteps = int(tempramptime/MDtimestep)
+
+
+
 NA = 6.022e23
 boxsize=(((targetmolecules*moleculemass/NA)/densitygcm3)**(1/3))*1e8 #boxsize in angstroms
 water = Water()
@@ -78,7 +92,7 @@ def simpleMD(init_conf, temp, pressure_gpa, calc, fname, s, T, T_thermo=100):
     # s is save interval, T is total NPT integration steps
     init_conf.calc = calc
 
-    MaxwellBoltzmannDistribution(init_conf, temperature_K=temp)
+    MaxwellBoltzmannDistribution(init_conf, temperature_K=T_initial)
     Stationary(init_conf)
     ZeroRotation(init_conf)
     # ----------------------------
@@ -86,12 +100,12 @@ def simpleMD(init_conf, temp, pressure_gpa, calc, fname, s, T, T_thermo=100):
     # ----------------------------
     thermo = Langevin(
         init_conf,
-        timestep=0.5 * units.fs,
-        temperature_K=temp,
+        timestep=MDtimestep,
+        temperature_K=T_initial, #Start near room temperature
         friction=0.01 / units.fs,   # damping time ~100 fs
     )
 
-    print(f"Initial NVT Langevin thermalization for {T_thermo} steps at {temp} K...")
+    print(f"Initial NVT Langevin thermalization for {T_thermo} steps at {T_initial} K...")
     starttime = time.time()
     thermo.run(T_thermo)
     endtime=time.time()
@@ -103,14 +117,39 @@ def simpleMD(init_conf, temp, pressure_gpa, calc, fname, s, T, T_thermo=100):
     # 2. NPT production run
     # ----------------------
     pressure_au = pressure_gpa * units.GPa
-    dyn = IsotropicMTKNPT(
-        init_conf,
-        timestep=0.5 * units.fs,
-        temperature_K=temp,
-        pressure_au=pressure_au,
-        tdamp=100 * units.fs,
-        pdamp=200 * units.fs
-    )
+
+
+
+    def make_npt_dynamics(temperature_K):
+        return IsotropicMTKNPT(
+            init_conf,
+            timestep=MDtimestep,
+            temperature_K=temperature_K,
+            pressure_au=pressure_au,
+            tdamp=100 * units.fs,
+            pdamp=200 * units.fs
+        )
+
+    t0 = time.time()
+
+    for start in range(0, rampsteps, updateinterval):
+        fraction = start / max(rampsteps - 1, 1)
+
+        target_temperature = (
+            T_initial
+            + fraction * (temp - T_initial)
+        )
+
+        steps_this_chunk = min(
+            updateinterval,
+            rampsteps - start,
+        )
+        # This ASE version has no public MTK temperature setter, so each ramp
+        # chunk uses a fresh thermostat/barostat target without changing dt/P.
+        dyn = make_npt_dynamics(target_temperature)
+        dyn.run(steps_this_chunk)
+
+    dyn = make_npt_dynamics(temp)
 
     output_dir = os.path.dirname(fname)
     if output_dir:
@@ -173,7 +212,6 @@ def simpleMD(init_conf, temp, pressure_gpa, calc, fname, s, T, T_thermo=100):
     dyn.attach(update_progress, interval=1)
     dyn.attach(write_frame, interval=s)
 
-    t0 = time.time()
     dyn.run(T)
     t1 = time.time()
 
@@ -218,10 +256,10 @@ mace_calc = mace_polar(
 
 simpleMD(
     init_conf,
-    temp=temp,
+    temp=T_final,
     pressure_gpa=pressuregpa,
     calc=mace_calc,
-    fname=os.path.join(MD_RESULTS_DIR, f"mace_1500K_density_{densitygcm3}.xyz"),
-    s=100,
-    T=2000000,
+    fname=os.path.join(MD_RESULTS_DIR, f"mace_{T_final:g}K_density_{densitygcm3}.xyz"),
+    s=saveinterval,
+    T=totaltimesteps
 )

@@ -131,7 +131,6 @@ def write_text_lf(path: Path, text: str) -> None:
 def make_script(base_text: str, row: dict[str, float], temp_name: str, comp_name: str) -> str:
     run_id = f"r{int(row['row']):02d}_{temp_name}_{comp_name}"
     pressure = row["pressure_GPa"]
-    density = row["density_g_cm3"]
     temperature = row[TEMPERATURES[temp_name]]
 
     text = base_text
@@ -145,7 +144,6 @@ def make_script(base_text: str, row: dict[str, float], temp_name: str, comp_name
         "MD_RESULTS_DIR",
         f'MD_RESULTS_DIR = os.path.join(PROJECT_ROOT, "outputsfull", "{run_id}")',
     )
-    text = replace_assignment(text, "densitygcm3", f"densitygcm3 = {density:.12g} # g/cm^3")
     text = replace_assignment(text, "pressuregpa", f"pressuregpa = {pressure:.12g} # GPa")
     text = replace_once(text, r"^simbox\.add_solvent\(.*$", COMPOSITIONS[comp_name])
     text = replace_call_keyword(text, "temp", f"{temperature:.12g}")

@@ -19,9 +19,11 @@ export PATH=/ptmp/kshao/mlip/packmol:$PATH
 
 export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
 export CUDA_VISIBLE_DEVICES=
+export MLIP_MACE_DEVICE=${MLIP_MACE_DEVICE:-cpu}
 
 echo "Job started on $(hostname)"
 echo "CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-unset}"
+echo "MLIP_MACE_DEVICE=${MLIP_MACE_DEVICE}"
 
 cd /ptmp/kshao/mlip/codes/6_26_NPT_MACE
 # Local GPU campaign without Slurm: source ~/env/bin/activate && cd ~/mlip/codes/6_26_NPT_MACE && CUDA_VISIBLE_DEVICES=0 MLIP_MACE_DEVICE=cuda python NPTMACEbase.py
