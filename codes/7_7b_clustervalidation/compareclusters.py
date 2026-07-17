@@ -289,57 +289,37 @@ def plot_comparison(
     plot_min_ev: float | None = DEFAULT_PLOT_MIN_EV,
     plot_max_ev: float | None = DEFAULT_PLOT_MAX_EV,
 ) -> Path:
-    dft = np.array([float(record["orca_total_energy_eV"]) for record in records])
-    mace = np.array([float(record["mace_polar_cluster_energy_eV"]) for record in records])
-    errors = mace - dft
-    if plot_min_ev is not None and plot_max_ev is not None:
-        mask = (
-            (dft >= plot_min_ev)
-            & (dft <= plot_max_ev)
-            & (mace >= plot_min_ev)
-            & (mace <= plot_max_ev)
-        )
-        dft_plot = dft[mask]
-        mace_plot = mace[mask]
-        if len(dft_plot) == 0:
-            raise ValueError(
-                f"No points fall inside the requested plot window "
-                f"{plot_min_ev:g} to {plot_max_ev:g} eV on both axes."
-            )
+    cluster_indices = np.array([int(record["cluster_index"]) for record in records])
+    errors = np.array([float(record["error_mace_minus_orca_total_eV"]) for record in records])
+    natoms = np.array([int(record["natoms"]) for record in records])
+    errors_mev_per_atom = 1000.0 * errors / natoms
+    abs_errors_mev_per_atom = np.abs(errors_mev_per_atom)
+    positive_errors = abs_errors_mev_per_atom[abs_errors_mev_per_atom > 0.0]
+    if len(positive_errors) == 0:
+        plot_abs_errors = np.full_like(abs_errors_mev_per_atom, 1.0e-12)
     else:
-        dft_plot = dft
-        mace_plot = mace
+        plot_abs_errors = np.maximum(abs_errors_mev_per_atom, positive_errors.min() * 0.1)
     try:
         import matplotlib.pyplot as plt
     except ModuleNotFoundError:
         svg_path = path.with_suffix(".svg")
-        write_svg_plot(svg_path, dft_plot, mace_plot, errors, plot_min_ev, plot_max_ev)
+        write_svg_plot(svg_path, cluster_indices, natoms, abs_errors_mev_per_atom)
         return svg_path
 
-    if plot_min_ev is not None and plot_max_ev is not None:
-        lo = plot_min_ev
-        hi = plot_max_ev
-    else:
-        lo = min(dft_plot.min(), mace_plot.min())
-        hi = max(dft_plot.max(), mace_plot.max())
-        pad = 0.05 * max(hi - lo, 1.0)
-        lo -= pad
-        hi += pad
-
     fig, ax = plt.subplots(figsize=(6.2, 5.6))
-    ax.scatter(dft_plot, mace_plot, s=42, color="#1f77b4", edgecolor="black", linewidth=0.4)
-    ax.plot([lo, hi], [lo, hi], color="black", linewidth=1.2, label="slope 1")
-    ax.set_xlim(lo, hi)
-    ax.set_ylim(lo, hi)
-    ax.set_xlabel("DFT ORCA total energy (eV)")
-    ax.set_ylabel("MACE-POLAR cluster energy (eV)")
-    ax.set_title("Small cluster energy comparison")
+    ax.scatter(cluster_indices, plot_abs_errors, s=42, color="#1f77b4", edgecolor="black", linewidth=0.4)
+    ax.set_yscale("log")
+    ax.set_xlabel("Cluster index")
+    ax.set_ylabel("Absolute energy error |MACE-POLAR - DFT| / N_atoms (meV/atom)")
+    ax.set_title("Small cluster absolute energy error per atom")
     ax.grid(alpha=0.25)
-    ax.legend()
+    ax.grid(alpha=0.25, which="minor", axis="y")
     ax.text(
         0.04,
         0.96,
-        f"MAE = {np.mean(np.abs(errors)):.4f} eV\nRMSE = {np.sqrt(np.mean(errors**2)):.4f} eV\nn = {len(dft_plot)}",
+        f"MAE = {np.mean(abs_errors_mev_per_atom):.2f} meV/atom\n"
+        f"RMSE = {np.sqrt(np.mean(errors_mev_per_atom**2)):.2f} meV/atom\n"
+        f"n = {len(abs_errors_mev_per_atom)} clusters",
         transform=ax.transAxes,
         va="top",
         bbox={"boxstyle": "round,pad=0.3", "facecolor": "white", "alpha": 0.85, "edgecolor": "0.8"},
@@ -435,11 +415,9 @@ def plot_force_comparison(
 
 def write_svg_plot(
     path: Path,
-    dft: np.ndarray,
-    mace: np.ndarray,
-    errors: np.ndarray,
-    plot_min_ev: float | None,
-    plot_max_ev: float | None,
+    cluster_indices: np.ndarray,
+    natoms: np.ndarray,
+    abs_errors_mev_per_atom: np.ndarray,
 ) -> None:
     width = 720
     height = 640
@@ -449,58 +427,61 @@ def write_svg_plot(
     margin_bottom = 85
     plot_w = width - margin_left - margin_right
     plot_h = height - margin_top - margin_bottom
-    if plot_min_ev is not None and plot_max_ev is not None:
-        lo = plot_min_ev
-        hi = plot_max_ev
+    x_lo = float(cluster_indices.min()) - 1.0
+    x_hi = float(cluster_indices.max()) + 1.0
+    positive_errors = abs_errors_mev_per_atom[abs_errors_mev_per_atom > 0.0]
+    if len(positive_errors) == 0:
+        y_lo = 1.0e-12
+        y_hi = 1.0
     else:
-        lo = min(dft.min(), mace.min())
-        hi = max(dft.max(), mace.max())
-        pad = 0.05 * max(hi - lo, 1.0)
-        lo -= pad
-        hi += pad
+        y_lo = 10 ** np.floor(np.log10(positive_errors.min()))
+        y_hi = 10 ** np.ceil(np.log10(positive_errors.max()))
+        if y_lo == y_hi:
+            y_lo /= 10.0
+            y_hi *= 10.0
 
     def sx(value: float) -> float:
-        return margin_left + (value - lo) / (hi - lo) * plot_w
+        return margin_left + (value - x_lo) / (x_hi - x_lo) * plot_w
 
     def sy(value: float) -> float:
-        return margin_top + (hi - value) / (hi - lo) * plot_h
+        value = max(value, y_lo)
+        return margin_top + (np.log10(y_hi) - np.log10(value)) / (np.log10(y_hi) - np.log10(y_lo)) * plot_h
 
-    ticks = np.linspace(lo, hi, 6)
+    x_ticks = np.linspace(x_lo + 1.0, x_hi - 1.0, min(len(cluster_indices), 6))
+    y_ticks = np.logspace(np.log10(y_lo), np.log10(y_hi), int(np.log10(y_hi) - np.log10(y_lo)) + 1)
     points = "\n".join(
-        f'<circle cx="{sx(x):.2f}" cy="{sy(y):.2f}" r="4.5" fill="#1f77b4" '
-        f'stroke="black" stroke-width="0.7"><title>DFT {x:.6f} eV, MACE {y:.6f} eV</title></circle>'
-        for x, y in zip(dft, mace)
+        f'<circle cx="{sx(float(index)):.2f}" cy="{sy(float(error)):.2f}" r="4.5" fill="#1f77b4" '
+        f'stroke="black" stroke-width="0.7"><title>Cluster {index}: absolute energy error {error:.6g} meV/atom, N={natoms_i}</title></circle>'
+        for index, natoms_i, error in zip(cluster_indices, natoms, abs_errors_mev_per_atom)
     )
     grid = "\n".join(
-        f'<line x1="{sx(t):.2f}" y1="{margin_top}" x2="{sx(t):.2f}" y2="{margin_top + plot_h}" stroke="#ddd"/>'
         f'<line x1="{margin_left}" y1="{sy(t):.2f}" x2="{margin_left + plot_w}" y2="{sy(t):.2f}" stroke="#ddd"/>'
-        for t in ticks
+        for t in y_ticks
     )
     x_labels = "\n".join(
-        f'<text x="{sx(t):.2f}" y="{height - 55}" text-anchor="middle" font-size="12">{t:.1f}</text>'
-        for t in ticks
+        f'<text x="{sx(t):.2f}" y="{height - 55}" text-anchor="middle" font-size="12">{t:.0f}</text>'
+        for t in x_ticks
     )
     y_labels = "\n".join(
-        f'<text x="{margin_left - 10}" y="{sy(t) + 4:.2f}" text-anchor="end" font-size="12">{t:.1f}</text>'
-        for t in ticks
+        f'<text x="{margin_left - 10}" y="{sy(t) + 4:.2f}" text-anchor="end" font-size="12">{t:.0e}</text>'
+        for t in y_ticks
     )
-    mae = np.mean(np.abs(errors))
-    rmse = np.sqrt(np.mean(errors**2))
+    mae = np.mean(abs_errors_mev_per_atom)
+    rmse = np.sqrt(np.mean(abs_errors_mev_per_atom**2))
     svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
 <rect width="100%" height="100%" fill="white"/>
-<text x="{width / 2}" y="24" text-anchor="middle" font-size="20" font-family="Arial">Small cluster energy comparison</text>
+<text x="{width / 2}" y="24" text-anchor="middle" font-size="20" font-family="Arial">Small cluster absolute energy error per atom</text>
 {grid}
 <rect x="{margin_left}" y="{margin_top}" width="{plot_w}" height="{plot_h}" fill="none" stroke="black"/>
-<line x1="{sx(lo):.2f}" y1="{sy(lo):.2f}" x2="{sx(hi):.2f}" y2="{sy(hi):.2f}" stroke="black" stroke-width="1.4"/>
 {points}
 {x_labels}
 {y_labels}
-<text x="{width / 2}" y="{height - 18}" text-anchor="middle" font-size="14" font-family="Arial">DFT ORCA total energy (eV)</text>
-<text x="20" y="{height / 2}" text-anchor="middle" transform="rotate(-90 20 {height / 2})" font-size="14" font-family="Arial">MACE-POLAR cluster energy (eV)</text>
-<rect x="{margin_left + 15}" y="{margin_top + 12}" width="155" height="74" fill="white" stroke="#bbb"/>
-<text x="{margin_left + 25}" y="{margin_top + 34}" font-size="13" font-family="Arial">MAE = {mae:.4f} eV</text>
-<text x="{margin_left + 25}" y="{margin_top + 54}" font-size="13" font-family="Arial">RMSE = {rmse:.4f} eV</text>
-<text x="{margin_left + 25}" y="{margin_top + 74}" font-size="13" font-family="Arial">n = {len(dft)}</text>
+<text x="{width / 2}" y="{height - 18}" text-anchor="middle" font-size="14" font-family="Arial">Cluster index</text>
+<text x="20" y="{height / 2}" text-anchor="middle" transform="rotate(-90 20 {height / 2})" font-size="14" font-family="Arial">Absolute energy error |MACE-POLAR - DFT| / N_atoms (meV/atom, log scale)</text>
+<rect x="{margin_left + 15}" y="{margin_top + 12}" width="215" height="74" fill="white" stroke="#bbb"/>
+<text x="{margin_left + 25}" y="{margin_top + 34}" font-size="13" font-family="Arial">MAE = {mae:.2f} meV/atom</text>
+<text x="{margin_left + 25}" y="{margin_top + 54}" font-size="13" font-family="Arial">RMSE = {rmse:.2f} meV/atom</text>
+<text x="{margin_left + 25}" y="{margin_top + 74}" font-size="13" font-family="Arial">n = {len(abs_errors_mev_per_atom)} clusters</text>
 </svg>
 '''
     path.write_text(svg, encoding="utf-8")
