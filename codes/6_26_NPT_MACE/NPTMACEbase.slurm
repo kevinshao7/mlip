@@ -2,6 +2,7 @@
 #SBATCH --job-name=NPT_MACE_base
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=24
+#SBATCH --gres=gpu:1
 #SBATCH --mem=128G
 #SBATCH --time=12:00:00
 #SBATCH --output=/ptmp/kshao/mlip/outputsfull/slurm/slurm-%x-%j.out
@@ -16,10 +17,7 @@ source /ptmp/kshao/envs/mlip_clean/bin/activate
 export PYTHONNOUSERSITE=1
 export PATH=/ptmp/kshao/mlip/packmol:$PATH
 
-
-export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
-export CUDA_VISIBLE_DEVICES=
-export MLIP_MACE_DEVICE=${MLIP_MACE_DEVICE:-cpu}
+export MLIP_MACE_DEVICE=${MLIP_MACE_DEVICE:-cuda}
 
 echo "Job started on $(hostname)"
 echo "CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-unset}"

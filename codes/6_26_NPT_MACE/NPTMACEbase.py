@@ -1,19 +1,4 @@
 import os
-# -------------------------
-# CPU parallelism settings
-# -------------------------
-N_THREADS = "20"
-
-os.environ["OMP_NUM_THREADS"] = N_THREADS
-os.environ["MKL_NUM_THREADS"] = N_THREADS
-os.environ["OPENBLAS_NUM_THREADS"] = N_THREADS
-os.environ["NUMEXPR_NUM_THREADS"] = N_THREADS
-os.environ["VECLIB_MAXIMUM_THREADS"] = N_THREADS
-os.environ["TORCH_NUM_THREADS"] = N_THREADS
-
-# Optional: avoid oversubscription from nested OpenMP regions
-os.environ["OMP_PROC_BIND"] = "spread"
-os.environ["OMP_PLACES"] = "threads"
 
 from ase.io import read
 from ase import units
@@ -29,13 +14,11 @@ from tqdm import tqdm
 import numpy as np
 import time
 
+import torch
+
 from mdinterface import SimCell
 from mdinterface.database import Water
 from mdinterface.core.specie import Specie
-
-import torch
-torch.set_num_threads(int(N_THREADS))
-torch.set_num_interop_threads(1)
 
 from mace.calculators import mace_polar
 
@@ -61,7 +44,8 @@ T_final = 2500
 
 rampsteps = int(tempramptime/MDtimestep)
 
-
+print("rampsteps")
+print(rampsteps)
 
 NA = 6.022e23
 boxsize=(((targetmolecules*moleculemass/NA)/densitygcm3)**(1/3))*1e8 #boxsize in angstroms
@@ -248,9 +232,16 @@ def simpleMD(init_conf, temp, pressure_gpa, calc, fname, s, T, T_thermo=100):
 
 
 
+MACE_DEVICE = os.environ.get("MLIP_MACE_DEVICE", "cuda")
+if MACE_DEVICE.startswith("cuda") and not torch.cuda.is_available():
+    raise RuntimeError(
+        "MLIP_MACE_DEVICE is set to CUDA, but PyTorch cannot see an NVIDIA CUDA GPU. "
+        "Run on a GPU node or set MLIP_MACE_DEVICE=cpu explicitly for a CPU test."
+    )
+
 mace_calc = mace_polar(
     model="polar-1-s",
-    device=os.environ.get("MLIP_MACE_DEVICE", "cpu"),
+    device=MACE_DEVICE,
     default_dtype="float32",  # faster for MD
 )
 
