@@ -147,11 +147,6 @@ def make_script(base_text: str, row: dict[str, float], temp_name: str, comp_name
     text = replace_assignment(text, "pressuregpa", f"pressuregpa = {pressure:.12g} # GPa")
     text = replace_assignment(text, "T_final", f"T_final = {temperature:.12g}")
     text = replace_once(text, r"^simbox\.add_solvent\(.*$", COMPOSITIONS[comp_name])
-    text = replace_once(
-        text,
-        r'^\s*fname\s*=\s*os\.path\.join\(MD_RESULTS_DIR,.*$',
-        f'    fname=os.path.join(MD_RESULTS_DIR, "{run_id}.xyz"),',
-    )
     text = replace_call_keyword(text, "s", str(SAVE_INTERVAL_STEPS))
     if MD_STEPS is not None:
         text = replace_call_keyword(text, "T", str(MD_STEPS))

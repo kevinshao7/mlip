@@ -1,6 +1,5 @@
 import os
 
-from ase.io import read
 from ase import units
 from ase.md.langevin import Langevin
 from ase.md.nose_hoover_chain import IsotropicMTKNPT
@@ -37,15 +36,12 @@ tempramptime = 10*1000*units.fs
 MDtimestep = 0.5*units.fs
 totaltimesteps = 60000
 saveinterval =100
-updateinterval = 20
 T_initial=300 #always keep at room temperature
-T_final = 2500  # Placeholder; NPTMaceexpand.py overwrites this per Uranus row.
+T_final = 2500  # Heating target for downstream runs; not used during pressure equilibration.
 
-
-rampsteps = int(tempramptime/MDtimestep)
-
-print("rampsteps")
-print(rampsteps)
+RUN_SEED = int.from_bytes(os.urandom(8), "little") % 1_000_000_000
+np.random.seed(RUN_SEED)
+print(f"RUN_SEED {RUN_SEED}")
 
 NA = 6.022e23
 boxsize=(((targetmolecules*moleculemass/NA)/densitygcm3)**(1/3))*1e8 #boxsize in angstroms
@@ -72,7 +68,7 @@ init_conf.info["external_field"] = [0.0, 0.0, 0.0]
 WATER_COMPRESSIBILITY_AU = 4.57e-5 / units.bar
 
 
-def simpleMD(init_conf, temp, pressure_gpa, calc, fname, s, T, T_thermo=100):
+def simpleMD(init_conf, temp, pressure_gpa, calc, fname, checkpoint_fname, s, T, T_thermo=100):
     # s is save interval, T is total NPT integration steps
     init_conf.calc = calc
 
@@ -109,7 +105,7 @@ def simpleMD(init_conf, temp, pressure_gpa, calc, fname, s, T, T_thermo=100):
     if os.path.exists(fname):
         os.remove(fname)
 
-    # arrays for plotting; time is continuous across the NPT ramp and production
+    # arrays for plotting; pressure equilibration is kept at fixed temperature
     times = []
     temperatures = []
     pressures = []
@@ -119,8 +115,8 @@ def simpleMD(init_conf, temp, pressure_gpa, calc, fname, s, T, T_thermo=100):
     target_temperatures = []
 
     pbar = tqdm(
-        total=rampsteps + T,
-        desc=f"NPT ramp {T_initial} -> {temp} K, then MD at {pressure_gpa} GPa",
+        total=T,
+        desc=f"NPT pressure equilibration at {temp} K and {pressure_gpa} GPa",
     )
 
 
@@ -131,8 +127,8 @@ def simpleMD(init_conf, temp, pressure_gpa, calc, fname, s, T, T_thermo=100):
             timestep=MDtimestep,
             temperature_K=temperature_K,
             pressure_au=pressure_au,
-            tdamp=50 * units.fs,
-            pdamp=50 * units.fs
+            tdamp=100 * units.fs,
+            pdamp=100 * units.fs
         )
 
     def write_frame(dyn, t_fs, target_temperature):
@@ -175,37 +171,6 @@ def simpleMD(init_conf, temp, pressure_gpa, calc, fname, s, T, T_thermo=100):
         })
 
     t0 = time.time()
-    total_npt_steps = 0
-    next_save_step = s
-
-    for start in range(0, rampsteps, updateinterval):
-        fraction = start / max(rampsteps - 1, 1)
-
-        target_temperature = (
-            T_initial
-            + fraction * (temp - T_initial)
-        )
-
-        steps_this_chunk = min(
-            updateinterval,
-            rampsteps - start,
-        )
-        # This ASE version has no public MTK temperature setter, so each ramp
-        # chunk uses a fresh thermostat/barostat target without changing dt/P.
-        dyn = make_npt_dynamics(target_temperature)
-        dyn.run(steps_this_chunk)
-        total_npt_steps += steps_this_chunk
-        pbar.update(steps_this_chunk)
-
-        if total_npt_steps >= next_save_step:
-            write_frame(
-                dyn,
-                t_fs=(total_npt_steps * MDtimestep) / units.fs,
-                target_temperature=target_temperature,
-            )
-            next_save_step += s
-
-    production_start_steps = total_npt_steps
     dyn = make_npt_dynamics(temp)
 
     def update_progress():
@@ -214,7 +179,7 @@ def simpleMD(init_conf, temp, pressure_gpa, calc, fname, s, T, T_thermo=100):
     def write_production_frame():
         if dyn.get_time() == 0:
             return
-        t_fs = ((production_start_steps * MDtimestep) + dyn.get_time()) / units.fs
+        t_fs = dyn.get_time() / units.fs
         write_frame(dyn, t_fs=t_fs, target_temperature=temp)
 
     dyn.attach(update_progress, interval=1)
@@ -224,6 +189,7 @@ def simpleMD(init_conf, temp, pressure_gpa, calc, fname, s, T, T_thermo=100):
     t1 = time.time()
 
     pbar.close()
+    dyn.atoms.write(checkpoint_fname)
 
     data = np.column_stack([
         times,
@@ -251,6 +217,7 @@ def simpleMD(init_conf, temp, pressure_gpa, calc, fname, s, T, T_thermo=100):
 
     print(f"MD finished in {(t1 - t0) / 60:.2f} minutes")
     print(f"Trajectory written to {fname}")
+    print(f"Final checkpoint written to {checkpoint_fname}")
     print(f"Thermo data written to {npyname}")
     print(f"Text data written to {txtname}")
 
@@ -272,10 +239,17 @@ mace_calc = mace_polar(
 
 simpleMD(
     init_conf,
-    temp=T_final,
+    temp=T_initial,
     pressure_gpa=pressuregpa,
     calc=mace_calc,
-    fname=os.path.join(MD_RESULTS_DIR, f"mace_{T_final:g}K_density_{densitygcm3}.xyz"),
+    fname=os.path.join(
+        MD_RESULTS_DIR,
+        f"pressure_equil_seed_{RUN_SEED}_P_{pressuregpa:g}GPa_T_{T_initial:g}K_density_{densitygcm3}.xyz",
+    ),
+    checkpoint_fname=os.path.join(
+        MD_RESULTS_DIR,
+        f"checkpoint_seed_{RUN_SEED}_P_{pressuregpa:g}GPa_T_{T_initial:g}K_density_{densitygcm3}.xyz",
+    ),
     s=saveinterval,
     T=totaltimesteps
 )
