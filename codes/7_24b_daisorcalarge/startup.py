@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
-"""Run either half of the ORCA large-cluster inputs in series.
-module load mpi/openmpi-x86_64
+"""Run either half of the ORCA large-cluster inputs in series on the HPC.
+
+The launcher loads the MPI module before each ORCA call:
+    module load mpi/openmpi-x86_64
+
 Examples:
     python startup.py --run 0
     python startup.py --run 1
@@ -10,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -20,6 +24,8 @@ INPUT_PATTERN = "r09_hot_w_large_cluster_*.inp"
 THREADS = "24"
 BASIS_FILE = "def2-tzvpd.bas"
 RUNTIME_DIR = SCRIPT_DIR / ".orca_runtime"
+DEFAULT_MPI_MODULE = "mpi/openmpi-x86_64"
+ORCA_COMMAND = "orca_qc"
 
 
 def selected_inputs(run: int) -> list[Path]:
@@ -54,7 +60,17 @@ def runtime_input(inp_path: Path, basis: Path) -> Path:
     return out_path
 
 
-def run_input(inp_path: Path, env: dict[str, str]) -> None:
+def orca_command(run_path: Path, mpi_module: str | None) -> list[str]:
+    if os.name == "posix" and mpi_module:
+        shell_command = (
+            f"module load {shlex.quote(mpi_module)} && "
+            f"exec {shlex.quote(ORCA_COMMAND)} {shlex.quote(str(run_path))}"
+        )
+        return ["bash", "-lc", shell_command]
+    return [ORCA_COMMAND, str(run_path)]
+
+
+def run_input(inp_path: Path, env: dict[str, str], mpi_module: str | None) -> None:
     basis = basis_path()
     run_path = runtime_input(inp_path, basis)
     out_path = inp_path.with_suffix(".out")
@@ -62,7 +78,7 @@ def run_input(inp_path: Path, env: dict[str, str]) -> None:
 
     with out_path.open("w", encoding="utf-8", newline="\n") as out_handle:
         process = subprocess.Popen(
-            ["orca_qc", str(run_path)],
+            orca_command(run_path, mpi_module),
             cwd=SCRIPT_DIR,
             env=env,
             stdout=subprocess.PIPE,
@@ -89,11 +105,17 @@ def main() -> None:
         required=True,
         help="0 runs clusters 001-015; 1 runs clusters 016-030.",
     )
+    parser.add_argument(
+        "--mpi-module",
+        default=DEFAULT_MPI_MODULE,
+        help=f"MPI module to load before each ORCA run; use an empty string to skip. Default: {DEFAULT_MPI_MODULE}",
+    )
     args = parser.parse_args()
 
     env = orca_env()
+    mpi_module = args.mpi_module or None
     for inp_path in selected_inputs(args.run):
-        run_input(inp_path, env)
+        run_input(inp_path, env, mpi_module)
 
 
 if __name__ == "__main__":
