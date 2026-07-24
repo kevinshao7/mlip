@@ -18,6 +18,8 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 INPUT_PATTERN = "r09_hot_w_large_cluster_*.inp"
 THREADS = "24"
+BASIS_FILE = "def2-tzvpd.bas"
+RUNTIME_DIR = SCRIPT_DIR / ".orca_runtime"
 
 
 def selected_inputs(run: int) -> list[Path]:
@@ -35,13 +37,31 @@ def orca_env() -> dict[str, str]:
     return env
 
 
+def basis_path() -> Path:
+    path = SCRIPT_DIR / BASIS_FILE
+    if not path.is_file():
+        raise SystemExit(f"Required ORCA basis file is missing: {path}")
+    return path.resolve()
+
+
+def runtime_input(inp_path: Path, basis: Path) -> Path:
+    RUNTIME_DIR.mkdir(exist_ok=True)
+    text = inp_path.read_text(encoding="utf-8")
+    text = text.replace(f'GTOName "{BASIS_FILE}"', f'GTOName "{basis}"')
+    out_path = RUNTIME_DIR / inp_path.name
+    out_path.write_text(text, encoding="utf-8", newline="\n")
+    return out_path
+
+
 def run_input(inp_path: Path, env: dict[str, str]) -> None:
+    basis = basis_path()
+    run_path = runtime_input(inp_path, basis)
     out_path = inp_path.with_suffix(".out")
     print(f"Running {inp_path.name} -> {out_path.name}", flush=True)
 
     with out_path.open("w", encoding="utf-8", newline="\n") as out_handle:
         process = subprocess.Popen(
-            ["orca_qc", str(inp_path)],
+            ["orca_qc", str(run_path)],
             cwd=SCRIPT_DIR,
             env=env,
             stdout=subprocess.PIPE,
