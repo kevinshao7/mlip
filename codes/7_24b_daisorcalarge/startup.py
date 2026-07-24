@@ -49,7 +49,8 @@ def runtime_input(inp_path: Path, basis: Path) -> Path:
     text = inp_path.read_text(encoding="utf-8")
     text = text.replace(f'GTOName "{BASIS_FILE}"', f'GTOName "{basis}"')
     out_path = RUNTIME_DIR / inp_path.name
-    out_path.write_text(text, encoding="utf-8", newline="\n")
+    with out_path.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write(text)
     return out_path
 
 
