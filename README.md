@@ -14,9 +14,11 @@ The active cluster-validation workflow is:
 Relevant scripts:
 
 ```text
-codes/7_7b_clustervalidation/extract_clusters.py
-codes/7_7b_clustervalidation/extract_small_clusters.py
-codes/7_7b_clustervalidation/compareclusters.py
+codes/7_7b_clustervalidation/extract_dft_sized_clusters.py
+codes/7_7b_clustervalidation/extract_small_cutoff_clusters.py
+codes/7_7b_clustervalidation/compare_mace_polar_orca_clusters.py
+codes/7_7b_clustervalidation/compute_trajectory_rdf.py
+codes/7_7b_clustervalidation/summarize_npt_block_errors.py
 codes/7_13a_orcaclusterssmall/expand77c.py
 ```
 
@@ -68,13 +70,13 @@ Keep source scripts under `codes/`. Avoid adding large trajectories, checkpoints
 Compile a modified script:
 
 ```powershell
-python -m py_compile .\codes\7_7b_clustervalidation\compareclusters.py
+python -m py_compile .\codes\7_7b_clustervalidation\compare_mace_polar_orca_clusters.py
 ```
 
 Run the small-cluster ORCA/MACE comparison:
 
 ```powershell
-python .\codes\7_7b_clustervalidation\compareclusters.py
+python .\codes\7_7b_clustervalidation\compare_mace_polar_orca_clusters.py
 ```
 
 Run ORCA locally over all generated small-cluster inputs, sequentially with 8 threads each:

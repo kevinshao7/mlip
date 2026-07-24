@@ -11,9 +11,11 @@ Use the local code and generated data as the source of truth. The project has mo
 ```text
 codes/                  dated workflow scripts
 codes/7_7b_clustervalidation/
-  extract_clusters.py   extracts roughly 18-20 atom clusters
-  extract_small_clusters.py extracts roughly 10-13 atom clusters
-  compareclusters.py    compares MACE-POLAR energies to ORCA DFT outputs
+  extract_dft_sized_clusters.py       extracts roughly 18-20 atom clusters
+  extract_small_cutoff_clusters.py    extracts smaller cutoff-defined clusters
+  compare_mace_polar_orca_clusters.py compares MACE-POLAR energies/forces to ORCA DFT outputs
+  compute_trajectory_rdf.py           computes trajectory RDF plots
+  summarize_npt_block_errors.py       estimates NPT block-average errors
 codes/7_13a_orcaclusterssmall/
   clusters/             small cluster xyz files
   expand/               ORCA inputs and outputs for those clusters

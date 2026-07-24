@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 from ase.io import read, write
 
-import extract_clusters as base
+import extract_dft_sized_clusters as base
 
 
 DEFAULT_INTERACTION_CUTOFF = 1.7

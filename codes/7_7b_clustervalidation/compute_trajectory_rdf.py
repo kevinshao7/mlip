@@ -12,7 +12,7 @@ from ase.io import read
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[1]
-DEFAULT_RUN = REPO_ROOT / "outputsfull" / "r09_hot_w7n1"
+DEFAULT_RUN = REPO_ROOT / "outputsfull" / "r09_hot_w"
 
 
 def status(message: str) -> None:

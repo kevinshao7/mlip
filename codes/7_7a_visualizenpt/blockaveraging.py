@@ -76,14 +76,19 @@ def load_run(folder: Path) -> tuple[Path, dict[str, np.ndarray]]:
 
 def autocorr_fft(values: np.ndarray) -> np.ndarray:
     x = np.asarray(values, dtype=float)
-    x = x[np.isfinite(x)] - np.nanmean(x)
+    x = x[np.isfinite(x)]
     n = len(x)
-    if n < 2 or np.allclose(x, 0.0):
-        return np.ones(max(n, 1))
+    if n < 2:
+        return np.full(max(n, 1), np.nan)
+    x = x - np.mean(x)
+    if np.allclose(x, 0.0):
+        return np.ones(n)
     fft_len = 1 << (2 * n - 1).bit_length()
     spectrum = np.fft.rfft(x, fft_len)
     acf = np.fft.irfft(spectrum * np.conjugate(spectrum), fft_len)[:n]
     acf /= np.arange(n, 0, -1)
+    if not np.isfinite(acf[0]) or np.isclose(acf[0], 0.0):
+        return np.full(n, np.nan)
     return np.real(acf / acf[0])
 
 
@@ -192,7 +197,7 @@ def plot_acf(txt: Path, data: dict[str, np.ndarray], cutoff_ps: float, max_lag_p
 def main() -> None:
     parser = argparse.ArgumentParser(description="Block-average NPT thermo output after an initial cutoff.")
     parser.add_argument("folder", nargs="?", type=Path, default=DEFAULT_FOLDER)
-    parser.add_argument("--cutoff-ps", type=float, default=25.0, help="Initial transient cutoff in ps.")
+    parser.add_argument("--cutoff-ps", type=float, default=5.0, help="Initial transient cutoff in ps.")
     parser.add_argument(
         "--acf-max-lag-ps",
         type=float,
