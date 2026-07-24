@@ -1,0 +1,201 @@
+#!/usr/bin/env python3
+"""Expand TemperatureRampbase.py over Uranus pressure/temperature/composition cases.
+
+Each generated script reads the user-selected pressure-equilibrated endpoint from
+the CHECKPOINT_XYZ environment variable and ramps from 300 K to the target row
+temperature at fixed target pressure.
+"""
+
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+BASE_SCRIPT = SCRIPT_DIR / "TemperatureRampbase.py"
+BASE_SLURM = SCRIPT_DIR / "TemperatureRampbase.slurm"
+OUT_DIR = SCRIPT_DIR / "expand"
+
+SAVE_INTERVAL_STEPS = 5
+
+TEMPERATURES = {
+    "hot": "hot_uranus_temperature_K",
+    "cold": "cold_uranus_temperature_K",
+    "pref": "preferred_uranus_temperature_K",
+}
+
+COMPOSITIONS = ("w", "w4n1", "w7n1")
+
+PRESSURE_ROWS = [
+    {
+        "row": 2,
+        "pressure_GPa": 0.0001,
+        "density_g_cm3": 0.000449,
+        "hot_uranus_temperature_K": 76,
+        "cold_uranus_temperature_K": 76,
+        "preferred_uranus_temperature_K": 76,
+    },
+    {
+        "row": 3,
+        "pressure_GPa": 0.0011,
+        "density_g_cm3": 0.00281,
+        "hot_uranus_temperature_K": 136,
+        "cold_uranus_temperature_K": 156,
+        "preferred_uranus_temperature_K": 179,
+    },
+    {
+        "row": 4,
+        "pressure_GPa": 0.01,
+        "density_g_cm3": 0.012,
+        "hot_uranus_temperature_K": 269,
+        "cold_uranus_temperature_K": 269,
+        "preferred_uranus_temperature_K": 398,
+    },
+    {
+        "row": 5,
+        "pressure_GPa": 0.11,
+        "density_g_cm3": 0.0495,
+        "hot_uranus_temperature_K": 537,
+        "cold_uranus_temperature_K": 481,
+        "preferred_uranus_temperature_K": 759,
+    },
+    {
+        "row": 6,
+        "pressure_GPa": 1,
+        "density_g_cm3": 0.14,
+        "hot_uranus_temperature_K": 1020,
+        "cold_uranus_temperature_K": 854,
+        "preferred_uranus_temperature_K": 1240,
+    },
+    {
+        "row": 7,
+        "pressure_GPa": 10,
+        "density_g_cm3": 0.344,
+        "hot_uranus_temperature_K": 2050,
+        "cold_uranus_temperature_K": 1500,
+        "preferred_uranus_temperature_K": 1920,
+    },
+    {
+        "row": 8,
+        "pressure_GPa": 15,
+        "density_g_cm3": 0.405,
+        "hot_uranus_temperature_K": 2340,
+        "cold_uranus_temperature_K": 1640,
+        "preferred_uranus_temperature_K": 2070,
+    },
+    {
+        "row": 9,
+        "pressure_GPa": 15,
+        "density_g_cm3": 1.19,
+        "hot_uranus_temperature_K": 2340,
+        "cold_uranus_temperature_K": 1640,
+        "preferred_uranus_temperature_K": 2070,
+    },
+    {
+        "row": 10,
+        "pressure_GPa": 100,
+        "density_g_cm3": 3.72,
+        "hot_uranus_temperature_K": 5520,
+        "cold_uranus_temperature_K": 1920,
+        "preferred_uranus_temperature_K": 2840,
+    },
+]
+
+
+def replace_once(text: str, pattern: str, replacement: str) -> str:
+    text, count = re.subn(pattern, replacement, text, count=1, flags=re.MULTILINE)
+    if count != 1:
+        raise RuntimeError(f"Could not replace pattern: {pattern}")
+    return text
+
+
+def replace_assignment(text: str, name: str, replacement: str) -> str:
+    return replace_once(text, rf"^{name}\s*=.*$", replacement)
+
+
+def replace_call_keyword(text: str, name: str, replacement_value: str) -> str:
+    return replace_once(text, rf"^(\s*){name}\s*=\s*[^,\n]+,", rf"\1{name}={replacement_value},")
+
+
+def write_text_lf(path: Path, text: str) -> None:
+    with path.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write(text)
+
+
+def make_script(base_text: str, row: dict[str, float], temp_name: str, comp_name: str) -> str:
+    run_id = f"r{int(row['row']):02d}_{temp_name}_{comp_name}"
+    pressure = row["pressure_GPa"]
+    temperature = row[TEMPERATURES[temp_name]]
+    density = row["density_g_cm3"]
+
+    text = base_text
+    text = replace_assignment(
+        text,
+        "PROJECT_ROOT",
+        "PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))",
+    )
+    text = replace_assignment(
+        text,
+        "MD_RESULTS_DIR",
+        f'MD_RESULTS_DIR = os.path.join(PROJECT_ROOT, "outputsfull", "temperature_ramp", "{run_id}")',
+    )
+    text = replace_assignment(text, "densitygcm3", f"densitygcm3 = {density:.12g} # metadata from Uranus row, g/cm3")
+    text = replace_assignment(text, "pressuregpa", f"pressuregpa = {pressure:.12g} # GPa")
+    text = replace_assignment(text, "saveinterval", f"saveinterval ={SAVE_INTERVAL_STEPS}")
+    text = replace_assignment(text, "T_final", f"T_final = {temperature:.12g}")
+    text = replace_call_keyword(text, "s", str(SAVE_INTERVAL_STEPS))
+    return text
+
+
+def make_slurm(base_text: str, run_id: str, py_name: str) -> str:
+    text = re.sub(r"^# Local GPU run without Slurm: .*\n", "", base_text, flags=re.MULTILINE)
+    text = replace_once(text, r"^#SBATCH --job-name=.*$", f"#SBATCH --job-name=tramp_{run_id}")
+    text = replace_once(text, r"^cd .*$", "cd /ptmp/kshao/mlip/codes/7_24_temperatureramp/expand")
+    text = replace_once(
+        text,
+        r"^srun python .*$",
+        (
+            "# Local GPU run without Slurm: "
+            "source ~/env/bin/activate && "
+            "cd ~/mlip/codes/7_24_temperatureramp/expand && "
+            f"CHECKPOINT_XYZ=/path/to/selected_checkpoint.xyz "
+            f"CUDA_VISIBLE_DEVICES=0 MLIP_MACE_DEVICE=cuda python {py_name}\n"
+            f"srun python {py_name}"
+        ),
+    )
+    return text
+
+
+def main() -> None:
+    base_text = BASE_SCRIPT.read_text(encoding="utf-8")
+    base_slurm_text = BASE_SLURM.read_text(encoding="utf-8")
+    OUT_DIR.mkdir(exist_ok=True)
+
+    written_python = 0
+    written_slurm = 0
+    for row in PRESSURE_ROWS:
+        for temp_name in TEMPERATURES:
+            for comp_name in COMPOSITIONS:
+                run_id = f"r{int(row['row']):02d}_{temp_name}_{comp_name}"
+                py_name = f"tramp_{run_id}.py"
+                slurm_name = f"tramp_{run_id}.sh"
+                py_path = OUT_DIR / py_name
+                slurm_path = OUT_DIR / slurm_name
+
+                write_text_lf(py_path, make_script(base_text, row, temp_name, comp_name))
+                write_text_lf(slurm_path, make_slurm(base_slurm_text, run_id, py_name))
+
+                print(f"wrote {py_path.relative_to(SCRIPT_DIR)}")
+                print(f"wrote {slurm_path.relative_to(SCRIPT_DIR)}")
+                written_python += 1
+                written_slurm += 1
+
+    print(
+        f"Generated {written_python} Python files and {written_slurm} Slurm files "
+        f"in {OUT_DIR.relative_to(SCRIPT_DIR)}"
+    )
+
+
+if __name__ == "__main__":
+    main()
