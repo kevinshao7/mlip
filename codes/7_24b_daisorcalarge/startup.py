@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Run either half of the ORCA large-cluster inputs in series.
-
+module load mpi/openmpi-x86_64
 Examples:
     python startup.py --run 0
     python startup.py --run 1
@@ -41,7 +41,7 @@ def run_input(inp_path: Path, env: dict[str, str]) -> None:
 
     with out_path.open("w", encoding="utf-8", newline="\n") as out_handle:
         process = subprocess.Popen(
-            ["orca", str(inp_path)],
+            ["orca_qc", str(inp_path)],
             cwd=SCRIPT_DIR,
             env=env,
             stdout=subprocess.PIPE,
