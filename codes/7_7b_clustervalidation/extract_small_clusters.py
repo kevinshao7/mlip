@@ -8,11 +8,10 @@ from pathlib import Path
 import numpy as np
 from ase.io import read, write
 
-import extract_dft_sized_clusters as base
+import extract_large_clusters as base
 
-
-DEFAULT_INTERACTION_CUTOFF = 1.7
-DEFAULT_BOND_FCT = 1.0
+DEFAULT_PREFERRED_ATOMS = 12
+DEFAULT_INTERACTION_CUTOFF = 1.75
 
 
 def default_output_dir(run_dir: Path) -> Path:
@@ -20,19 +19,19 @@ def default_output_dir(run_dir: Path) -> Path:
 
 
 def small_cluster_candidate(task):
-    frame_index, atoms, cutoff, bond_fct, vacuum = task
-    atoms, mol_indices, centers = base.wrapped_molecules(atoms, bond_fct)
-    lengths = atoms.cell.lengths()
-    center_id = int(np.argmin(np.linalg.norm(base.minimum_image(centers - 0.5 * lengths, lengths), axis=1)))
-    cluster, selected_molecules = base.cluster_for_center(atoms, mol_indices, centers, center_id, cutoff, vacuum)
-    cluster.info["selected_molecules"] = ",".join(str(i) for i in selected_molecules)
-    cluster.info["interaction_cutoff_A"] = cutoff
+    frame_index, atoms, cutoff, bond_scale, preferred_atoms, vacuum = task
+    cluster, center_id = base.choose_cluster(atoms, cutoff, bond_scale, preferred_atoms, vacuum)
     return frame_index, cluster, center_id
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Extract cutoff-defined water/NH3 clusters.")
-    parser.add_argument("--run-dir", type=Path, default=base.DEFAULT_RUN)
+    parser.add_argument(
+        "--run-dir",
+        type=Path,
+        default=base.DEFAULT_RUN,
+        help=f"Trajectory output directory to process. Default: outputsfull/{base.DEFAULT_DATA_SOURCE_NAME}",
+    )
     parser.add_argument("--output-dir", type=Path, default=None)
     parser.add_argument("--cutoff-ps", type=float, default=25.0, help="Use frames at/after this time.")
     parser.add_argument(
@@ -43,10 +42,23 @@ def main() -> None:
     )
     parser.add_argument("--clusters", type=int, default=30)
     parser.add_argument("--stride", type=int, default=2, help="Frame stride for cluster extraction candidates.")
-    parser.add_argument("--bond-fct", type=float, default=DEFAULT_BOND_FCT, help="aseMolec molecular connectivity scale.")
+    parser.add_argument(
+        "--bond-scale",
+        type=float,
+        default=base.DEFAULT_BOND_SCALE,
+        help="ASE covalent-radius multiplier for molecule detection.",
+    )
+    parser.add_argument(
+        "--preferred-atoms",
+        type=int,
+        default=DEFAULT_PREFERRED_ATOMS,
+        help="Preferred cluster size used to choose the center molecule; clusters are not rejected by size.",
+    )
     parser.add_argument("--vacuum", type=float, default=24.0)
     parser.add_argument("--workers", type=int, default=8, help="CPU workers for cluster extraction.")
     args = parser.parse_args()
+    if args.bond_scale <= 0:
+        parser.error("--bond-scale must be positive")
 
     if args.output_dir is None:
         args.output_dir = default_output_dir(args.run_dir)
@@ -95,7 +107,8 @@ def main() -> None:
                 int(frame_index),
                 frames[int(frame_index)],
                 args.interaction_cutoff,
-                args.bond_fct,
+                args.bond_scale,
+                args.preferred_atoms,
                 args.vacuum,
             )
             for frame_index in cluster_candidates
@@ -147,6 +160,7 @@ def main() -> None:
     if len(sizes) == 0:
         raise RuntimeError("No small clusters were extracted.")
     print(f"Cluster sizes: min={sizes.min()}, median={np.median(sizes):.0f}, max={sizes.max()}")
+    print(f"Clusters with {args.preferred_atoms} atoms: {np.count_nonzero(sizes == args.preferred_atoms)}/{len(sizes)}")
     print(f"Summary: {summary_path}")
 
 

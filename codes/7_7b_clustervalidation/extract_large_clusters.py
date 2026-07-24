@@ -3,38 +3,21 @@ from __future__ import annotations
 import argparse
 from concurrent.futures import ProcessPoolExecutor
 import csv
-import sys
-import types
 from pathlib import Path
 
 import numpy as np
 from ase import Atoms
 from ase.io import read, write
+from ase.neighborlist import NeighborList, natural_cutoffs
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[1]
-DEFAULT_RUN = REPO_ROOT / "outputsfull" / "r09_hot_w7n1"
-DEFAULT_INTERACTION_CUTOFF = 2.2
-DEFAULT_BOND_FCT = 1.0
-DEFAULT_PREFERRED_ATOMS = 19
-
-
-def import_anaatoms():
-    if "ase_ga.utilities" not in sys.modules:
-        ase_ga = types.ModuleType("ase_ga")
-        utilities = types.ModuleType("ase_ga.utilities")
-        utilities.get_rdf = lambda *args, **kwargs: None
-        ase_ga.utilities = utilities
-        sys.modules["ase_ga"] = ase_ga
-        sys.modules["ase_ga.utilities"] = utilities
-    sys.path.insert(0, str(REPO_ROOT / "aseMolec"))
-    from aseMolec import anaAtoms
-
-    return anaAtoms
-
-
-anaAtoms = import_anaatoms()
+DEFAULT_DATA_SOURCE_NAME = "r09_hot_w"
+DEFAULT_RUN = REPO_ROOT / "outputsfull" / DEFAULT_DATA_SOURCE_NAME
+DEFAULT_INTERACTION_CUTOFF = 2.15
+DEFAULT_BOND_SCALE = 1.2
+DEFAULT_PREFERRED_ATOMS = 21
 
 
 def status(message: str) -> None:
@@ -76,20 +59,48 @@ def minimum_image(delta: np.ndarray, lengths: np.ndarray) -> np.ndarray:
     return delta - np.rint(delta / lengths) * lengths
 
 
-def wrapped_molecules(atoms: Atoms, bond_fct: float) -> tuple[Atoms, list[np.ndarray], np.ndarray]:
+def wrapped_molecules(atoms: Atoms, bond_scale: float) -> tuple[Atoms, list[np.ndarray], np.ndarray]:
     atoms = atoms.copy()
-    anaAtoms.find_molecs([atoms], fct=bond_fct)
-    mol_ids = atoms.arrays["molID"]
-    indices: list[np.ndarray] = []
+    cutoffs = natural_cutoffs(atoms, mult=bond_scale)
+    neighbors = NeighborList(cutoffs, skin=0.0, self_interaction=False, bothways=True)
+    neighbors.update(atoms)
+    cell = atoms.cell.array
+    visited: set[int] = set()
+    molecule_indices: list[np.ndarray] = []
     centers = []
-    for mol_id in np.unique(mol_ids):
-        idx = np.flatnonzero(mol_ids == mol_id)
-        mol = atoms[idx]
-        center = anaAtoms.wrap_molec(mol, fct=bond_fct)
-        atoms.positions[idx] = mol.positions
-        indices.append(idx)
-        centers.append(center)
-    return atoms, indices, np.array(centers)
+    wrapped_positions = atoms.positions.copy()
+
+    for seed in range(len(atoms)):
+        if seed in visited:
+            continue
+        component: list[int] = []
+        unwrapped: dict[int, np.ndarray] = {seed: atoms.positions[seed].copy()}
+        stack = [seed]
+        visited.add(seed)
+
+        while stack:
+            atom_index = stack.pop()
+            component.append(atom_index)
+            indices, offsets = neighbors.get_neighbors(atom_index)
+            current_shift = unwrapped[atom_index] - atoms.positions[atom_index]
+            for neighbor_index, offset in zip(indices, offsets):
+                neighbor_index = int(neighbor_index)
+                if neighbor_index in visited:
+                    continue
+                unwrapped[neighbor_index] = atoms.positions[neighbor_index] + np.asarray(offset) @ cell + current_shift
+                visited.add(neighbor_index)
+                stack.append(neighbor_index)
+
+        idx = np.array(sorted(component), dtype=int)
+        positions = np.array([unwrapped[int(atom_index)] for atom_index in idx])
+        wrapped_positions[idx] = positions
+        molecule_indices.append(idx)
+        centers.append(positions.mean(axis=0))
+
+    atoms.positions = wrapped_positions
+    if not molecule_indices:
+        raise RuntimeError("No molecules were identified.")
+    return atoms, molecule_indices, np.array(centers)
 
 
 def cluster_for_center(
@@ -123,11 +134,11 @@ def cluster_for_center(
 def choose_cluster(
     atoms: Atoms,
     cutoff: float,
-    bond_fct: float,
+    bond_scale: float,
     preferred_atoms: int,
     vacuum: float,
 ) -> tuple[Atoms, int]:
-    atoms, mol_indices, centers = wrapped_molecules(atoms, bond_fct)
+    atoms, mol_indices, centers = wrapped_molecules(atoms, bond_scale)
     lengths = atoms.cell.lengths()
     order = np.argsort(np.linalg.norm(minimum_image(centers - 0.5 * lengths, lengths), axis=1))
     best = None
@@ -149,14 +160,19 @@ def choose_cluster(
 def cluster_candidate(
     task: tuple[int, Atoms, float, float, int, float],
 ) -> tuple[int, Atoms, int]:
-    frame_index, atoms, cutoff, bond_fct, preferred_atoms, vacuum = task
-    cluster, center_id = choose_cluster(atoms, cutoff, bond_fct, preferred_atoms, vacuum)
+    frame_index, atoms, cutoff, bond_scale, preferred_atoms, vacuum = task
+    cluster, center_id = choose_cluster(atoms, cutoff, bond_scale, preferred_atoms, vacuum)
     return frame_index, cluster, center_id
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Extract DFT-sized water/NH3 clusters.")
-    parser.add_argument("--run-dir", type=Path, default=DEFAULT_RUN)
+    parser.add_argument(
+        "--run-dir",
+        type=Path,
+        default=DEFAULT_RUN,
+        help=f"Trajectory output directory to process. Default: outputsfull/{DEFAULT_DATA_SOURCE_NAME}",
+    )
     parser.add_argument("--output-dir", type=Path, default=None)
     parser.add_argument("--cutoff-ps", type=float, default=25.0, help="Use frames at/after this time.")
     parser.add_argument(
@@ -167,7 +183,12 @@ def main() -> None:
     )
     parser.add_argument("--clusters", type=int, default=30)
     parser.add_argument("--stride", type=int, default=2, help="Frame stride for cluster extraction candidates.")
-    parser.add_argument("--bond-fct", type=float, default=DEFAULT_BOND_FCT, help="aseMolec molecular connectivity scale.")
+    parser.add_argument(
+        "--bond-scale",
+        type=float,
+        default=DEFAULT_BOND_SCALE,
+        help="ASE covalent-radius multiplier for molecule detection.",
+    )
     parser.add_argument(
         "--preferred-atoms",
         type=int,
@@ -175,8 +196,10 @@ def main() -> None:
         help="Preferred cluster size used only to choose the center molecule; clusters are not rejected by size.",
     )
     parser.add_argument("--vacuum", type=float, default=24.0)
-    parser.add_argument("--workers", type=int, default=8, help="CPU workers for RDF and cluster extraction.")
+    parser.add_argument("--workers", type=int, default=8, help="CPU workers for cluster extraction.")
     args = parser.parse_args()
+    if args.bond_scale <= 0:
+        parser.error("--bond-scale must be positive")
     if args.output_dir is None:
         args.output_dir = default_output_dir(args.run_dir)
     workers = max(1, args.workers)
@@ -224,7 +247,7 @@ def main() -> None:
                 int(frame_index),
                 frames[int(frame_index)],
                 args.interaction_cutoff,
-                args.bond_fct,
+                args.bond_scale,
                 args.preferred_atoms,
                 args.vacuum,
             )
@@ -282,7 +305,7 @@ def main() -> None:
     if len(sizes) == 0:
         raise RuntimeError("No clusters were extracted.")
     print(f"Cluster sizes: min={sizes.min()}, median={np.median(sizes):.0f}, max={sizes.max()}")
-    print(f"Clusters with 18-20 atoms: {np.count_nonzero((sizes >= 18) & (sizes <= 20))}/{len(sizes)}")
+    print(f"Clusters with {args.preferred_atoms} atoms: {np.count_nonzero(sizes == args.preferred_atoms)}/{len(sizes)}")
     print(f"Summary: {summary_path}")
 
 

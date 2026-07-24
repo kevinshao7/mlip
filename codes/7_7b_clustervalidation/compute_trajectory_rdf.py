@@ -7,6 +7,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 from ase import Atoms
+from ase.geometry.rdf import get_rdf
 from ase.io import read
 
 
@@ -55,28 +56,22 @@ def rdf_pairs(frames: list[Atoms]) -> list[tuple[str, str]]:
 
 def rdf_for_frame(task: tuple[Atoms, float, int, list[tuple[str, str]]]) -> dict[str, np.ndarray]:
     atoms, rmax, nbins, pairs = task
-    edges = np.linspace(0.0, rmax, nbins + 1)
-    radii = 0.5 * (edges[:-1] + edges[1:])
-    shell = 4.0 * np.pi * radii**2 * np.diff(edges)
     accum = {f"{a}-{b}": np.zeros(nbins) for a, b in pairs}
-
-    symbols = np.array(atoms.get_chemical_symbols())
+    distance_matrix = atoms.get_all_distances(mic=True)
+    rdf_atoms = atoms.copy()
+    rdf_atoms.set_cell([2.1 * rmax, 2.1 * rmax, 2.1 * rmax], scale_atoms=False)
     volume = atoms.get_volume()
-    distances = atoms.get_all_distances(mic=True)
+
     for a, b in pairs:
-        ia = np.flatnonzero(symbols == a)
-        ib = np.flatnonzero(symbols == b)
-        if not len(ia) or not len(ib):
-            continue
-        if a == b:
-            d = distances[np.ix_(ia, ia)]
-            d = d[np.triu_indices_from(d, k=1)]
-            norm = 0.5 * len(ia) * (len(ib) / volume) * shell
-        else:
-            d = distances[np.ix_(ia, ib)].ravel()
-            norm = len(ia) * (len(ib) / volume) * shell
-        hist, _ = np.histogram(d[(d > 0.0) & (d < rmax)], bins=edges)
-        accum[f"{a}-{b}"] += hist / np.maximum(norm, 1e-30)
+        accum[f"{a}-{b}"] += get_rdf(
+            rdf_atoms,
+            rmax,
+            nbins,
+            distance_matrix=distance_matrix,
+            elements=(a, b),
+            no_dists=True,
+            volume=volume,
+        )
 
     return accum
 

@@ -8,7 +8,8 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 from ase import Atoms
-from ase.geometry import cellpar_to_cell, find_mic
+from ase.geometry import cellpar_to_cell
+from ase.geometry.rdf import get_rdf
 from ase.io import read
 from scipy.io import netcdf_file
 
@@ -82,26 +83,36 @@ def calculate_rdfs(
     symbols, selections = load_topology(replica_dir / "minimized.pdb")
 
     nbins = int(np.ceil(rmax / dr))
-    edges = np.linspace(0.0, rmax, nbins + 1)
-    centers = 0.5 * (edges[:-1] + edges[1:])
-    shell = 4.0 * np.pi * centers**2 * np.diff(edges)
-    rdf = np.zeros(nbins)
+    centers = None
+    rdf = None
     selection_counts = {name: int(indices.size) for name, indices in selections.items()}
+    rdf_indices = np.unique(np.concatenate((selections["methanol_C"], selections["all_O"])))
 
     frame_count = 0
     for _frame_index, atoms in iter_netcdf_frames(
         replica_dir / "trajectory.nc", symbols, stride, max_frames
     ):
         frame_count += 1
-        volume = atoms.get_volume()
-        distances = atoms.get_all_distances(mic=True)
-        pair_distances = distances[np.ix_(selections["methanol_C"], selections["all_O"])].ravel()
-        hist, _ = np.histogram(pair_distances[(pair_distances > 0.0) & (pair_distances < rmax)], bins=edges)
-        norm = selections["methanol_C"].size * (selections["all_O"].size / volume) * shell
-        rdf += hist / np.maximum(norm, 1e-30)
+        rdf_atoms = atoms[rdf_indices]
+        distance_matrix = atoms.get_all_distances(mic=True)[np.ix_(rdf_indices, rdf_indices)]
+        rdf_atoms.set_cell([2.1 * rmax, 2.1 * rmax, 2.1 * rmax], scale_atoms=False)
+        frame_rdf, centers = get_rdf(
+            rdf_atoms,
+            rmax,
+            nbins,
+            distance_matrix=distance_matrix,
+            elements=("C", "O"),
+            volume=atoms.get_volume(),
+        )
+        if rdf is None:
+            rdf = np.zeros_like(frame_rdf)
+        rdf += frame_rdf
 
     if frame_count == 0:
         raise ValueError("No trajectory frames were sampled.")
+
+    if centers is None or rdf is None:
+        raise ValueError("No RDF values were calculated.")
 
     rdf /= frame_count
     return centers, rdf, selection_counts, frame_count
