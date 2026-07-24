@@ -33,13 +33,13 @@ densitygcm3 = 0.2 #gcm3, always 0.2 and allow NPT to naturally bring up pressure
 pressuregpa = 1.0 # GPa
 targetmolecules = 100
 moleculemass = 18 #grams per mol
-tempramptime = 200*1000*units.fs
+tempramptime = 10*1000*units.fs
 MDtimestep = 0.5*units.fs
-totaltimesteps = 2000000
+totaltimesteps = 60000
 saveinterval =100
 updateinterval = 20
-T_initial=300
-T_final = 2500
+T_initial=300 #always keep at room temperature
+T_final = 2500  # Placeholder; NPTMaceexpand.py overwrites this per Uranus row.
 
 
 rampsteps = int(tempramptime/MDtimestep)
@@ -102,6 +102,27 @@ def simpleMD(init_conf, temp, pressure_gpa, calc, fname, s, T, T_thermo=100):
     # ----------------------
     pressure_au = pressure_gpa * units.GPa
 
+    output_dir = os.path.dirname(fname)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+
+    if os.path.exists(fname):
+        os.remove(fname)
+
+    # arrays for plotting; time is continuous across the NPT ramp and production
+    times = []
+    temperatures = []
+    pressures = []
+    energies = []
+    kinetic_energies = []
+    total_energies = []
+    target_temperatures = []
+
+    pbar = tqdm(
+        total=rampsteps + T,
+        desc=f"NPT ramp {T_initial} -> {temp} K, then MD at {pressure_gpa} GPa",
+    )
+
 
 
     def make_npt_dynamics(temperature_K):
@@ -110,53 +131,13 @@ def simpleMD(init_conf, temp, pressure_gpa, calc, fname, s, T, T_thermo=100):
             timestep=MDtimestep,
             temperature_K=temperature_K,
             pressure_au=pressure_au,
-            tdamp=100 * units.fs,
-            pdamp=200 * units.fs
+            tdamp=50 * units.fs,
+            pdamp=50 * units.fs
         )
 
-    t0 = time.time()
-
-    for start in range(0, rampsteps, updateinterval):
-        fraction = start / max(rampsteps - 1, 1)
-
-        target_temperature = (
-            T_initial
-            + fraction * (temp - T_initial)
-        )
-
-        steps_this_chunk = min(
-            updateinterval,
-            rampsteps - start,
-        )
-        # This ASE version has no public MTK temperature setter, so each ramp
-        # chunk uses a fresh thermostat/barostat target without changing dt/P.
-        dyn = make_npt_dynamics(target_temperature)
-        dyn.run(steps_this_chunk)
-
-    dyn = make_npt_dynamics(temp)
-
-    output_dir = os.path.dirname(fname)
-    if output_dir:
-        os.makedirs(output_dir, exist_ok=True)
-
-    if os.path.exists(fname):
-        os.remove(fname)
-
-    # arrays for plotting
-    times = []
-    temperatures = []
-    pressures = []
-    energies = []
-    kinetic_energies = []
-    total_energies = []
-
-    pbar = tqdm(total=T, desc=f"NPT MD at {temp} K and {pressure_gpa} GPa")
-
-    def write_frame():
+    def write_frame(dyn, t_fs, target_temperature):
         atoms = dyn.atoms
         atoms.write(fname, append=True)
-
-        t_fs = dyn.get_time() / units.fs
 
         E = atoms.get_potential_energy() / len(atoms)
         Ekin = atoms.get_kinetic_energy() / len(atoms)
@@ -181,20 +162,63 @@ def simpleMD(init_conf, temp, pressure_gpa, calc, fname, s, T, T_thermo=100):
         energies.append(E)
         kinetic_energies.append(Ekin)
         total_energies.append(Etot)
+        target_temperatures.append(target_temperature)
 
         # pbar.update(s)
         pbar.set_postfix({
             "T(K)": f"{Tnow:.0f}",
+            "Ttarget(K)": f"{target_temperature:.0f}",
             "P(GPa)": f"{Pnow:.2f}",
             "rho": f"{density:.3f}",
             "E(eV/a)": f"{E:.4f}",
             "Etot(eV/a)": f"{Etot:.4f}",
         })
+
+    t0 = time.time()
+    total_npt_steps = 0
+    next_save_step = s
+
+    for start in range(0, rampsteps, updateinterval):
+        fraction = start / max(rampsteps - 1, 1)
+
+        target_temperature = (
+            T_initial
+            + fraction * (temp - T_initial)
+        )
+
+        steps_this_chunk = min(
+            updateinterval,
+            rampsteps - start,
+        )
+        # This ASE version has no public MTK temperature setter, so each ramp
+        # chunk uses a fresh thermostat/barostat target without changing dt/P.
+        dyn = make_npt_dynamics(target_temperature)
+        dyn.run(steps_this_chunk)
+        total_npt_steps += steps_this_chunk
+        pbar.update(steps_this_chunk)
+
+        if total_npt_steps >= next_save_step:
+            write_frame(
+                dyn,
+                t_fs=(total_npt_steps * MDtimestep) / units.fs,
+                target_temperature=target_temperature,
+            )
+            next_save_step += s
+
+    production_start_steps = total_npt_steps
+    dyn = make_npt_dynamics(temp)
+
     def update_progress():
         pbar.update(1)
 
+    def write_production_frame():
+        if dyn.get_time() == 0:
+            return
+        t_fs = ((production_start_steps * MDtimestep) + dyn.get_time()) / units.fs
+        write_frame(dyn, t_fs=t_fs, target_temperature=temp)
+
     dyn.attach(update_progress, interval=1)
-    dyn.attach(write_frame, interval=s)
+    dyn.attach(write_production_frame, interval=s)
 
     dyn.run(T)
     t1 = time.time()
@@ -208,6 +232,7 @@ def simpleMD(init_conf, temp, pressure_gpa, calc, fname, s, T, T_thermo=100):
         energies,
         kinetic_energies,
         total_energies,
+        target_temperatures,
     ])
 
     npyname = fname.replace(".xyz", "_thermo.npy")
@@ -220,7 +245,7 @@ def simpleMD(init_conf, temp, pressure_gpa, calc, fname, s, T, T_thermo=100):
         header=(
             "time_fs temperature_K pressure_GPa "
             "energy_eV_per_atom kinetic_energy_eV_per_atom "
-            "total_energy_eV_per_atom"
+            "total_energy_eV_per_atom target_temperature_K"
         ),
     )
 

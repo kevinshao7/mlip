@@ -145,8 +145,8 @@ def make_script(base_text: str, row: dict[str, float], temp_name: str, comp_name
         f'MD_RESULTS_DIR = os.path.join(PROJECT_ROOT, "outputsfull", "{run_id}")',
     )
     text = replace_assignment(text, "pressuregpa", f"pressuregpa = {pressure:.12g} # GPa")
+    text = replace_assignment(text, "T_final", f"T_final = {temperature:.12g}")
     text = replace_once(text, r"^simbox\.add_solvent\(.*$", COMPOSITIONS[comp_name])
-    text = replace_call_keyword(text, "temp", f"{temperature:.12g}")
     text = replace_once(
         text,
         r'^\s*fname\s*=\s*os\.path\.join\(MD_RESULTS_DIR,.*$',
