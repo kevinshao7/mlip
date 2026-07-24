@@ -1,7 +1,7 @@
 #!/bin/bash -l
 #SBATCH --job-name=orca_r09_hot_w_large_cluster_021
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=16
+#SBATCH --cpus-per-task=24
 #SBATCH --mem=64G
 #SBATCH --time=1:00:00
 #SBATCH --output=/ptmp/kshao/mlip/outputsfull/slurm/slurm-%x-%j.out

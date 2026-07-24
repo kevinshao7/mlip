@@ -108,8 +108,12 @@ def make_input_with_fairchem(atoms: Atoms) -> str:
     orca_calc.OrcaProfile = compatible_orca_profile
     transient_input = OUT_DIR / "orca.inp"
     orcasimpleinput = orca_calc.ORCA_ASE_SIMPLE_INPUT
-    if "PAL8" not in orcasimpleinput.split():
-        orcasimpleinput = f"{orcasimpleinput} PAL8"
+    orcasimpleinput = " ".join(
+        "PAL24" if token.upper().startswith("PAL") and token[3:].isdigit() else token
+        for token in orcasimpleinput.split()
+    )
+    if "PAL24" not in orcasimpleinput.split():
+        orcasimpleinput = f"{orcasimpleinput} PAL24"
     orca_calc.write_orca_inputs(
         atoms,
         OUT_DIR,
