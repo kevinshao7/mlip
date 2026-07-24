@@ -32,7 +32,7 @@ def find_xyz(run_dir: Path) -> Path:
 
 
 def default_output_dir(run_dir: Path) -> Path:
-    return run_dir
+    return run_dir / "large_clusters"
 
 
 def frame_times_ps(run_dir: Path, n_frames: int) -> np.ndarray:
@@ -166,7 +166,7 @@ def cluster_candidate(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Extract DFT-sized water/NH3 clusters.")
+    parser = argparse.ArgumentParser(description="Extract large cutoff-defined water/NH3 clusters.")
     parser.add_argument(
         "--run-dir",
         type=Path,
@@ -217,19 +217,14 @@ def main() -> None:
         f"{times_ps[int(cluster_candidates[0])]:.6g} to {times_ps[int(cluster_candidates[-1])]:.6g} ps"
     )
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    cluster_dir = args.output_dir / "clusters"
-    cluster_dir.mkdir(exist_ok=True)
     run_name = args.run_dir.name
-    stale_clusters = list(cluster_dir.glob(f"{run_name}_cluster_*.xyz"))
-    if stale_clusters:
-        status(f"Removing {len(stale_clusters)} existing cluster files for {run_name}")
-    for old_cluster in cluster_dir.glob(f"{run_name}_cluster_*.xyz"):
-        old_cluster.unlink()
 
-    summary_path = args.output_dir / "cluster_summary.csv"
+    summary_path = args.output_dir / "large_cluster_summary.csv"
+    clusters_path = args.output_dir / f"{run_name}_large_clusters.xyz"
     sizes = []
+    clusters = []
     cluster_progress_step = max(1, len(cluster_candidates) // 20)
-    status(f"Extracting {len(cluster_candidates)} clusters using {workers} workers")
+    status(f"Extracting {len(cluster_candidates)} large clusters using {workers} workers")
     with summary_path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(
             handle,
@@ -271,14 +266,14 @@ def main() -> None:
                 cluster_no += 1
                 sizes.append(len(cluster))
                 cluster.info.update({
+                    "cluster_id": cluster_no,
                     "source_xyz": str(xyz),
                     "source_frame": int(frame_index),
                     "source_time_ps": float(times_ps[int(frame_index)]),
                     "center_molecule": center_id,
                 })
                 symbols = cluster.get_chemical_symbols()
-                out = cluster_dir / f"{run_name}_cluster_{cluster_no:03d}.xyz"
-                write(out, cluster)
+                clusters.append(cluster)
                 writer.writerow({
                     "cluster_id": cluster_no,
                     "frame": int(frame_index),
@@ -294,16 +289,17 @@ def main() -> None:
                     ),
                     "selected_molecules": cluster.info.get("selected_molecules", ""),
                 })
-                status(f"Saved cluster {cluster_no}/{args.clusters} from frame {frame_index}")
+                status(f"Prepared large cluster {cluster_no}/{args.clusters} from frame {frame_index}")
         finally:
             if executor is not None:
                 executor.shutdown(wait=True)
 
     sizes = np.array(sizes)
     print(f"Input trajectory: {xyz}")
-    print(f"Saved clusters: {cluster_dir}")
     if len(sizes) == 0:
         raise RuntimeError("No clusters were extracted.")
+    write(clusters_path, clusters)
+    print(f"Saved large clusters: {clusters_path}")
     print(f"Cluster sizes: min={sizes.min()}, median={np.median(sizes):.0f}, max={sizes.max()}")
     print(f"Clusters with {args.preferred_atoms} atoms: {np.count_nonzero(sizes == args.preferred_atoms)}/{len(sizes)}")
     print(f"Summary: {summary_path}")

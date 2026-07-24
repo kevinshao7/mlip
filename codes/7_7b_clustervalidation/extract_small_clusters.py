@@ -12,6 +12,7 @@ import extract_large_clusters as base
 
 DEFAULT_PREFERRED_ATOMS = 12
 DEFAULT_INTERACTION_CUTOFF = 1.75
+DEFAULT_CUTOFF_PS = 10.0
 
 
 def default_output_dir(run_dir: Path) -> Path:
@@ -33,7 +34,7 @@ def main() -> None:
         help=f"Trajectory output directory to process. Default: outputsfull/{base.DEFAULT_DATA_SOURCE_NAME}",
     )
     parser.add_argument("--output-dir", type=Path, default=None)
-    parser.add_argument("--cutoff-ps", type=float, default=25.0, help="Use frames at/after this time.")
+    parser.add_argument("--cutoff-ps", type=float, default=DEFAULT_CUTOFF_PS, help="Use frames at/after this time.")
     parser.add_argument(
         "--interaction-cutoff",
         type=float,
@@ -78,17 +79,12 @@ def main() -> None:
     )
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    cluster_dir = args.output_dir / "clusters"
-    cluster_dir.mkdir(exist_ok=True)
     run_name = args.run_dir.name
-    stale_clusters = list(cluster_dir.glob(f"{run_name}_small_cluster_*.xyz"))
-    if stale_clusters:
-        base.status(f"Removing {len(stale_clusters)} existing small cluster files for {run_name}")
-    for old_cluster in stale_clusters:
-        old_cluster.unlink()
 
     summary_path = args.output_dir / "small_cluster_summary.csv"
+    clusters_path = args.output_dir / f"{run_name}_small_clusters.xyz"
     sizes = []
+    clusters = []
     progress_step = max(1, len(cluster_candidates) // 20)
     base.status(f"Extracting {len(cluster_candidates)} small clusters using {workers} workers")
     with summary_path.open("w", newline="", encoding="utf-8") as handle:
@@ -127,14 +123,14 @@ def main() -> None:
                     base.status(f"Small cluster progress: {cluster_no}/{len(cluster_candidates)}")
                 sizes.append(len(cluster))
                 cluster.info.update({
+                    "cluster_id": cluster_no,
                     "source_xyz": str(xyz),
                     "source_frame": int(frame_index),
                     "source_time_ps": float(times_ps[int(frame_index)]),
                     "center_molecule": center_id,
                 })
                 symbols = cluster.get_chemical_symbols()
-                out = cluster_dir / f"{run_name}_small_cluster_{cluster_no:03d}.xyz"
-                write(out, cluster)
+                clusters.append(cluster)
                 writer.writerow({
                     "cluster_id": cluster_no,
                     "frame": int(frame_index),
@@ -156,9 +152,10 @@ def main() -> None:
 
     sizes = np.array(sizes)
     print(f"Input trajectory: {xyz}")
-    print(f"Saved clusters: {cluster_dir}")
     if len(sizes) == 0:
         raise RuntimeError("No small clusters were extracted.")
+    write(clusters_path, clusters)
+    print(f"Saved clusters: {clusters_path}")
     print(f"Cluster sizes: min={sizes.min()}, median={np.median(sizes):.0f}, max={sizes.max()}")
     print(f"Clusters with {args.preferred_atoms} atoms: {np.count_nonzero(sizes == args.preferred_atoms)}/{len(sizes)}")
     print(f"Summary: {summary_path}")

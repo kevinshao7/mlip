@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Expand ORCA cluster calculations from clusters/*.xyz.
+"""Expand ORCA cluster calculations from a multi-frame cluster XYZ.
 
 Run from anywhere.  The generated .inp and .slurm files are written to the
 expand folder next to this script.
@@ -20,12 +20,16 @@ import shutil
 import sys
 from pathlib import Path
 
+from ase import Atoms
+from ase.io import read
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-CLUSTER_DIR = SCRIPT_DIR / "clusters"
 OUT_DIR = SCRIPT_DIR / "expand"
 BASE_SLURM = SCRIPT_DIR / "orcaclustersbase.slurm"
 MLIP_DIR = SCRIPT_DIR.parents[1]
+DEFAULT_CLUSTER_XYZ = MLIP_DIR / "outputsfull" / "r09_hot_w" / "small_clusters" / "r09_hot_w_small_clusters.xyz"
+DEFAULT_CLUSTER_STEM = "r09_hot_w_small_cluster"
+EXPECTED_CLUSTERS = 30
 FAIRCHEM_ORCA_CALC = MLIP_DIR / "fairchem" / "src" / "fairchem" / "data" / "omol" / "orca" / "calc.py"
 FAIRCHEM_SRC = MLIP_DIR / "fairchem" / "src"
 FAIRCHEM_ORCA_BASIS = MLIP_DIR / "fairchem" / "src" / "fairchem" / "data" / "omol" / "orca" / "basis" / "def2-tzvpd.bas"
@@ -44,29 +48,13 @@ FORMAL_CHARGES = {
 MULTIPLICITY = 1
 
 
-def read_xyz_atoms(path: Path) -> list[tuple[str, float, float, float]]:
-    lines = path.read_text(encoding="utf-8").splitlines()
-    if len(lines) < 3:
-        raise ValueError(f"XYZ file is too short: {path}")
-    try:
-        natoms = int(lines[0].strip())
-    except ValueError as exc:
-        raise ValueError(f"First line is not an atom count in {path}") from exc
-    atom_lines = lines[2 : 2 + natoms]
-    if len(atom_lines) != natoms:
-        raise ValueError(f"Expected {natoms} atom lines in {path}, found {len(atom_lines)}")
-
-    atoms = []
-    for line in atom_lines:
-        parts = line.split()
-        if len(parts) < 4:
-            raise ValueError(f"Malformed atom line in {path}: {line}")
-        symbol = parts[0]
+def atom_tuples(atoms: Atoms) -> list[tuple[str, float, float, float]]:
+    rows = []
+    for symbol, position in zip(atoms.get_chemical_symbols(), atoms.positions):
         if symbol not in ATOMIC_NUMBERS:
-            raise ValueError(f"No atomic number configured for {symbol!r} in {path}")
-        x, y, z = (float(parts[1]), float(parts[2]), float(parts[3]))
-        atoms.append((symbol, x, y, z))
-    return atoms
+            raise ValueError(f"No atomic number configured for {symbol!r}")
+        rows.append((symbol, float(position[0]), float(position[1]), float(position[2])))
+    return rows
 
 
 def formal_charge(atoms: list[tuple[str, float, float, float]]) -> int:
@@ -104,7 +92,7 @@ def load_fairchem_orca_calc():
     return module
 
 
-def make_input_with_fairchem(cluster_xyz: Path, atoms: list[tuple[str, float, float, float]]) -> str:
+def make_input_with_fairchem(atoms: Atoms) -> str:
     orca_calc = load_fairchem_orca_calc()
     if orca_calc is None:
         raise RuntimeError(
@@ -112,11 +100,8 @@ def make_input_with_fairchem(cluster_xyz: Path, atoms: list[tuple[str, float, fl
             f"{FAIRCHEM_ORCA_CALC}"
         )
 
-    charge = formal_charge(atoms)
+    charge = formal_charge(atom_tuples(atoms))
     from ase.calculators.orca import OrcaProfile
-    from ase.io import read
-
-    ase_atoms = read(cluster_xyz)
 
     def compatible_orca_profile(command):
         if isinstance(command, list):
@@ -130,7 +115,7 @@ def make_input_with_fairchem(cluster_xyz: Path, atoms: list[tuple[str, float, fl
     if "PAL8" not in orcasimpleinput.split():
         orcasimpleinput = f"{orcasimpleinput} PAL8"
     orca_calc.write_orca_inputs(
-        ase_atoms,
+        atoms,
         OUT_DIR,
         charge=charge,
         mult=MULTIPLICITY,
@@ -141,34 +126,51 @@ def make_input_with_fairchem(cluster_xyz: Path, atoms: list[tuple[str, float, fl
     return text
 
 
-def make_input(cluster_xyz: Path) -> str:
-    atoms = read_xyz_atoms(cluster_xyz)
-    return make_input_with_fairchem(cluster_xyz, atoms)
+def make_input(atoms: Atoms) -> str:
+    return make_input_with_fairchem(atoms)
 
 
 def make_slurm(base: str, stem: str) -> str:
     return (
-        base.replace("__JOB_NAME__", f"orca_{stem[:26]}")
+        base.replace("__JOB_NAME__", f"orca_{stem}")
         .replace("__INPUT_FILE__", f"{stem}.inp")
         .replace("__OUTPUT_FILE__", f"{stem}.out")
     )
 
 
+def cluster_frames(path: Path) -> list[Atoms]:
+    if not path.is_file():
+        raise FileNotFoundError(f"Multi-frame cluster XYZ not found: {path}")
+    frames = read(path, ":")
+    if len(frames) != EXPECTED_CLUSTERS:
+        raise ValueError(f"Expected {EXPECTED_CLUSTERS} cluster frames in {path}, found {len(frames)}")
+    return frames
+
+
+def remove_stale_generated_files() -> int:
+    patterns = ("*_small_cluster_*.inp", "*_small_cluster_*.slurm")
+    stale_files = [path for pattern in patterns for path in OUT_DIR.glob(pattern)]
+    for path in stale_files:
+        path.unlink()
+    return len(stale_files)
+
+
 def main() -> None:
-    clusters = sorted(CLUSTER_DIR.glob("*.xyz"))
-    if not clusters:
-        raise FileNotFoundError(f"No cluster .xyz files found in {CLUSTER_DIR}")
+    clusters = cluster_frames(DEFAULT_CLUSTER_XYZ)
 
     base_slurm = BASE_SLURM.read_text(encoding="utf-8")
     OUT_DIR.mkdir(exist_ok=True)
+    stale_count = remove_stale_generated_files()
+    if stale_count:
+        print(f"Removed {stale_count} stale generated input/slurm files from {OUT_DIR.relative_to(SCRIPT_DIR)}")
     if FAIRCHEM_ORCA_BASIS.exists():
         shutil.copy2(FAIRCHEM_ORCA_BASIS, OUT_DIR / FAIRCHEM_ORCA_BASIS.name)
 
-    for cluster_xyz in clusters:
-        stem = cluster_xyz.stem
+    for cluster_index, atoms in enumerate(clusters, start=1):
+        stem = f"{DEFAULT_CLUSTER_STEM}_{cluster_index:03d}"
         inp_path = OUT_DIR / f"{stem}.inp"
         slurm_path = OUT_DIR / f"{stem}.slurm"
-        write_text_lf(inp_path, make_input(cluster_xyz))
+        write_text_lf(inp_path, make_input(atoms))
         write_text_lf(slurm_path, make_slurm(base_slurm, stem))
         print(f"wrote {inp_path.relative_to(SCRIPT_DIR)}")
         print(f"wrote {slurm_path.relative_to(SCRIPT_DIR)}")
