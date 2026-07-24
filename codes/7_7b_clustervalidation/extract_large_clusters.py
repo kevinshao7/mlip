@@ -18,6 +18,7 @@ DEFAULT_RUN = REPO_ROOT / "outputsfull" / DEFAULT_DATA_SOURCE_NAME
 DEFAULT_INTERACTION_CUTOFF = 2.15
 DEFAULT_BOND_SCALE = 1.2
 DEFAULT_PREFERRED_ATOMS = 21
+DEFAULT_CUTOFF_PS = 10.0
 
 
 def status(message: str) -> None:
@@ -174,7 +175,7 @@ def main() -> None:
         help=f"Trajectory output directory to process. Default: outputsfull/{DEFAULT_DATA_SOURCE_NAME}",
     )
     parser.add_argument("--output-dir", type=Path, default=None)
-    parser.add_argument("--cutoff-ps", type=float, default=25.0, help="Use frames at/after this time.")
+    parser.add_argument("--cutoff-ps", type=float, default=DEFAULT_CUTOFF_PS, help="Use frames at/after this time.")
     parser.add_argument(
         "--interaction-cutoff",
         type=float,
