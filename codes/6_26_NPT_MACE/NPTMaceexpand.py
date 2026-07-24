@@ -16,7 +16,7 @@ BASE_SCRIPT = SCRIPT_DIR / "NPTMACEbase.py"
 BASE_SLURM = SCRIPT_DIR / "NPTMACEbase.slurm"
 OUT_DIR = SCRIPT_DIR / "expand"
 
-SAVE_INTERVAL_STEPS = 100
+SAVE_INTERVAL_STEPS = 5
 # Keep None to inherit the current production length from NPTMACEbase.py.
 MD_STEPS: int | None = None
 

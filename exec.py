@@ -7,7 +7,7 @@ Commands:
     python ~/mlip/exec.py -j 7_6_jaxoutputs -m viper-cpu --dry-run
     python ~/mlip/exec.py -j 6_26_NPT_MACE -m raven --entry NPTMACEbase.py --dry-run
     python ~/mlip/exec.py -j 6_26_NPT_MACE -m dungeon-gpu0 --entry expand/npt_r09_hot_w.py
-    python ~/mlip/exec.py -j 6_26_NPT_MACE -m dungeon-gpu0 --entry expand/npt_r09_hot_w.py
+    python ~/mlip/exec.py -j 6_26_NPT_MACE -m dungeon-gpu1 --entry expand/npt_r09_hot_w.py
 
     python ~/mlip/exec.py -j 6_26_NPT_MACE -m stormy-gpu0 --entry expand/npt_r09_hot_w7n1.py
 

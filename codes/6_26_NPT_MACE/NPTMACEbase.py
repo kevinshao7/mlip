@@ -34,14 +34,18 @@ targetmolecules = 100
 moleculemass = 18 #grams per mol
 tempramptime = 10*1000*units.fs
 MDtimestep = 0.5*units.fs
-totaltimesteps = 60000
-saveinterval =100
+totaltimesteps = 50000
+saveinterval =5
 T_initial=300 #always keep at room temperature
 T_final = 2500  # Heating target for downstream runs; not used during pressure equilibration.
+
+if saveinterval <= 0:
+    raise ValueError(f"saveinterval must be positive, got {saveinterval}")
 
 RUN_SEED = int.from_bytes(os.urandom(8), "little") % 1_000_000_000
 np.random.seed(RUN_SEED)
 print(f"RUN_SEED {RUN_SEED}")
+print(f"saveinterval_steps {saveinterval}")
 
 NA = 6.022e23
 boxsize=(((targetmolecules*moleculemass/NA)/densitygcm3)**(1/3))*1e8 #boxsize in angstroms
@@ -128,7 +132,7 @@ def simpleMD(init_conf, temp, pressure_gpa, calc, fname, checkpoint_fname, s, T,
             temperature_K=temperature_K,
             pressure_au=pressure_au,
             tdamp=100 * units.fs,
-            pdamp=100 * units.fs
+            pdamp=1000 * units.fs
         )
 
     def write_frame(dyn, t_fs, target_temperature):
