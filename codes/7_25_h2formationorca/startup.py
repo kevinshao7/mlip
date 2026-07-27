@@ -1,16 +1,11 @@
 #!/usr/bin/env python3
-"""Run either half of the ORCA H2-formation focused-frame inputs in series.
+"""Run ORCA H2-formation focused-frame inputs 003-010 in series.
 
 The launcher loads the MPI module before each ORCA call:
     module load mpi/openmpi-x86_64
 
-Examples:
-    python startup.py --batch first
-    python startup.py --batch last
-
-Equivalent numeric switches:
-    python startup.py --run 0   # frames 001-010
-    python startup.py --run 1   # frames 011-020
+Example:
+    python startup.py
 """
 
 from __future__ import annotations
@@ -33,11 +28,11 @@ DEFAULT_MPI_MODULE = "mpi/openmpi-x86_64"
 ORCA_COMMAND = "orca_qc"
 
 
-def selected_inputs(batch: str) -> list[Path]:
+def selected_inputs() -> list[Path]:
     inputs = sorted(SCRIPT_DIR.glob(INPUT_PATTERN))
     if len(inputs) != EXPECTED_INPUTS:
         raise SystemExit(f"Expected {EXPECTED_INPUTS} ORCA inputs matching {INPUT_PATTERN}, found {len(inputs)}")
-    return inputs[:10] if batch == "first" else inputs[10:]
+    return inputs[2:10]
 
 
 def orca_env() -> dict[str, str]:
@@ -101,18 +96,8 @@ def run_input(inp_path: Path, env: dict[str, str], mpi_module: str | None) -> No
         raise SystemExit(f"ORCA failed for {inp_path.name} with exit code {return_code}")
 
 
-def resolve_batch(args: argparse.Namespace) -> str:
-    if args.batch is not None:
-        return args.batch
-    if args.run is not None:
-        return "first" if args.run == 0 else "last"
-    raise SystemExit("Choose one batch with --batch first, --batch last, --run 0, or --run 1.")
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--batch", choices=("first", "last"), help="first runs frames 001-010; last runs 011-020.")
-    parser.add_argument("--run", type=int, choices=(0, 1), help="0 runs frames 001-010; 1 runs frames 011-020.")
     parser.add_argument(
         "--mpi-module",
         default=DEFAULT_MPI_MODULE,
@@ -120,10 +105,9 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    batch = resolve_batch(args)
     env = orca_env()
     mpi_module = args.mpi_module or None
-    for inp_path in selected_inputs(batch):
+    for inp_path in selected_inputs():
         run_input(inp_path, env, mpi_module)
 
 
