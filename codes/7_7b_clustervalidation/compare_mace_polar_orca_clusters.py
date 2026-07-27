@@ -56,13 +56,14 @@ torch.set_num_interop_threads(1)
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[1]
-DEFAULT_CLUSTER_DIR = REPO_ROOT / "codes" / "7_24b_daisorcalarge"
-DEFAULT_ORCA_OUTPUT_DIR = REPO_ROOT / "codes" / "7_24b_daisorcalarge"
-DEFAULT_OUTPUT_DIR = REPO_ROOT / "outputsfull" / "7_24b_daisorcalarge_comparison"
+DEFAULT_TEMPERATURE_RAMP_RUN = REPO_ROOT / "outputsfull" / "temperature_ramp" / "r09_hot_w"
+DEFAULT_CLUSTER_DIR = DEFAULT_TEMPERATURE_RAMP_RUN / "large_clusters"
+DEFAULT_ORCA_OUTPUT_DIR = DEFAULT_CLUSTER_DIR
+DEFAULT_OUTPUT_DIR = DEFAULT_TEMPERATURE_RAMP_RUN / "orca_comparison"
 DEFAULT_CACHE_DIR = REPO_ROOT / "outputsfull" / ".cache"
 DEFAULT_ATOMIC_REFERENCE_PATH = SCRIPT_DIR / "atomizationenergies.txt"
 DEFAULT_MULTI_FRAME_CLUSTER_XYZ = (
-    REPO_ROOT / "outputsfull" / "r09_hot_w" / "large_clusters" / "r09_hot_w_large_clusters.xyz"
+    DEFAULT_CLUSTER_DIR / "r09_hot_w_large_clusters.xyz"
 )
 XYZ_BLOCK_HEADER_RE = re.compile(r"^\*xyz\s+(-?\d+)\s+(\d+)\s*$", re.IGNORECASE)
 XYZ_BLOCK_ATOM_RE = re.compile(

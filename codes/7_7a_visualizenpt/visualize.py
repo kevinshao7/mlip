@@ -8,7 +8,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-DEFAULT_FOLDER = Path(r"C:\Users\shaoq\Documents\Mainz\mlip\outputsfull\r09_hot_w")
+DEFAULT_THERMO = (
+    Path(__file__).resolve().parents[2]
+    / "outputsfull"
+    / "temperature_ramp"
+    / "r09_hot_w"
+    / "temperature_ramp_seed_525385756_from_pressure_equil_seed_353168294_P_15GPa_T_300K_density_0.2_P_15GPa_300K_to_2340K_thermo.txt"
+)
 AMU_TO_G = 1.66053906660e-24
 ANG3_TO_CM3 = 1e-24
 MASSES = {"H": 1.00784, "C": 12.011, "N": 14.0067, "O": 15.999, "S": 32.06}
@@ -53,13 +59,21 @@ def xyz_densities(path: Path) -> np.ndarray:
     return np.array(densities, dtype=float)
 
 
-def plot(folder: Path) -> Path:
-    txt = find_one(folder, "*thermo*.txt") or find_one(folder, "*.txt")
+def find_thermo(input_path: Path) -> Path:
+    if input_path.is_file():
+        return input_path
+    txt = find_one(input_path, "*thermo*.txt") or find_one(input_path, "*.txt")
     if txt is None:
-        raise FileNotFoundError(f"No .txt file found in {folder}")
+        raise FileNotFoundError(f"No .txt file found in {input_path}")
+    return txt
+
+
+def plot(input_path: Path) -> Path:
+    txt = find_thermo(input_path)
 
     thermo = load_thermo(txt)
     time = thermo.get("time_fs", np.arange(len(next(iter(thermo.values())))))
+    folder = txt.parent
     xyz = find_one(folder, f"{txt.stem.replace('_thermo', '')}*.xyz") or find_one(folder, "*.xyz")
     if xyz:
         density = xyz_densities(xyz)
@@ -82,6 +96,9 @@ def plot(folder: Path) -> Path:
     for ax, (col, ylabel, is_energy_panel) in zip(axes, panels):
         if not is_energy_panel:
             ax.plot(time, thermo[col])
+            if col == "temperature_K" and "target_temperature_K" in thermo:
+                ax.plot(time, thermo["target_temperature_K"], label="Target")
+                ax.legend()
             ax.set_ylabel(ylabel)
             continue
         for energy_col, label in [
@@ -110,9 +127,9 @@ def plot(folder: Path) -> Path:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Plot thermo text output from an MLIP run folder.")
-    parser.add_argument("folder", nargs="?", type=Path, default=DEFAULT_FOLDER)
-    out = plot(parser.parse_args().folder)
+    parser = argparse.ArgumentParser(description="Plot thermo text output from an MLIP run folder or file.")
+    parser.add_argument("input", nargs="?", type=Path, default=DEFAULT_THERMO)
+    out = plot(parser.parse_args().input)
     print(f"Saved {out}")
 
 

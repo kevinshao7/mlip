@@ -2,9 +2,21 @@ from __future__ import annotations
 
 import argparse
 import csv
+from concurrent.futures import ProcessPoolExecutor
+import os
 import re
 from collections.abc import Iterator
 from pathlib import Path
+
+# Parallel usage:
+#   python plot_r09_hot_w_water_autoionization.py --cpu=24
+#
+# Use process-level parallelism over sampled trajectory frames. Keep BLAS/OpenMP
+# threads at 1 so --cpu=24 means 24 worker processes, not nested thread pools.
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -12,14 +24,17 @@ import numpy as np
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[1]
-DEFAULT_RUN_DIR = REPO_ROOT / "outputsfull" / "r09_hot_w"
+DEFAULT_RUN_DIR = REPO_ROOT / "outputsfull" / "temperature_ramp" / "r09_hot_w"
 FS_PER_PS = 1000.0
 SPECIES = ("O", "OH", "H2O", "H3O", "H4O_or_more")
 LATTICE_RE = re.compile(r'Lattice="([^"]+)"')
+CANONICAL_O_H_COUNTS = {1, 2, 3}
 
 
 def find_one(folder: Path, pattern: str) -> Path | None:
     files = sorted(folder.glob(pattern), key=lambda path: (path.stat().st_mtime, path.name), reverse=True)
+    if pattern == "*.xyz":
+        files = [path for path in files if "checkpoint" not in path.name.lower()] or files
     return files[0] if files else None
 
 
@@ -75,6 +90,21 @@ def iter_xyz_frames(xyz_path: Path) -> Iterator[tuple[int, np.ndarray, np.ndarra
             frame_index += 1
 
 
+def iter_sampled_xyz_frames(
+    xyz_path: Path,
+    stride: int,
+    max_frames: int | None,
+) -> Iterator[tuple[int, np.ndarray, np.ndarray, np.ndarray]]:
+    sampled = 0
+    for frame_index, symbols, positions, cell in iter_xyz_frames(xyz_path):
+        if frame_index % stride != 0:
+            continue
+        if max_frames is not None and sampled >= max_frames:
+            break
+        sampled += 1
+        yield frame_index, symbols, positions, cell
+
+
 def minimum_image_distances(h_positions: np.ndarray, o_positions: np.ndarray, cell: np.ndarray) -> np.ndarray:
     delta = h_positions[:, None, :] - o_positions[None, :, :]
     fractional = delta @ np.linalg.inv(cell)
@@ -82,7 +112,18 @@ def minimum_image_distances(h_positions: np.ndarray, o_positions: np.ndarray, ce
     return np.linalg.norm(delta, axis=2)
 
 
-def classify_frame(symbols: np.ndarray, positions: np.ndarray, cell: np.ndarray, oh_cutoff: float) -> dict[str, int | float | bool]:
+def minimum_image_vectors(anchor: np.ndarray, positions: np.ndarray, cell: np.ndarray) -> np.ndarray:
+    delta = positions - anchor
+    fractional = delta @ np.linalg.inv(cell)
+    return delta - np.round(fractional) @ cell
+
+
+def water_assignment(
+    symbols: np.ndarray,
+    positions: np.ndarray,
+    cell: np.ndarray,
+    oh_cutoff: float,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     oxygen_indices = np.flatnonzero(symbols == "O")
     hydrogen_indices = np.flatnonzero(symbols == "H")
     if oxygen_indices.size == 0 or hydrogen_indices.size == 0:
@@ -93,6 +134,31 @@ def classify_frame(symbols: np.ndarray, positions: np.ndarray, cell: np.ndarray,
     nearest_distances = distances[np.arange(hydrogen_indices.size), nearest_o]
     bonded = nearest_distances <= oh_cutoff
     attached_h = np.bincount(nearest_o[bonded], minlength=oxygen_indices.size).astype(int)
+    return oxygen_indices, hydrogen_indices, nearest_o, bonded, attached_h
+
+
+def oxygen_species_label(n_h: int) -> str:
+    if n_h == 0:
+        return "O"
+    if n_h == 1:
+        return "OH"
+    if n_h == 2:
+        return "H2O"
+    if n_h == 3:
+        return "H3O"
+    return f"H{n_h}O"
+
+
+def classify_frame(symbols: np.ndarray, positions: np.ndarray, cell: np.ndarray, oh_cutoff: float) -> dict[str, int | float | bool]:
+    _oxygen_indices, hydrogen_indices, nearest_o, bonded, attached_h = water_assignment(
+        symbols, positions, cell, oh_cutoff
+    )
+    distances = minimum_image_distances(
+        positions[hydrogen_indices],
+        positions[np.flatnonzero(symbols == "O")],
+        cell,
+    )
+    nearest_distances = distances[np.arange(hydrogen_indices.size), nearest_o]
 
     counts = {
         "O": int(np.count_nonzero(attached_h == 0)),
@@ -109,41 +175,177 @@ def classify_frame(symbols: np.ndarray, positions: np.ndarray, cell: np.ndarray,
     return counts
 
 
+def classify_frame_task(task: tuple[int, np.ndarray, np.ndarray, np.ndarray, float]) -> dict[str, int | float | bool]:
+    frame_index, symbols, positions, cell, oh_cutoff = task
+    row = classify_frame(symbols, positions, cell, oh_cutoff)
+    row["frame"] = frame_index
+    return row
+
+
+def noncanonical_cluster_indices(
+    symbols: np.ndarray,
+    positions: np.ndarray,
+    cell: np.ndarray,
+    center_index: int,
+    cluster_cutoff: float,
+    required_indices: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    vectors = minimum_image_vectors(positions[center_index], positions, cell)
+    distances = np.linalg.norm(vectors, axis=1)
+    selected = np.flatnonzero(distances <= cluster_cutoff)
+    selected = np.unique(np.concatenate([selected, required_indices.astype(int)]))
+    selected = selected[np.argsort(np.linalg.norm(vectors[selected], axis=1))]
+    return selected, vectors[selected]
+
+
+def noncanonical_frame_xyz_blocks(
+    task: tuple[int, np.ndarray, np.ndarray, np.ndarray, float, float, float, float],
+) -> list[str]:
+    frame_index, symbols, positions, cell, time_ps, oh_cutoff, cluster_cutoff, vacuum = task
+    oxygen_indices, hydrogen_indices, nearest_o, bonded, attached_h = water_assignment(
+        symbols, positions, cell, oh_cutoff
+    )
+    events: list[tuple[str, int, int, np.ndarray]] = []
+
+    for local_o, oxygen_index in enumerate(oxygen_indices):
+        n_h = int(attached_h[local_o])
+        if n_h in CANONICAL_O_H_COUNTS:
+            continue
+        attached_h_indices = hydrogen_indices[(nearest_o == local_o) & bonded]
+        required = np.concatenate([np.array([oxygen_index]), attached_h_indices])
+        events.append((oxygen_species_label(n_h), int(oxygen_index), n_h, required))
+
+    for hydrogen_index in hydrogen_indices[~bonded]:
+        events.append(("unassigned_H", int(hydrogen_index), -1, np.array([hydrogen_index])))
+
+    blocks = []
+    for species_label, center_index, n_h, required in events:
+        selected, relative_positions = noncanonical_cluster_indices(
+            symbols, positions, cell, center_index, cluster_cutoff, required
+        )
+        cluster_positions = relative_positions + 0.5 * vacuum
+        lines = [
+            f"{len(selected)}\n",
+            (
+                f'source_frame={frame_index} source_time_ps={time_ps:.8g} '
+                f'center_atom={center_index} center_symbol={symbols[center_index]} '
+                f'noncanonical_species={species_label} attached_H_count={n_h} '
+                f'oh_cutoff_A={oh_cutoff:.6g} cluster_cutoff_A={cluster_cutoff:.6g} '
+                f'Lattice="{vacuum:.8f} 0 0 0 {vacuum:.8f} 0 0 0 {vacuum:.8f}" '
+                'Properties=species:S:1:pos:R:3 pbc="F F F"\n'
+            ),
+        ]
+        lines.extend(
+            f"{symbol} {pos[0]:.10f} {pos[1]:.10f} {pos[2]:.10f}\n"
+            for symbol, pos in zip(symbols[selected], cluster_positions)
+        )
+        blocks.append("".join(lines))
+    return blocks
+
+
+def time_for_frame(thermo: dict[str, np.ndarray], frame_index: int) -> float:
+    thermo_time = thermo.get("time_ps")
+    return (
+        float(thermo_time[frame_index])
+        if thermo_time is not None and frame_index < thermo_time.size
+        else float(frame_index)
+    )
+
+
+def write_noncanonical_species_clusters(
+    xyz_path: Path,
+    thermo_path: Path,
+    output_dir: Path,
+    oh_cutoff: float,
+    stride: int,
+    max_frames: int | None,
+    cluster_cutoff: float,
+    vacuum: float,
+    max_clusters: int,
+    cpu: int,
+) -> tuple[Path, int]:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / "r09_hot_w_noncanonical_species_clusters.xyz"
+    thermo = load_thermo(thermo_path)
+    n_written = 0
+    cpu = max(1, cpu)
+
+    tasks = (
+        (
+            frame_index,
+            symbols,
+            positions,
+            cell,
+            time_for_frame(thermo, frame_index),
+            oh_cutoff,
+            cluster_cutoff,
+            vacuum,
+        )
+        for frame_index, symbols, positions, cell in iter_sampled_xyz_frames(xyz_path, stride, max_frames)
+    )
+    if cpu <= 1:
+        block_results = map(noncanonical_frame_xyz_blocks, tasks)
+        executor = None
+    else:
+        executor = ProcessPoolExecutor(max_workers=cpu)
+        block_results = executor.map(noncanonical_frame_xyz_blocks, tasks, chunksize=8)
+
+    try:
+        with output_path.open("w", encoding="utf-8") as handle:
+            for blocks in block_results:
+                for block in blocks:
+                    if max_clusters > 0 and n_written >= max_clusters:
+                        return output_path, n_written
+                    n_written += 1
+                    handle.write(block.replace("source_frame=", f"cluster_id={n_written} source_frame=", 1))
+    finally:
+        if executor is not None:
+            executor.shutdown(wait=True)
+
+    return output_path, n_written
+
+
 def analyze_trajectory(
     xyz_path: Path,
     thermo_path: Path,
     oh_cutoff: float,
     stride: int,
     max_frames: int | None,
+    cpu: int,
 ) -> list[dict[str, int | float | bool]]:
     thermo = load_thermo(thermo_path)
-    thermo_time = thermo.get("time_ps")
     rows: list[dict[str, int | float | bool]] = []
 
-    for frame_index, symbols, positions, cell in iter_xyz_frames(xyz_path):
-        if frame_index % stride != 0:
-            continue
-        if max_frames is not None and len(rows) >= max_frames:
-            break
+    tasks = (
+        (frame_index, symbols, positions, cell, oh_cutoff)
+        for frame_index, symbols, positions, cell in iter_sampled_xyz_frames(xyz_path, stride, max_frames)
+    )
+    cpu = max(1, cpu)
+    if cpu <= 1:
+        row_iter = map(classify_frame_task, tasks)
+        executor = None
+    else:
+        executor = ProcessPoolExecutor(max_workers=cpu)
+        row_iter = executor.map(classify_frame_task, tasks, chunksize=16)
 
-        row = classify_frame(symbols, positions, cell, oh_cutoff)
-        row["frame"] = frame_index
-        row["time_ps"] = (
-            float(thermo_time[frame_index])
-            if thermo_time is not None and frame_index < thermo_time.size
-            else float(frame_index)
-        )
-        row["temperature_K"] = (
-            float(thermo["temperature_K"][frame_index])
-            if "temperature_K" in thermo and frame_index < thermo["temperature_K"].size
-            else np.nan
-        )
-        row["pressure_GPa"] = (
-            float(thermo["pressure_GPa"][frame_index])
-            if "pressure_GPa" in thermo and frame_index < thermo["pressure_GPa"].size
-            else np.nan
-        )
-        rows.append(row)
+    try:
+        for row in row_iter:
+            frame_index = int(row["frame"])
+            row["time_ps"] = time_for_frame(thermo, frame_index)
+            row["temperature_K"] = (
+                float(thermo["temperature_K"][frame_index])
+                if "temperature_K" in thermo and frame_index < thermo["temperature_K"].size
+                else np.nan
+            )
+            row["pressure_GPa"] = (
+                float(thermo["pressure_GPa"][frame_index])
+                if "pressure_GPa" in thermo and frame_index < thermo["pressure_GPa"].size
+                else np.nan
+            )
+            rows.append(row)
+    finally:
+        if executor is not None:
+            executor.shutdown(wait=True)
 
     if not rows:
         raise ValueError("No frames were sampled.")
@@ -225,6 +427,25 @@ def main() -> None:
     parser.add_argument("--oh-cutoff", type=float, default=1.25, help="O-H assignment cutoff in Angstrom.")
     parser.add_argument("--stride", type=int, default=1)
     parser.add_argument("--max-frames", type=int, default=None)
+    parser.add_argument("--cpu", "--cores", dest="cpu", type=int, default=1, help="Parallel worker processes for sampled frames.")
+    parser.add_argument(
+        "--noncanonical-cluster-cutoff",
+        type=float,
+        default=3.0,
+        help="Minimum-image atom cutoff in Angstrom for saved noncanonical diagnostic clusters.",
+    )
+    parser.add_argument("--noncanonical-cluster-vacuum", type=float, default=18.0, help="Vacuum box size in Angstrom.")
+    parser.add_argument(
+        "--max-noncanonical-clusters",
+        type=int,
+        default=0,
+        help="Maximum noncanonical clusters to save; 0 saves all sampled events.",
+    )
+    parser.add_argument(
+        "--no-save-noncanonical-clusters",
+        action="store_true",
+        help="Disable writing the noncanonical species cluster XYZ.",
+    )
     args = parser.parse_args()
 
     if args.oh_cutoff <= 0:
@@ -233,6 +454,14 @@ def main() -> None:
         parser.error("--stride must be at least 1")
     if args.max_frames is not None and args.max_frames < 1:
         parser.error("--max-frames must be at least 1")
+    if args.cpu < 1:
+        parser.error("--cpu must be at least 1")
+    if args.noncanonical_cluster_cutoff <= 0:
+        parser.error("--noncanonical-cluster-cutoff must be positive")
+    if args.noncanonical_cluster_vacuum <= 0:
+        parser.error("--noncanonical-cluster-vacuum must be positive")
+    if args.max_noncanonical_clusters < 0:
+        parser.error("--max-noncanonical-clusters must be non-negative")
 
     xyz_path = args.xyz or find_one(args.run_dir, "*.xyz")
     if xyz_path is None:
@@ -240,15 +469,33 @@ def main() -> None:
     thermo_path = args.thermo or find_one(args.run_dir, "*thermo*.txt") or Path()
     output_dir = args.output_dir or args.run_dir / "plots"
 
-    rows = analyze_trajectory(xyz_path, thermo_path, args.oh_cutoff, args.stride, args.max_frames)
+    print(f"Using {args.cpu} CPU worker process(es)")
+    rows = analyze_trajectory(xyz_path, thermo_path, args.oh_cutoff, args.stride, args.max_frames, args.cpu)
     csv_path = write_csv(rows, output_dir)
     plot_path = plot_timeseries(rows, output_dir)
+    noncanonical_path = None
+    noncanonical_count = 0
+    if not args.no_save_noncanonical_clusters:
+        noncanonical_path, noncanonical_count = write_noncanonical_species_clusters(
+            xyz_path,
+            thermo_path,
+            output_dir,
+            args.oh_cutoff,
+            args.stride,
+            args.max_frames,
+            args.noncanonical_cluster_cutoff,
+            args.noncanonical_cluster_vacuum,
+            args.max_noncanonical_clusters,
+            args.cpu,
+        )
 
     print(f"Analyzed {len(rows)} sampled frame(s) from {xyz_path}")
     print(f"O-H cutoff: {args.oh_cutoff:g} A")
     print(summarize_events(rows))
     print(f"Saved {csv_path}")
     print(f"Saved {plot_path}")
+    if noncanonical_path is not None:
+        print(f"Saved noncanonical clusters: {noncanonical_path} ({noncanonical_count} cluster(s))")
 
 
 if __name__ == "__main__":

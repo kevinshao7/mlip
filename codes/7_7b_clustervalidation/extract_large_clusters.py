@@ -13,12 +13,12 @@ from ase.neighborlist import NeighborList, natural_cutoffs
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[1]
-DEFAULT_DATA_SOURCE_NAME = "r09_hot_w"
-DEFAULT_RUN = REPO_ROOT / "outputsfull" / DEFAULT_DATA_SOURCE_NAME
+DEFAULT_DATA_SOURCE_NAME = "temperature_ramp/r09_hot_w"
+DEFAULT_RUN = REPO_ROOT / "outputsfull" / "temperature_ramp" / "r09_hot_w"
 DEFAULT_INTERACTION_CUTOFF = 2.15
 DEFAULT_BOND_SCALE = 1.2
 DEFAULT_PREFERRED_ATOMS = 21
-DEFAULT_CUTOFF_PS = 10.0
+DEFAULT_CUTOFF_PS = 110.0
 
 
 def status(message: str) -> None:
@@ -27,6 +27,7 @@ def status(message: str) -> None:
 
 def find_xyz(run_dir: Path) -> Path:
     files = sorted(run_dir.glob("*.xyz"), key=lambda p: (p.stat().st_mtime, p.name), reverse=True)
+    files = [path for path in files if "checkpoint" not in path.name.lower()] or files
     if not files:
         raise FileNotFoundError(f"No .xyz trajectory found in {run_dir}")
     return files[0]

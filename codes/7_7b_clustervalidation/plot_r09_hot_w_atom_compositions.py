@@ -14,13 +14,15 @@ from ase import Atoms
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[1]
-DEFAULT_RUN_DIR = REPO_ROOT / "outputsfull" / "r09_hot_w"
+DEFAULT_RUN_DIR = REPO_ROOT / "outputsfull" / "temperature_ramp" / "r09_hot_w"
 LATTICE_RE = re.compile(r'Lattice="([^"]+)"')
 SPECIES = ("O", "OH", "H2O", "H3O", "H4O_or_more")
 
 
 def find_one(folder: Path, pattern: str) -> Path | None:
     files = sorted(folder.glob(pattern), key=lambda path: (path.stat().st_mtime, path.name), reverse=True)
+    if pattern == "*.xyz":
+        files = [path for path in files if "checkpoint" not in path.name.lower()] or files
     return files[0] if files else None
 
 

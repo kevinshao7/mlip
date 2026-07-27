@@ -8,7 +8,9 @@ from pathlib import Path
 import numpy as np
 
 
-DEFAULT_FOLDER = Path(r"C:\Users\shaoq\Documents\Mainz\mlip\outputsfull\r09_hot_w7n1")
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parents[1]
+DEFAULT_FOLDER = REPO_ROOT / "outputsfull" / "temperature_ramp" / "r09_hot_w"
 AMU_TO_G = 1.66053906660e-24
 ANG3_TO_CM3 = 1e-24
 MASSES = {"H": 1.00784, "C": 12.011, "N": 14.0067, "O": 15.999, "S": 32.06}
@@ -110,7 +112,7 @@ def summarize_blocks(block_values: np.ndarray) -> tuple[float, float, float]:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Estimate NPT thermo uncertainties from uncorrelated block means.")
     parser.add_argument("folder", nargs="?", type=Path, default=DEFAULT_FOLDER)
-    parser.add_argument("--cutoff-ps", type=float, default=25.0, help="Initial transient cutoff in ps.")
+    parser.add_argument("--cutoff-ps", type=float, default=110.0, help="Initial transient cutoff in ps.")
     parser.add_argument("--block-ps", type=float, default=3.0, help="Block length in ps.")
     args = parser.parse_args()
 

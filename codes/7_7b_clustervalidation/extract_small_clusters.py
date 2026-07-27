@@ -12,7 +12,7 @@ import extract_large_clusters as base
 
 DEFAULT_PREFERRED_ATOMS = 12
 DEFAULT_INTERACTION_CUTOFF = 1.75
-DEFAULT_CUTOFF_PS = 10.0
+DEFAULT_CUTOFF_PS = 110.0
 
 
 def default_output_dir(run_dir: Path) -> Path:

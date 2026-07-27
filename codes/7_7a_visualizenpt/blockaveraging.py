@@ -8,12 +8,19 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-DEFAULT_FOLDER = Path(r"C:\Users\shaoq\Documents\Mainz\mlip\outputsfull\r09_hot_w")
+DEFAULT_THERMO = (
+    Path(__file__).resolve().parents[2]
+    / "outputsfull"
+    / "temperature_ramp"
+    / "r09_hot_w"
+    / "temperature_ramp_seed_525385756_from_pressure_equil_seed_353168294_P_15GPa_T_300K_density_0.2_P_15GPa_300K_to_2340K_thermo.txt"
+)
 AMU_TO_G = 1.66053906660e-24
 ANG3_TO_CM3 = 1e-24
 MASSES = {"H": 1.00784, "C": 12.011, "N": 14.0067, "O": 15.999, "S": 32.06}
 PLOT_KEYS = [
     ("temperature_K", "Temperature (K)"),
+    ("target_temperature_K", "Target temperature (K)"),
     ("pressure_GPa", "Pressure (GPa)"),
     ("density_g_cm3", "Density (g/cm^3)"),
     ("energy_eV_per_atom", "Potential energy (eV/atom)"),
@@ -59,12 +66,20 @@ def xyz_densities(path: Path) -> np.ndarray:
     return np.array(densities, dtype=float)
 
 
-def load_run(folder: Path) -> tuple[Path, dict[str, np.ndarray]]:
-    txt = find_one(folder, "*thermo*.txt") or find_one(folder, "*.txt")
+def find_thermo(input_path: Path) -> Path:
+    if input_path.is_file():
+        return input_path
+    txt = find_one(input_path, "*thermo*.txt") or find_one(input_path, "*.txt")
     if txt is None:
-        raise FileNotFoundError(f"No .txt file found in {folder}")
+        raise FileNotFoundError(f"No .txt file found in {input_path}")
+    return txt
+
+
+def load_run(input_path: Path) -> tuple[Path, dict[str, np.ndarray]]:
+    txt = find_thermo(input_path)
     data = load_thermo(txt)
 
+    folder = txt.parent
     xyz = find_one(folder, f"{txt.stem.replace('_thermo', '')}*.xyz") or find_one(folder, "*.xyz")
     if xyz:
         density = xyz_densities(xyz)
@@ -196,8 +211,8 @@ def plot_acf(txt: Path, data: dict[str, np.ndarray], cutoff_ps: float, max_lag_p
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Block-average NPT thermo output after an initial cutoff.")
-    parser.add_argument("folder", nargs="?", type=Path, default=DEFAULT_FOLDER)
-    parser.add_argument("--cutoff-ps", type=float, default=5.0, help="Initial transient cutoff in ps.")
+    parser.add_argument("input", nargs="?", type=Path, default=DEFAULT_THERMO, help="Thermo text file or run folder.")
+    parser.add_argument("--cutoff-ps", type=float, default=110.0, help="Initial transient cutoff in ps.")
     parser.add_argument(
         "--acf-max-lag-ps",
         type=float,
@@ -206,7 +221,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    txt, data = load_run(args.folder)
+    txt, data = load_run(args.input)
     outputs = [
         plot_timeseries(txt, data, args.cutoff_ps),
         plot_blocks(txt, data, args.cutoff_ps),
