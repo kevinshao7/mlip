@@ -24,7 +24,7 @@ import numpy as np
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[1]
-DEFAULT_RUN_DIR = REPO_ROOT / "outputsfull" / "temperature_ramp" / "r09_hot_w"
+DEFAULT_RUN_DIR = REPO_ROOT / "outputsfull" / "7_25_mdtempramp" 
 FS_PER_PS = 1000.0
 SPECIES = ("O", "OH", "H2O", "H3O", "H4O_or_more")
 LATTICE_RE = re.compile(r'Lattice="([^"]+)"')
