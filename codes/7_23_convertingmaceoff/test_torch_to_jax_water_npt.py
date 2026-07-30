@@ -313,7 +313,7 @@ class TestMacePolarPublicConversionAndNPT:
     production MACE-POLAR config (example_configs/mace_polar_npt.toml).
     """
 
-    @pytest.fixture(scope="class")
+    # @pytest.fixture(scope="class")
     def polar_checkpoint(self, tmp_path_factory):
         """Convert the torch model once and share across tests in this class."""
         from mace.calculators import mace_polar
@@ -329,7 +329,7 @@ class TestMacePolarPublicConversionAndNPT:
         assert (checkpoint_dir / "model_config.json").exists()
         return checkpoint_dir
 
-    @pytest.fixture(scope="class")
+    # @pytest.fixture(scope="class")
     def polar_checkpoint_f64(self, tmp_path_factory):
         """Convert the torch model to float64 once and share across tests."""
         from mace.calculators import mace_polar
