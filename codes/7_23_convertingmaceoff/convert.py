@@ -3,7 +3,7 @@ import torch
 from pathlib import Path
 converter = ttj.TestMacePolarPublicConversionAndNPT()
 converter.polar_checkpoint(
-    Path("./macepolarjaxdir/").resolve(),
+    Path("./macepolarjaxdir")
 )
 # path = "MACE-POLAR-1-M.model"
 # torch_model = torch.load(
