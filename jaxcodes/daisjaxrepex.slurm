@@ -11,5 +11,5 @@
 #SBATCH --error=slurm-%x-%j.err
 
 source /dais/fs/scratch/kshao/jaxmd-cli/.venv/bin/activate
-cd /dais/fs/scratch/kshao/mlip
-jaxmd-run /dais/fs/scratch/kshao/mlip/jaxcodes/harryrepex.toml
+cd /dais/fs/scratch/kshao/jaxmd-cli
+jaxmd-run /dais/fs/scratch/kshao/mlip/jaxcodes/angstromschedule.toml
