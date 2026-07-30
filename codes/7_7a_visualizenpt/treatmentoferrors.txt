@@ -1,0 +1,462 @@
+Implement a robust time-series error-analysis module for observables measured
+along a molecular-dynamics or Markov-chain Monte Carlo trajectory.
+
+CONTEXT
+
+Given a stationary scalar time series
+
+    A_0, A_1, ..., A_{N-1}
+
+sampled at a constant interval dt, estimate:
+
+1. The sample mean.
+2. The autocovariance and normalized autocorrelation functions.
+3. The integrated autocorrelation time.
+4. The correlation-corrected standard error of the sample mean.
+5. The effective number of independent samples.
+6. Diagnostics indicating whether the trajectory is long enough for these
+   estimates to be credible.
+
+The implementation must not treat consecutive trajectory samples as
+independent.
+
+---------------------------------------------------------------------------
+1. SAMPLE MEAN
+---------------------------------------------------------------------------
+
+For N samples, define
+
+    mean_A = (1/N) * sum_i A_i
+
+This is the estimator of the equilibrium expectation value <A>.
+
+The sample mean is itself a random variable. Its uncertainty depends on the
+time correlations in A.
+
+---------------------------------------------------------------------------
+2. AUTOCOVARIANCE
+---------------------------------------------------------------------------
+
+The theoretical autocovariance at lag k is
+
+    C(k) = <(A_i - <A>)(A_{i+k} - <A>)>
+
+For finite data, replace the unknown theoretical mean with the sample mean:
+
+    C_hat(k)
+        = 1/(N-k) * sum_{i=0}^{N-k-1}
+            (A_i - mean_A) * (A_{i+k} - mean_A)
+
+for
+
+    k = 0, 1, ..., N-1
+
+In particular,
+
+    C_hat(0)
+
+is the estimated variance of the observable.
+
+Use the lag-dependent denominator N-k, as shown above. Be explicit in the
+documentation that this differs from estimators that divide every lag by N.
+
+---------------------------------------------------------------------------
+3. NORMALIZED AUTOCORRELATION
+---------------------------------------------------------------------------
+
+Define the normalized autocorrelation function
+
+    rho_hat(k) = C_hat(k) / C_hat(0)
+
+Therefore,
+
+    rho_hat(0) = 1
+
+Interpretation:
+
+- Large positive rho_hat(k): samples k steps apart contain similar information.
+- rho_hat(k) near zero: samples at that separation are approximately
+  uncorrelated.
+- Negative values are valid and must not automatically be discarded.
+- At large lag, the estimator becomes very noisy because only N-k pairs remain.
+
+Do not estimate the integrated autocorrelation time by summing rho_hat(k) over
+all available lags. The long-lag noise can dominate the result.
+
+---------------------------------------------------------------------------
+4. VARIANCE OF THE SAMPLE MEAN
+---------------------------------------------------------------------------
+
+For correlated samples,
+
+    Var(mean_A)
+        = 1/N^2 * sum_i sum_j Cov(A_i, A_j)
+
+For a stationary time series this can be written as
+
+    Var(mean_A)
+        = 1/N * sum_{k=-(N-1)}^(N-1)
+            (1 - |k|/N) C(|k|)
+
+When N is much longer than the correlation time, approximate this by
+
+    Var(mean_A)
+        approximately
+        C(0)/N * sum_{k=-infinity}^{infinity} rho(|k|)
+
+Define the integrated autocorrelation time in units of samples as
+
+    tau_int
+        = (1/2) * sum_{k=-infinity}^{infinity} rho(|k|)
+        = 1/2 + sum_{k=1}^{infinity} rho(k)
+
+This gives
+
+    Var(mean_A) approximately 2 * tau_int * C(0) / N
+
+and therefore
+
+    standard_error_mean
+        = sqrt(2 * tau_int * C_hat(0) / N)
+
+If the sampling interval is dt, then the physical integrated autocorrelation
+time is
+
+    tau_int_physical = tau_int * dt
+
+Keep tau_int in sample units internally, and return the physical value
+separately when dt is supplied.
+
+For independent samples,
+
+    rho(k > 0) = 0
+    tau_int = 1/2
+
+so the formula reduces to
+
+    Var(mean_A) = C(0)/N
+
+as required.
+
+---------------------------------------------------------------------------
+5. EFFECTIVE SAMPLE SIZE
+---------------------------------------------------------------------------
+
+Define the effective number of independent samples as
+
+    N_eff = N / (2 * tau_int)
+
+Then the standard error may also be expressed as
+
+    standard_error_mean = sqrt(C_hat(0) / N_eff)
+
+Interpret 2*tau_int as the efficiency loss relative to independent sampling.
+
+Examples:
+
+- tau_int = 0.5 gives N_eff = N, corresponding to independent samples.
+- tau_int = 5 gives N_eff = N/10.
+- tau_int = 50 gives N_eff = N/100.
+
+Negative autocorrelation can produce tau_int below 0.5 in some processes.
+Do not hard-code tau_int >= 0.5 unless that restriction is explicitly requested.
+However, flag non-positive estimates as unreliable or pathological because they
+would imply a non-positive estimated variance of the mean.
+
+---------------------------------------------------------------------------
+6. WINDOWED ESTIMATE OF INTEGRATED AUTOCORRELATION TIME
+---------------------------------------------------------------------------
+
+The naive finite-data estimate
+
+    tau_int_hat = 1/2 + sum_{k=1}^{N-1} rho_hat(k)
+
+is generally poor because rho_hat(k) has high variance at large k.
+
+Instead, truncate the sum at a window M:
+
+    tau_int_hat(M)
+        = 1/2 + sum_{k=1}^{M} rho_hat(k)
+
+Choosing M creates a bias-variance tradeoff:
+
+- M too small:
+    The estimator is biased because genuine correlation is omitted.
+
+- M too large:
+    The estimator has excessive variance because noisy long-lag estimates are
+    included.
+
+Use the self-consistent rule from the notes:
+
+    choose the smallest M such that
+
+        M >= 10 * tau_int_hat(M)
+
+Only accept a candidate M when tau_int_hat(M) is finite and positive.
+
+Suggested procedure:
+
+    cumulative_tau = 0.5
+
+    for M from 1 to max_lag:
+        cumulative_tau += rho_hat(M)
+
+        if cumulative_tau > 0 and M >= 10 * cumulative_tau:
+            selected_M = M
+            tau_int = cumulative_tau
+            stop
+
+If no M satisfies the criterion, return the best available estimate but mark
+the result as unconverged. Do not silently claim that the autocorrelation time
+has been reliably estimated.
+
+The default maximum lag should not exceed N-1. It may be sensible to use a
+smaller configurable maximum lag for numerical and statistical stability.
+
+---------------------------------------------------------------------------
+7. REQUIRED OUTPUTS
+---------------------------------------------------------------------------
+
+Return a structured result containing at least:
+
+    mean
+    observable_variance
+    standard_error
+    tau_int_samples
+    tau_int_physical
+    effective_sample_size
+    selected_window
+    autocovariance
+    autocorrelation
+    converged
+    warnings
+    n_samples
+    dt
+
+Definitions:
+
+    observable_variance = C_hat(0)
+
+    standard_error
+        = sqrt(2 * tau_int_samples * observable_variance / N)
+
+    effective_sample_size
+        = N / (2 * tau_int_samples)
+
+The autocovariance and autocorrelation arrays only need to be returned up to
+the maximum lag that was evaluated.
+
+---------------------------------------------------------------------------
+8. BURN-IN
+---------------------------------------------------------------------------
+
+Treat equilibration or burn-in separately from autocorrelation error analysis.
+
+Integrated autocorrelation time measures correlations within the stationary
+part of the trajectory. It does not determine whether the initial state was
+drawn from equilibrium.
+
+The API should therefore support an explicit burn_in argument:
+
+    production_data = data[burn_in:]
+
+All reported statistics should be computed from production_data only.
+
+Do not claim that cancellation between positive and negative correlations
+reduces the required burn-in period. The lecture notes explicitly separate
+burn-in from the integrated-autocorrelation correction.
+
+---------------------------------------------------------------------------
+9. DIAGNOSTICS
+---------------------------------------------------------------------------
+
+Generate warnings in at least the following cases:
+
+1. Too few samples.
+2. Zero or numerically negligible C_hat(0).
+3. No self-consistent window was found.
+4. The selected window is close to the maximum available lag.
+5. N is not substantially larger than the estimated correlation scale.
+6. N_eff is very small.
+7. tau_int is non-finite or non-positive.
+8. The time series contains NaN or infinite values.
+
+A useful trajectory-length diagnostic is
+
+    N / tau_int
+
+or equivalently N_eff.
+
+Do not present a strict universal convergence threshold unless configured by
+the caller. Instead, return the ratio and warnings so that the user can judge
+whether the simulation contains many correlation times.
+
+The central self-consistency issue is:
+
+- A short run produces a poor estimate of the autocorrelation time.
+- A poor autocorrelation estimate may fail to reveal that the run is too short.
+- A sufficiently long run should produce a stable autocorrelation estimate and
+  thereby provide evidence of its own adequacy.
+
+---------------------------------------------------------------------------
+10. COMPUTATIONAL IMPLEMENTATION
+---------------------------------------------------------------------------
+
+Provide two possible autocovariance implementations:
+
+A. Direct O(N * max_lag) implementation for testing and small arrays.
+
+B. FFT-based O(N log N) implementation for long trajectories.
+
+For an FFT implementation:
+
+1. Convert input to a floating-point array.
+2. Subtract the sample mean.
+3. Zero-pad sufficiently to avoid circular wraparound.
+4. Compute the power spectrum from the FFT.
+5. Apply the inverse FFT to obtain the unnormalized autocovariance sums.
+6. Divide lag k by N-k.
+7. Normalize by C_hat(0) to obtain rho_hat(k).
+
+Check the FFT result against the direct implementation in unit tests.
+
+Do not confuse the following:
+
+- C_hat(0), the variance of the observable.
+- Var(mean_A), the variance of the estimated mean.
+- tau_int, measured in sample intervals.
+- tau_int * dt, measured in physical time.
+
+---------------------------------------------------------------------------
+11. PROPOSED PYTHON API
+---------------------------------------------------------------------------
+
+Use an interface resembling:
+
+    @dataclass
+    class TimeSeriesErrorResult:
+        mean: float
+        observable_variance: float
+        standard_error: float
+        tau_int_samples: float
+        tau_int_physical: float | None
+        effective_sample_size: float
+        selected_window: int
+        autocovariance: np.ndarray
+        autocorrelation: np.ndarray
+        converged: bool
+        warnings: list[str]
+        n_samples: int
+        dt: float | None
+
+    def analyze_time_series(
+        values: ArrayLike,
+        *,
+        dt: float | None = None,
+        burn_in: int = 0,
+        max_lag: int | None = None,
+        window_factor: float = 10.0,
+        method: Literal["fft", "direct"] = "fft",
+    ) -> TimeSeriesErrorResult:
+        ...
+
+Validate all inputs and include type hints and docstrings.
+
+---------------------------------------------------------------------------
+12. UNIT TESTS
+---------------------------------------------------------------------------
+
+Include tests using synthetic processes with known behavior.
+
+Test 1: Independent Gaussian noise
+
+Expected:
+
+    rho(k > 0) approximately 0
+    tau_int approximately 0.5
+    N_eff approximately N
+    standard_error approximately sample_std / sqrt(N)
+
+Test 2: AR(1) process
+
+    X_t = phi * X_{t-1} + epsilon_t
+
+For |phi| < 1,
+
+    rho(k) = phi^k
+
+and the theoretical integrated autocorrelation time is
+
+    tau_int
+        = 1/2 + sum_{k=1}^{infinity} phi^k
+        = (1 + phi) / (2 * (1 - phi))
+
+Therefore,
+
+    2 * tau_int = (1 + phi) / (1 - phi)
+
+Test several values, such as phi = 0.2, 0.7, and 0.9. Use sufficiently long
+series and statistical tolerances rather than exact equality.
+
+Test 3: Negatively correlated AR(1)
+
+Use a negative phi and verify that negative correlations are included rather
+than clipped.
+
+Test 4: Constant signal
+
+C_hat(0) is zero. Return zero observable variance and an appropriate warning.
+Do not divide by zero when constructing rho.
+
+Test 5: Short trajectory
+
+Verify that the result is marked unconverged when no self-consistent window can
+be identified.
+
+Test 6: FFT versus direct estimator
+
+For the same input and maximum lag, the two implementations should agree
+within floating-point tolerance.
+
+---------------------------------------------------------------------------
+13. OPTIONAL PLOTS
+---------------------------------------------------------------------------
+
+Provide an optional plotting function showing:
+
+1. The time series.
+2. rho_hat(k) versus lag.
+3. The cumulative estimate
+
+       tau_int_hat(M) = 1/2 + sum_{k=1}^{M} rho_hat(k)
+
+4. The selected truncation window M.
+5. The line M / window_factor, so the self-consistency intersection can be
+   visually inspected.
+
+Label lag both in sample units and physical units when dt is available.
+
+---------------------------------------------------------------------------
+14. IMPORTANT INTERPRETATION
+---------------------------------------------------------------------------
+
+Do not thin the trajectory merely to create apparently independent samples.
+The error in the mean can be calculated using all samples and the integrated
+autocorrelation time.
+
+Positive and negative correlations both contribute to tau_int. Their partial
+cancellation can make the estimator of the mean more efficient than a scheme
+that waits until samples appear completely independent.
+
+The final reported uncertainty must be correlation corrected:
+
+    mean_A +/- standard_error_mean
+
+where
+
+    standard_error_mean
+        = sqrt(2 * tau_int * C_hat(0) / N)
+
+Do not report the independent-sample error C_hat(0)^(1/2)/sqrt(N) unless
+tau_int is approximately 0.5.

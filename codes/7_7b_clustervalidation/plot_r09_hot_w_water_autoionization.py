@@ -29,6 +29,8 @@ FS_PER_PS = 1000.0
 SPECIES = ("O", "OH", "H2O", "H3O", "H4O_or_more")
 LATTICE_RE = re.compile(r'Lattice="([^"]+)"')
 CANONICAL_O_H_COUNTS = {1, 2, 3}
+DEFAULT_H2_CUTOFF = 1.0
+DEFAULT_CONNECTIVITY_CUTOFF = 1.5
 
 
 def find_one(folder: Path, pattern: str) -> Path | None:
@@ -118,6 +120,12 @@ def minimum_image_vectors(anchor: np.ndarray, positions: np.ndarray, cell: np.nd
     return delta - np.round(fractional) @ cell
 
 
+def minimum_image_vector(from_position: np.ndarray, to_position: np.ndarray, cell: np.ndarray) -> np.ndarray:
+    delta = to_position - from_position
+    fractional = delta @ np.linalg.inv(cell)
+    return delta - np.round(fractional) @ cell
+
+
 def water_assignment(
     symbols: np.ndarray,
     positions: np.ndarray,
@@ -182,65 +190,151 @@ def classify_frame_task(task: tuple[int, np.ndarray, np.ndarray, np.ndarray, flo
     return row
 
 
-def noncanonical_cluster_indices(
+def find_h2_candidate(
     symbols: np.ndarray,
     positions: np.ndarray,
     cell: np.ndarray,
-    center_index: int,
-    cluster_cutoff: float,
-    required_indices: np.ndarray,
-) -> tuple[np.ndarray, np.ndarray]:
-    vectors = minimum_image_vectors(positions[center_index], positions, cell)
-    distances = np.linalg.norm(vectors, axis=1)
-    selected = np.flatnonzero(distances <= cluster_cutoff)
-    selected = np.unique(np.concatenate([selected, required_indices.astype(int)]))
-    selected = selected[np.argsort(np.linalg.norm(vectors[selected], axis=1))]
-    return selected, vectors[selected]
-
-
-def noncanonical_frame_xyz_blocks(
-    task: tuple[int, np.ndarray, np.ndarray, np.ndarray, float, float, float, float],
-) -> list[str]:
-    frame_index, symbols, positions, cell, time_ps, oh_cutoff, cluster_cutoff, vacuum = task
-    oxygen_indices, hydrogen_indices, nearest_o, bonded, attached_h = water_assignment(
+    oh_cutoff: float,
+    h2_cutoff: float,
+    connectivity_cutoff: float,
+) -> tuple[int, int, float] | None:
+    oxygen_indices, hydrogen_indices, nearest_o, bonded, _attached_h = water_assignment(
         symbols, positions, cell, oh_cutoff
     )
-    events: list[tuple[str, int, int, np.ndarray]] = []
-
-    for local_o, oxygen_index in enumerate(oxygen_indices):
-        n_h = int(attached_h[local_o])
-        if n_h in CANONICAL_O_H_COUNTS:
+    if hydrogen_indices.size < 2:
+        return None
+    distances = minimum_image_distances(positions[hydrogen_indices], positions[hydrogen_indices], cell)
+    np.fill_diagonal(distances, np.inf)
+    order = np.argsort(distances, axis=None)
+    for flat_index in order:
+        local_i, local_j = np.unravel_index(int(flat_index), distances.shape)
+        if local_i >= local_j:
             continue
-        attached_h_indices = hydrogen_indices[(nearest_o == local_o) & bonded]
-        required = np.concatenate([np.array([oxygen_index]), attached_h_indices])
-        events.append((oxygen_species_label(n_h), int(oxygen_index), n_h, required))
+        distance = float(distances[local_i, local_j])
+        if distance > h2_cutoff:
+            break
+        same_oxygen = bool(bonded[local_i] and bonded[local_j] and nearest_o[local_i] == nearest_o[local_j])
+        if same_oxygen:
+            continue
+        seed_indices = np.array([hydrogen_indices[local_i], hydrogen_indices[local_j]], dtype=int)
+        component = connected_component_indices(positions, cell, seed_indices, connectivity_cutoff)
+        if component.size == 2 and np.all(symbols[component] == "H"):
+            return int(seed_indices[0]), int(seed_indices[1]), distance
+    return None
 
-    for hydrogen_index in hydrogen_indices[~bonded]:
-        events.append(("unassigned_H", int(hydrogen_index), -1, np.array([hydrogen_index])))
 
-    blocks = []
-    for species_label, center_index, n_h, required in events:
-        selected, relative_positions = noncanonical_cluster_indices(
-            symbols, positions, cell, center_index, cluster_cutoff, required
-        )
-        cluster_positions = relative_positions + 0.5 * vacuum
-        lines = [
-            f"{len(selected)}\n",
-            (
-                f'source_frame={frame_index} source_time_ps={time_ps:.8g} '
-                f'center_atom={center_index} center_symbol={symbols[center_index]} '
-                f'noncanonical_species={species_label} attached_H_count={n_h} '
-                f'oh_cutoff_A={oh_cutoff:.6g} cluster_cutoff_A={cluster_cutoff:.6g} '
-                f'Lattice="{vacuum:.8f} 0 0 0 {vacuum:.8f} 0 0 0 {vacuum:.8f}" '
-                'Properties=species:S:1:pos:R:3 pbc="F F F"\n'
-            ),
-        ]
-        lines.extend(
-            f"{symbol} {pos[0]:.10f} {pos[1]:.10f} {pos[2]:.10f}\n"
-            for symbol, pos in zip(symbols[selected], cluster_positions)
-        )
-        blocks.append("".join(lines))
-    return blocks
+def connected_component_indices(
+    positions: np.ndarray,
+    cell: np.ndarray,
+    seed_indices: np.ndarray,
+    cutoff: float,
+) -> np.ndarray:
+    distances = pairwise_distances_mic(positions, cell)
+    adjacency = distances <= cutoff
+    np.fill_diagonal(adjacency, False)
+    selected: set[int] = set(int(index) for index in seed_indices)
+    frontier = list(selected)
+    while frontier:
+        current = frontier.pop()
+        for neighbor in np.flatnonzero(adjacency[current]):
+            neighbor = int(neighbor)
+            if neighbor in selected:
+                continue
+            selected.add(neighbor)
+            frontier.append(neighbor)
+    return np.array(sorted(selected), dtype=int)
+
+
+def pairwise_distances_mic(positions: np.ndarray, cell: np.ndarray) -> np.ndarray:
+    delta = positions[:, None, :] - positions[None, :, :]
+    fractional = delta @ np.linalg.inv(cell)
+    delta -= np.round(fractional) @ cell
+    return np.linalg.norm(delta, axis=2)
+
+
+def unwrap_connected_component(
+    positions: np.ndarray,
+    cell: np.ndarray,
+    component_indices: np.ndarray,
+    seed_indices: np.ndarray,
+    cutoff: float,
+) -> np.ndarray:
+    component_set = set(int(index) for index in component_indices)
+    primary_seed = int(seed_indices[0])
+    unwrapped = {primary_seed: np.zeros(3, dtype=float)}
+    frontier = [primary_seed]
+    for seed_index in seed_indices[1:]:
+        seed_index = int(seed_index)
+        if seed_index in component_set and seed_index not in unwrapped:
+            unwrapped[seed_index] = minimum_image_vector(positions[primary_seed], positions[seed_index], cell)
+            frontier.append(seed_index)
+    while frontier:
+        current = frontier.pop(0)
+        for neighbor in component_indices:
+            neighbor = int(neighbor)
+            if neighbor in unwrapped or neighbor == current:
+                continue
+            step = minimum_image_vector(positions[current], positions[neighbor], cell)
+            if np.linalg.norm(step) <= cutoff and neighbor in component_set:
+                unwrapped[neighbor] = unwrapped[current] + step
+                frontier.append(neighbor)
+    missing = component_set.difference(unwrapped)
+    if missing:
+        raise RuntimeError(f"Could not unwrap connected atoms: {sorted(missing)}")
+    return np.array([unwrapped[int(index)] for index in component_indices], dtype=float)
+
+
+def validate_unwrapped_component(
+    positions: np.ndarray,
+    cell: np.ndarray,
+    component_indices: np.ndarray,
+    relative_positions: np.ndarray,
+    cutoff: float,
+) -> None:
+    original_distances = pairwise_distances_mic(positions[component_indices], cell)
+    unwrapped_distances = np.linalg.norm(
+        relative_positions[:, None, :] - relative_positions[None, :, :], axis=2
+    )
+    mask = original_distances <= cutoff
+    if not np.allclose(original_distances[mask], unwrapped_distances[mask], atol=1e-8):
+        raise RuntimeError("Unwrapped connected component does not preserve minimum-image neighbor distances.")
+
+
+def connected_h2_cluster_xyz_block(
+    frame_index: int,
+    symbols: np.ndarray,
+    positions: np.ndarray,
+    cell: np.ndarray,
+    time_ps: float,
+    oh_cutoff: float,
+    connectivity_cutoff: float,
+    seed_indices: np.ndarray,
+    vacuum: float,
+) -> str:
+    component_indices = connected_component_indices(positions, cell, seed_indices, connectivity_cutoff)
+    relative_positions = unwrap_connected_component(
+        positions, cell, component_indices, seed_indices, connectivity_cutoff
+    )
+    validate_unwrapped_component(positions, cell, component_indices, relative_positions, connectivity_cutoff)
+    cluster_positions = relative_positions + 0.5 * vacuum
+    h2_distance = np.linalg.norm(relative_positions[np.where(component_indices == seed_indices[0])[0][0]]
+                                 - relative_positions[np.where(component_indices == seed_indices[1])[0][0]])
+    lines = [
+        f"{len(component_indices)}\n",
+        (
+            f'cluster_id=1 source_frame={frame_index} source_time_ps={time_ps:.8g} '
+            f'h2_seed_atoms="{int(seed_indices[0])},{int(seed_indices[1])}" '
+            f'h2_distance_A={h2_distance:.8g} oh_cutoff_A={oh_cutoff:.6g} '
+            f'connectivity_cutoff_A={connectivity_cutoff:.6g} saved_atoms=connected_component '
+            f'Lattice="{vacuum:.8f} 0 0 0 {vacuum:.8f} 0 0 0 {vacuum:.8f}" '
+            'Properties=species:S:1:pos:R:3 pbc="F F F"\n'
+        ),
+    ]
+    lines.extend(
+        f"{symbol} {pos[0]:.10f} {pos[1]:.10f} {pos[2]:.10f}\n"
+        for symbol, pos in zip(symbols[component_indices], cluster_positions)
+    )
+    return "".join(lines)
 
 
 def time_for_frame(thermo: dict[str, np.ndarray], frame_index: int) -> float:
@@ -252,57 +346,106 @@ def time_for_frame(thermo: dict[str, np.ndarray], frame_index: int) -> float:
     )
 
 
-def write_noncanonical_species_clusters(
+def is_noncanonical_row(row: dict[str, int | float | bool]) -> bool:
+    return int(row["O"]) > 0 or int(row["H4O_or_more"]) > 0 or int(row["unassigned_H"]) > 0
+
+
+def find_first_h2_event(
+    xyz_path: Path,
+    oh_cutoff: float,
+    h2_cutoff: float,
+    connectivity_cutoff: float,
+    stride: int,
+    max_frames: int | None,
+) -> tuple[int, tuple[int, int], float]:
+    for frame_index, symbols, positions, cell in iter_sampled_xyz_frames(xyz_path, stride, max_frames):
+        candidate = find_h2_candidate(symbols, positions, cell, oh_cutoff, h2_cutoff, connectivity_cutoff)
+        if candidate is not None:
+            h_i, h_j, distance = candidate
+            return frame_index, (h_i, h_j), distance
+    raise RuntimeError(
+        f"No H2 candidate found with H-H cutoff {h2_cutoff:g} A "
+        f"and an isolated hydrogen-only connected component at {connectivity_cutoff:g} A."
+    )
+
+
+def write_connected_h2_frame(
+    handle,
+    frame_index: int,
+    symbols: np.ndarray,
+    positions: np.ndarray,
+    cell: np.ndarray,
+    time_ps: float,
+    first_h2_frame: int,
+    seed_indices: np.ndarray,
+    oh_cutoff: float,
+    connectivity_cutoff: float,
+    vacuum: float,
+) -> None:
+    block = connected_h2_cluster_xyz_block(
+        frame_index, symbols, positions, cell, time_ps, oh_cutoff, connectivity_cutoff, seed_indices, vacuum
+    )
+    block = block.replace("cluster_id=1 ", f"frames_from_first_h2={frame_index - first_h2_frame} ", 1)
+    handle.write(block)
+
+
+def write_first_h2_outputs(
     xyz_path: Path,
     thermo_path: Path,
     output_dir: Path,
     oh_cutoff: float,
-    stride: int,
-    max_frames: int | None,
-    cluster_cutoff: float,
+    first_frame: int,
+    h2_seed_atoms: tuple[int, int],
+    connectivity_cutoff: float,
     vacuum: float,
-    max_clusters: int,
-    cpu: int,
-) -> tuple[Path, int]:
+) -> tuple[Path, Path, str]:
     output_dir.mkdir(parents=True, exist_ok=True)
-    output_path = output_dir / "r09_hot_w_noncanonical_species_clusters.xyz"
+    cluster_path = output_dir / "r09_hot_w_first_h2_connected_cluster.xyz"
+    context_path = output_dir / "r09_hot_w_first_h2_connected_context_pm100_frames.xyz"
     thermo = load_thermo(thermo_path)
-    n_written = 0
-    cpu = max(1, cpu)
+    start_frame = max(0, first_frame - 100)
+    stop_frame = first_frame + 100
+    seed_indices = np.array(h2_seed_atoms, dtype=int)
+    wrote_cluster = False
 
-    tasks = (
-        (
-            frame_index,
-            symbols,
-            positions,
-            cell,
-            time_for_frame(thermo, frame_index),
-            oh_cutoff,
-            cluster_cutoff,
-            vacuum,
-        )
-        for frame_index, symbols, positions, cell in iter_sampled_xyz_frames(xyz_path, stride, max_frames)
-    )
-    if cpu <= 1:
-        block_results = map(noncanonical_frame_xyz_blocks, tasks)
-        executor = None
-    else:
-        executor = ProcessPoolExecutor(max_workers=cpu)
-        block_results = executor.map(noncanonical_frame_xyz_blocks, tasks, chunksize=8)
+    with context_path.open("w", encoding="utf-8") as context_handle:
+        for frame_index, symbols, positions, cell in iter_xyz_frames(xyz_path):
+            if frame_index > stop_frame:
+                break
+            if frame_index < start_frame:
+                continue
+            time_ps = time_for_frame(thermo, frame_index)
+            write_connected_h2_frame(
+                context_handle,
+                frame_index,
+                symbols,
+                positions,
+                cell,
+                time_ps,
+                first_frame,
+                seed_indices,
+                oh_cutoff,
+                connectivity_cutoff,
+                vacuum,
+            )
+            if frame_index == first_frame:
+                block = connected_h2_cluster_xyz_block(
+                    frame_index,
+                    symbols,
+                    positions,
+                    cell,
+                    time_ps,
+                    oh_cutoff,
+                    connectivity_cutoff,
+                    seed_indices,
+                    vacuum,
+                )
+                cluster_path.write_text(block, encoding="utf-8")
+                wrote_cluster = True
 
-    try:
-        with output_path.open("w", encoding="utf-8") as handle:
-            for blocks in block_results:
-                for block in blocks:
-                    if max_clusters > 0 and n_written >= max_clusters:
-                        return output_path, n_written
-                    n_written += 1
-                    handle.write(block.replace("source_frame=", f"cluster_id={n_written} source_frame=", 1))
-    finally:
-        if executor is not None:
-            executor.shutdown(wait=True)
-
-    return output_path, n_written
+    if not wrote_cluster:
+        raise RuntimeError(f"First H2 frame {first_frame} was not found in {xyz_path}.")
+    return cluster_path, context_path, "H2_connected_component"
 
 
 def analyze_trajectory(
@@ -424,27 +567,27 @@ def main() -> None:
     parser.add_argument("--xyz", type=Path, default=None)
     parser.add_argument("--thermo", type=Path, default=None)
     parser.add_argument("--output-dir", type=Path, default=None)
-    parser.add_argument("--oh-cutoff", type=float, default=1.25, help="O-H assignment cutoff in Angstrom.")
+    parser.add_argument("--oh-cutoff", type=float, default=1.4, help="O-H assignment cutoff in Angstrom.")
     parser.add_argument("--stride", type=int, default=1)
     parser.add_argument("--max-frames", type=int, default=None)
     parser.add_argument("--cpu", "--cores", dest="cpu", type=int, default=1, help="Parallel worker processes for sampled frames.")
     parser.add_argument(
-        "--noncanonical-cluster-cutoff",
+        "--h2-cutoff",
         type=float,
-        default=3.0,
-        help="Minimum-image atom cutoff in Angstrom for saved noncanonical diagnostic clusters.",
-    )
-    parser.add_argument("--noncanonical-cluster-vacuum", type=float, default=18.0, help="Vacuum box size in Angstrom.")
-    parser.add_argument(
-        "--max-noncanonical-clusters",
-        type=int,
-        default=0,
-        help="Maximum noncanonical clusters to save; 0 saves all sampled events.",
+        default=DEFAULT_H2_CUTOFF,
+        help="H-H distance cutoff in Angstrom for detecting an H2 candidate.",
     )
     parser.add_argument(
-        "--no-save-noncanonical-clusters",
+        "--connectivity-cutoff",
+        type=float,
+        default=DEFAULT_CONNECTIVITY_CUTOFF,
+        help="Neighbor graph cutoff in Angstrom for tracking atoms connected to the H2 atoms.",
+    )
+    parser.add_argument("--cluster-vacuum", type=float, default=18.0, help="Vacuum box size in Angstrom.")
+    parser.add_argument(
+        "--no-save-first-h2",
         action="store_true",
-        help="Disable writing the noncanonical species cluster XYZ.",
+        help="Disable writing the first H2 connected-component cluster and +/-100-frame context XYZ files.",
     )
     args = parser.parse_args()
 
@@ -456,12 +599,12 @@ def main() -> None:
         parser.error("--max-frames must be at least 1")
     if args.cpu < 1:
         parser.error("--cpu must be at least 1")
-    if args.noncanonical_cluster_cutoff <= 0:
-        parser.error("--noncanonical-cluster-cutoff must be positive")
-    if args.noncanonical_cluster_vacuum <= 0:
-        parser.error("--noncanonical-cluster-vacuum must be positive")
-    if args.max_noncanonical_clusters < 0:
-        parser.error("--max-noncanonical-clusters must be non-negative")
+    if args.h2_cutoff <= 0:
+        parser.error("--h2-cutoff must be positive")
+    if args.connectivity_cutoff <= 0:
+        parser.error("--connectivity-cutoff must be positive")
+    if args.cluster_vacuum <= 0:
+        parser.error("--cluster-vacuum must be positive")
 
     xyz_path = args.xyz or find_one(args.run_dir, "*.xyz")
     if xyz_path is None:
@@ -473,20 +616,29 @@ def main() -> None:
     rows = analyze_trajectory(xyz_path, thermo_path, args.oh_cutoff, args.stride, args.max_frames, args.cpu)
     csv_path = write_csv(rows, output_dir)
     plot_path = plot_timeseries(rows, output_dir)
-    noncanonical_path = None
-    noncanonical_count = 0
-    if not args.no_save_noncanonical_clusters:
-        noncanonical_path, noncanonical_count = write_noncanonical_species_clusters(
+    cluster_path = None
+    context_path = None
+    h2_frame = None
+    h2_seed_atoms = None
+    h2_distance = None
+    if not args.no_save_first_h2:
+        h2_frame, h2_seed_atoms, h2_distance = find_first_h2_event(
+            xyz_path,
+            args.oh_cutoff,
+            args.h2_cutoff,
+            args.connectivity_cutoff,
+            args.stride,
+            args.max_frames,
+        )
+        cluster_path, context_path, _species_label = write_first_h2_outputs(
             xyz_path,
             thermo_path,
             output_dir,
             args.oh_cutoff,
-            args.stride,
-            args.max_frames,
-            args.noncanonical_cluster_cutoff,
-            args.noncanonical_cluster_vacuum,
-            args.max_noncanonical_clusters,
-            args.cpu,
+            h2_frame,
+            h2_seed_atoms,
+            args.connectivity_cutoff,
+            args.cluster_vacuum,
         )
 
     print(f"Analyzed {len(rows)} sampled frame(s) from {xyz_path}")
@@ -494,8 +646,16 @@ def main() -> None:
     print(summarize_events(rows))
     print(f"Saved {csv_path}")
     print(f"Saved {plot_path}")
-    if noncanonical_path is not None:
-        print(f"Saved noncanonical clusters: {noncanonical_path} ({noncanonical_count} cluster(s))")
+    if h2_frame is not None and h2_seed_atoms is not None and h2_distance is not None:
+        thermo = load_thermo(thermo_path)
+        h2_time_ps = time_for_frame(thermo, h2_frame)
+        print(
+            f"First H2 candidate: frame {h2_frame} at {h2_time_ps:.6g} ps, "
+            f"H atoms {h2_seed_atoms[0]} and {h2_seed_atoms[1]}, H-H distance {h2_distance:.6g} A"
+        )
+    if cluster_path is not None and context_path is not None:
+        print(f"Saved first H2 connected cluster: {cluster_path}")
+        print(f"Saved +/-100-frame connected-component context XYZ: {context_path}")
 
 
 if __name__ == "__main__":
