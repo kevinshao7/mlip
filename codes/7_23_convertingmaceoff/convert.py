@@ -7,4 +7,4 @@ torch_model = torch.load(
     map_location="cpu",
     weights_only=False,
 )
-ttj._save_mace_off_checkpoint(torch_model, Path("jaxdir").resolve())
+ttj._save_mace_off_checkpoint(torch_model, Path("macepolarjaxdir").resolve())
