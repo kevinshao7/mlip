@@ -1,14 +1,21 @@
 import test_torch_to_jax_water_npt as ttj
-import torch
+
 from pathlib import Path
-converter = ttj.TestMacePolarPublicConversionAndNPT()
-converter.polar_checkpoint(
-    Path("./macepolarjaxdir")
+from types import SimpleNamespace
+
+
+output_path = Path("macepolarjaxdir").resolve()
+
+def make_output_directory(_name: str) -> Path:
+    output_path.mkdir(parents=True, exist_ok=True)
+    return output_path
+
+tmp_path_factory = SimpleNamespace(
+    mktemp=make_output_directory
 )
-# path = "MACE-POLAR-1-M.model"
-# torch_model = torch.load(
-#     path,
-#     map_location="cpu",
-#     weights_only=False,
-# )
-# ttj._save_polar_mace_checkpoint(torch_model, Path("macepolarjaxdir").resolve())
+
+converter = ttj.TestMacePolarPublicConversionAndNPT()
+
+converter.polar_checkpoint(
+    tmp_path_factory=tmp_path_factory,
+)
