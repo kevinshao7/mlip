@@ -2,9 +2,8 @@ import test_torch_to_jax_water_npt as ttj
 import torch
 from pathlib import Path
 converter = ttj.TestMacePolarPublicConversionAndNPT()
-converter.test_mace_polar_medium_torch_to_jax_water_npt(
-    "MACE-POLAR-1-M.model",
-    Path("./macepolartestdir/").resolve(),
+converter.polar_checkpoint(
+    Path("./macepolarjaxdir/").resolve(),
 )
 # path = "MACE-POLAR-1-M.model"
 # torch_model = torch.load(
