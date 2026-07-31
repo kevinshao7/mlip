@@ -78,6 +78,37 @@ def _save_mace_off_checkpoint(torch_model, checkpoint_dir: Path) -> None:
 
         ckpt_mgr.wait_until_finished()
 
+def _save_orbax_checkpoint(params, checkpoint_dir: Path) -> None:
+    """Synchronously save a parameter PyTree as Orbax checkpoint step 1."""
+    import orbax.checkpoint as ocp
+
+    checkpoint_dir = Path(checkpoint_dir).expanduser().resolve()
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
+    options = ocp.CheckpointManagerOptions(
+        max_to_keep=1,
+        create=True,
+        cleanup_tmp_directories=True,
+        enable_async_checkpointing=False,
+    )
+
+    with ocp.CheckpointManager(
+        checkpoint_dir,
+        options=options,
+    ) as checkpoint_manager:
+        saved = checkpoint_manager.save(
+            1,
+            args=ocp.args.StandardSave(params),
+        )
+
+        if not saved:
+            raise RuntimeError(
+                f"Orbax did not save checkpoint to {checkpoint_dir}"
+            )
+
+        checkpoint_manager.wait_until_finished()
+
+    print(f"Checkpoint saved to {checkpoint_dir / '1'}")
 
 def _save_polar_mace_checkpoint(torch_model, checkpoint_dir: Path,
                                  dtype: str = "float32") -> None:
