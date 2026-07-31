@@ -9,6 +9,9 @@ private Angstrom-AI forks to public ACEsuit/mace + graph_electrostatics.
 """
 
 import os
+
+os.environ["JAX_PLATFORMS"] = "cpu"
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
 import json
 from pathlib import Path
 
