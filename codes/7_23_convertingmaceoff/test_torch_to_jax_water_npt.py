@@ -48,9 +48,31 @@ def _save_mace_off_checkpoint(torch_model, checkpoint_dir: Path) -> None:
     with open(checkpoint_dir / "model_config.json", "w") as f:
         json.dump(config_to_save, f, indent=2)
 
-    options = ocp.CheckpointManagerOptions(max_to_keep=1, create=True)
-    ckpt_mgr = ocp.CheckpointManager(checkpoint_dir, options=options)
-    ckpt_mgr.save(1, args=ocp.args.StandardSave(params))
+    # options = ocp.CheckpointManagerOptions(max_to_keep=1, create=True)
+    # ckpt_mgr = ocp.CheckpointManager(checkpoint_dir, options=options)
+    # ckpt_mgr.save(1, args=ocp.args.StandardSave(params))
+
+    checkpoint_dir = Path(checkpoint_dir).expanduser().resolve()
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
+    options = ocp.CheckpointManagerOptions(
+        max_to_keep=1,
+        create=True,
+        cleanup_tmp_directories=True,
+        enable_async_checkpointing=False,
+    )
+
+    with ocp.CheckpointManager(checkpoint_dir, options=options) as ckpt_mgr:
+        saved = ckpt_mgr.save(
+            1,
+            args=ocp.args.StandardSave(params),
+        )
+
+        if not saved:
+            raise RuntimeError("Orbax did not perform the checkpoint save.")
+
+    print(f"Checkpoint saved to {checkpoint_dir / '1'}")
+
     ckpt_mgr.wait_until_finished()
 
 
