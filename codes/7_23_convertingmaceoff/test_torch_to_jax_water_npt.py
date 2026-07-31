@@ -121,13 +121,19 @@ def _save_polar_mace_checkpoint(torch_model, checkpoint_dir: Path,
     flax_model = PolarMACE(**mace_flax_config, **precision_kwargs)
     atomic_numbers = np.array(extra_config.get("atomic_numbers", []))
 
+    # Let the helper write model_config.json, but prevent its broken
+    # asynchronous Orbax checkpoint save.
     save_polar_mace_flax_to_orbax(
         params,
         flax_model,
         str(checkpoint_dir),
         atomic_numbers if len(atomic_numbers) > 0 else None,
         extra_config=extra_config,
+        use_orbax=False,
     )
+
+    # Perform the actual Orbax save using our synchronous helper above.
+    _save_orbax_checkpoint(params, checkpoint_dir)
 
 
 def _build_water_npt_config(checkpoint_path: str, model_type: str, output_dir: Path,
