@@ -74,9 +74,9 @@ def _save_mace_off_checkpoint(torch_model, checkpoint_dir: Path) -> None:
         if not saved:
             raise RuntimeError("Orbax did not perform the checkpoint save.")
 
-    print(f"Checkpoint saved to {checkpoint_dir / '1'}")
+        print(f"Checkpoint saved to {checkpoint_dir / '1'}")
 
-    ckpt_mgr.wait_until_finished()
+        ckpt_mgr.wait_until_finished()
 
 
 def _save_polar_mace_checkpoint(torch_model, checkpoint_dir: Path,
