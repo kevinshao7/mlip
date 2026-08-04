@@ -10,9 +10,15 @@
 set -e
 
 module purge
-module load orca
+module load orca/6.1.1
 
 OUTPUT_DIR=/ptmp/kshao/mlip/outputsfull/8_2_ravenDFT
+BASIS_FILE=/ptmp/kshao/mlip/codes/8_2_ravenDFT/def2-tzvpd.bas
 mkdir -p "$OUTPUT_DIR"
+if [[ ! -f "$BASIS_FILE" ]]; then
+  echo "Required ORCA basis file not found: $BASIS_FILE" >&2
+  exit 1
+fi
+cp "$BASIS_FILE" "$OUTPUT_DIR/"
 cd "$OUTPUT_DIR"
 orca /ptmp/kshao/mlip/codes/8_2_ravenDFT/r09_hot_w_h2training_last100_088.inp > "$OUTPUT_DIR/r09_hot_w_h2training_last100_088.out"
