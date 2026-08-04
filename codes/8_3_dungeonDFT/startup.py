@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Run the 8_1/8_2 ORCA input files in serial thirds.
+"""Run the 8_1/8_2 ORCA input files in serial halves.
 
 Examples:
     python startup.py --id 1
     python startup.py --id 2 --resume
-    python startup.py --id 3 --orca-command /path/to/orca
+    python startup.py --id 1 --orca-command /path/to/orca
 
 Outputs and ORCA side files are written under:
     outputsfull/8_3_dungeonDFT/
@@ -122,8 +122,8 @@ def validate_input_text(inp_path: Path) -> None:
 
 
 def selected_jobs(jobs: list[OrcaInput], run_id: int) -> list[OrcaInput]:
-    base, remainder = divmod(len(jobs), 3)
-    sizes = [base + (1 if i < remainder else 0) for i in range(3)]
+    base, remainder = divmod(len(jobs), 2)
+    sizes = [base + (1 if i < remainder else 0) for i in range(2)]
     start = sum(sizes[: run_id - 1])
     stop = start + sizes[run_id - 1]
     return jobs[start:stop]
@@ -220,9 +220,9 @@ def main() -> None:
     parser.add_argument(
         "--id",
         type=int,
-        choices=(1, 2, 3),
+        choices=(1, 2),
         required=True,
-        help="Serial shard to run: 1=first third, 2=middle third, 3=last third.",
+        help="Serial shard to run: 1=first half, 2=second half.",
     )
     parser.add_argument(
         "--resume",
@@ -256,12 +256,12 @@ def main() -> None:
     print(f"Selected {len(shard)} of {len(jobs)} ORCA inputs for --id {args.id}: {first} through {last}")
     print(f"Output directory: {OUTPUT_DIR}")
 
-    prepare_outputs(shard, resume=args.resume, force=args.force)
-
     if args.dry_run:
         for job in shard:
             print(f"{job.index:03d} {job.inp_path}")
         return
+
+    prepare_outputs(shard, resume=args.resume, force=args.force)
 
     env = orca_env()
     for job in shard:
