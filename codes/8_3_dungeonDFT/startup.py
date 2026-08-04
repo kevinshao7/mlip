@@ -4,7 +4,7 @@
 Examples:
     python startup.py --id 1
     python startup.py --id 2 --resume
-    python startup.py --id 1 --orca-command /path/to/orca
+    python startup.py --id 1 --orca-command /path/to/orca_qc
 
 Outputs and ORCA side files are written under:
     outputsfull/8_3_dungeonDFT/
@@ -38,7 +38,7 @@ EXPECTED_PER_SOURCE = 100
 EXPECTED_TOTAL = 200
 BASIS_FILE = "def2-tzvpd.bas"
 THREADS = "24"
-DEFAULT_ORCA_COMMAND = "orca"
+DEFAULT_ORCA_COMMAND = "orca_qc"
 
 FINAL_ENERGY_MARKER = "FINAL SINGLE POINT ENERGY"
 NORMAL_TERMINATION_MARKER = "ORCA TERMINATED NORMALLY"
@@ -170,6 +170,24 @@ def orca_env() -> dict[str, str]:
     return env
 
 
+def validate_orca_command(orca_command: str) -> str:
+    resolved = shutil.which(orca_command)
+    if resolved is None:
+        fail(
+            f"ORCA executable was not found on PATH: {orca_command!r}. "
+            "Load the ORCA module first or pass --orca-command /path/to/orca_qc."
+        )
+
+    resolved_path = Path(resolved).resolve()
+    if resolved_path in (Path("/usr/bin/orca"), Path("/bin/orca")):
+        fail(
+            f"{orca_command!r} resolves to {resolved_path}, which is the GNOME screen reader, "
+            "not the ORCA quantum chemistry executable. Load the ORCA module first or pass "
+            "--orca-command /path/to/orca_qc."
+        )
+    return str(resolved_path)
+
+
 def stage_basis_file(job: OrcaInput) -> None:
     shutil.copy2(job.basis_path, OUTPUT_DIR / BASIS_FILE)
 
@@ -261,13 +279,14 @@ def main() -> None:
             print(f"{job.index:03d} {job.inp_path}")
         return
 
+    orca_command = validate_orca_command(args.orca_command)
     prepare_outputs(shard, resume=args.resume, force=args.force)
 
     env = orca_env()
     for job in shard:
         if should_skip_completed(job, resume=args.resume):
             continue
-        run_job(job, env, args.orca_command)
+        run_job(job, env, orca_command)
 
     print(f"Completed shard --id {args.id}: {len(shard)} inputs checked/run successfully")
 
