@@ -36,15 +36,6 @@ EXPECTED_CLUSTERS = 100
 FAIRCHEM_ORCA_CALC = MLIP_DIR / "fairchem" / "src" / "fairchem" / "data" / "omol" / "orca" / "calc.py"
 FAIRCHEM_SRC = MLIP_DIR / "fairchem" / "src"
 FAIRCHEM_ORCA_BASIS = MLIP_DIR / "fairchem" / "src" / "fairchem" / "data" / "omol" / "orca" / "basis" / "def2-tzvpd.bas"
-LOCAL_BASIS_FALLBACK = SCRIPT_DIR / "def2-tzvpd.bas"
-ORCA_SIMPLE_INPUT = (
-    "! wB97M-V def2-TZVPD EnGrad RIJCOSX def2/J NoUseSym DIIS NOSOSCF NormalConv DEFGRID3 ALLPOP\n"
-    "%pal nprocs 24 end\n"
-    '%scf Convergence Tight maxiter 300 end %elprop Dipole true Quadrupole true end '
-    '%output Print[P_ReducedOrbPopMO_L] 1 Print[P_ReducedOrbPopMO_M] 1 Print[P_BondOrder_L] 1 '
-    'Print[P_BondOrder_M] 1 Print[P_Fockian] 1 Print[P_OrbEn] 2 end %basis GTOName "def2-tzvpd.bas" end '
-    '%scf THRESH 1e-12 TCUT 1e-13 end %maxcore 1000 %nbo NBOKEYLIST = "$NBO NPA NBO E2PERT 0.1 $END" end \n'
-)
 ATOMIC_NUMBERS = {
     "H": 1,
     "C": 6,
@@ -114,7 +105,10 @@ def load_fairchem_orca_calc():
 def make_input_with_fairchem(atoms: Atoms) -> str:
     orca_calc = load_fairchem_orca_calc()
     if orca_calc is None:
-        return make_input_from_local_template(atoms)
+        raise RuntimeError(
+            "Could not import fairchem.data.omol.orca.calc and could not load it from "
+            f"{FAIRCHEM_ORCA_CALC}"
+        )
 
     charge = formal_charge(atom_tuples(atoms))
     from ase.calculators.orca import OrcaProfile
@@ -146,15 +140,6 @@ def make_input_with_fairchem(atoms: Atoms) -> str:
         lines.insert(1, "%pal nprocs 24 end")
         text = "\n".join(lines) + "\n"
     return text
-
-
-def make_input_from_local_template(atoms: Atoms) -> str:
-    charge = formal_charge(atom_tuples(atoms))
-    lines = [ORCA_SIMPLE_INPUT.rstrip(), f"*xyz {charge} {MULTIPLICITY}"]
-    for symbol, x, y, z in atom_tuples(atoms):
-        lines.append(f"{symbol}   {x:.10f} {y:.10f} {z:.10f}")
-    lines.append("*")
-    return "\n".join(lines) + "\n"
 
 
 def make_slurm(base: str, stem: str) -> str:
@@ -191,15 +176,9 @@ def main() -> None:
     stale_count = remove_stale_generated_files()
     if stale_count:
         print(f"Removed {stale_count} stale generated input/slurm files from {OUT_DIR}")
-    if FAIRCHEM_ORCA_BASIS.exists():
-        copy_basis_to_output(FAIRCHEM_ORCA_BASIS)
-    elif LOCAL_BASIS_FALLBACK.exists():
-        copy_basis_to_output(LOCAL_BASIS_FALLBACK)
-    else:
-        raise FileNotFoundError(
-            f"Could not find {FAIRCHEM_ORCA_BASIS.name} at {FAIRCHEM_ORCA_BASIS} "
-            f"or fallback {LOCAL_BASIS_FALLBACK}"
-        )
+    if not FAIRCHEM_ORCA_BASIS.exists():
+        raise FileNotFoundError(f"Could not find required fairchem ORCA basis file: {FAIRCHEM_ORCA_BASIS}")
+    copy_basis_to_output(FAIRCHEM_ORCA_BASIS)
 
     for cluster_index, atoms in enumerate(clusters, start=1):
         stem = f"{DEFAULT_CLUSTER_STEM}_{cluster_index:03d}"
