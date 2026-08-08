@@ -3,7 +3,7 @@
 
 Examples:
     python startup.py --machine viper --frames 0,100
-    python startup.py --machine raven --frames 100,180
+    python startup.py --machine raven --frames 100,200
     python startup.py --machine viper --frames 0,100 --task-index 0 --resume
 
 The frame range is half-open: --frames 0,100 means cluster frames 0 through 99.
@@ -26,8 +26,8 @@ from ase.io import read
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-AP_DIR = SCRIPT_DIR.parent
-MLIP_DIR = SCRIPT_DIR.parents[2]
+AP_DIR = SCRIPT_DIR
+MLIP_DIR = SCRIPT_DIR.parents[1]
 DEFAULT_CLUSTER_XYZ = AP_DIR / "7_26_H2pathvalidation" / "r09_hot_w_h2formation_training_clusters.xyz"
 FAIRCHEM_ORCA_CALC = MLIP_DIR / "fairchem" / "src" / "fairchem" / "data" / "omol" / "orca" / "calc.py"
 FAIRCHEM_SRC = MLIP_DIR / "fairchem" / "src"
@@ -120,33 +120,36 @@ def write_text_lf(path: Path, text: str) -> None:
 
 
 def load_fairchem_orca_calc():
-    if FAIRCHEM_SRC.exists():
-        sys.path.insert(0, str(FAIRCHEM_SRC))
+    if not FAIRCHEM_SRC.is_dir():
+        fail(f"Required FairChem source directory is missing: {FAIRCHEM_SRC}")
+    if not FAIRCHEM_ORCA_CALC.is_file():
+        fail(f"Required FairChem ORCA calc module is missing: {FAIRCHEM_ORCA_CALC}")
+    if not FAIRCHEM_ORCA_BASIS.is_file():
+        fail(f"Required FairChem ORCA basis file is missing: {FAIRCHEM_ORCA_BASIS}")
+
+    sys.path.insert(0, str(FAIRCHEM_SRC))
 
     try:
         return importlib.import_module("fairchem.data.omol.orca.calc")
-    except ImportError:
-        pass
-
-    if not FAIRCHEM_ORCA_CALC.exists():
-        return None
+    except ImportError as import_error:
+        module_import_error = import_error
 
     spec = importlib.util.spec_from_file_location("fairchem_omol_orca_calc", FAIRCHEM_ORCA_CALC)
     if spec is None or spec.loader is None:
-        raise RuntimeError(f"Could not load fairchem ORCA calc module from {FAIRCHEM_ORCA_CALC}")
+        fail(f"Could not load FairChem ORCA calc module from {FAIRCHEM_ORCA_CALC}")
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    try:
+        spec.loader.exec_module(module)
+    except Exception as file_load_error:
+        fail(
+            "FairChem ORCA support is required and could not be loaded. "
+            f"Package import error: {module_import_error!r}; direct file-load error: {file_load_error!r}"
+        )
     return module
 
 
 def make_input_with_fairchem(atoms: Atoms, work_dir: Path) -> str:
     orca_calc = load_fairchem_orca_calc()
-    if orca_calc is None:
-        raise RuntimeError(
-            "Could not import fairchem.data.omol.orca.calc and could not load it from "
-            f"{FAIRCHEM_ORCA_CALC}"
-        )
-
     charge = formal_charge(atom_tuples(atoms))
     from ase.calculators.orca import OrcaProfile
 
@@ -278,6 +281,8 @@ def main() -> None:
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
+
+    load_fairchem_orca_calc()
 
     start, stop = parse_frames(args.frames)
     config = MACHINES[args.machine]
