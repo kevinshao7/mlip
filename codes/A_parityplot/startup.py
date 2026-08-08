@@ -3,10 +3,11 @@
 
 Examples:
     python startup.py --machine viper --frames 0,100
-    python startup.py --machine raven --frames 100,200
+    python startup.py --machine raven --frames 100,180
     python startup.py --machine viper --frames 0,100 --task-index 0 --resume
 
 The frame range is half-open: --frames 0,100 means cluster frames 0 through 99.
+Running without --task-index writes one .inp and one .slurm file per selected frame.
 """
 
 from __future__ import annotations
@@ -38,6 +39,7 @@ BASIS_FILE = "def2-tzvpd.bas"
 DEFAULT_ORCA_COMMAND = "orca"
 THREADS = 24
 MULTIPLICITY = 1
+DEFAULT_HPC_MLIP_DIR = "/ptmp/kshao/mlip"
 FINAL_ENERGY_MARKER = "FINAL SINGLE POINT ENERGY"
 NORMAL_TERMINATION_MARKER = "ORCA TERMINATED NORMALLY"
 
@@ -62,6 +64,8 @@ class MachineConfig:
     job_dir: Path
     output_dir: Path
     stem_prefix: str
+    slurm_time: str = "6:00:00"
+    slurm_memory: str = "64G"
 
 
 MACHINES = {
@@ -213,6 +217,52 @@ def generate_input(config: MachineConfig, atoms: Atoms, frame_index: int, force:
     return inp_path
 
 
+def relative_to_mlip(path: Path) -> str:
+    try:
+        return path.resolve().relative_to(MLIP_DIR.resolve()).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
+def slurm_text(config: MachineConfig, frame_index: int, orca_command: str) -> str:
+    stem = stem_for_frame(config, frame_index)
+    single_frame_spec = f"{frame_index},{frame_index + 1}"
+    startup_rel = relative_to_mlip(SCRIPT_DIR / "startup.py")
+    job_dir_rel = relative_to_mlip(config.job_dir)
+    slurm_out_dir = f"{DEFAULT_HPC_MLIP_DIR}/outputsfull/slurm"
+    return f"""#!/bin/bash -l
+#SBATCH --job-name={stem}
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task={THREADS}
+#SBATCH --mem={config.slurm_memory}
+#SBATCH --time={config.slurm_time}
+#SBATCH --output={slurm_out_dir}/{stem}-%j.out
+#SBATCH --error={slurm_out_dir}/{stem}-%j.err
+
+set -euo pipefail
+
+module purge
+module load orca/6.1.1
+
+MLIP_DIR=${{MLIP_DIR:-{DEFAULT_HPC_MLIP_DIR}}}
+STARTUP="$MLIP_DIR/{startup_rel}"
+
+mkdir -p "$MLIP_DIR/outputsfull/slurm"
+cd "$MLIP_DIR/{job_dir_rel}"
+
+python "$STARTUP" --machine {config.name} --frames {single_frame_spec!r} --task-index {frame_index} --orca-command {orca_command!r} --resume
+"""
+
+
+def generate_slurm(config: MachineConfig, frame_index: int, orca_command: str, force: bool) -> Path:
+    config.job_dir.mkdir(parents=True, exist_ok=True)
+    slurm_path = config.job_dir / f"{stem_for_frame(config, frame_index)}.slurm"
+    if slurm_path.exists() and not force:
+        return slurm_path
+    write_text_lf(slurm_path, slurm_text(config, frame_index, orca_command))
+    return slurm_path
+
+
 def parse_output_status(out_path: Path) -> tuple[bool, bool]:
     if not out_path.is_file():
         return False, False
@@ -307,17 +357,22 @@ def main() -> None:
 
     if args.dry_run:
         for frame_index, _atoms in selected:
-            print(f"{frame_index:03d} {config.job_dir / (stem_for_frame(config, frame_index) + '.inp')}")
+            stem = stem_for_frame(config, frame_index)
+            print(f"{frame_index:03d} {config.job_dir / (stem + '.inp')} {config.job_dir / (stem + '.slurm')}")
         return
 
     generated: list[Path] = []
+    generated_slurms: list[Path] = []
     for frame_index, atoms in selected:
         inp_path = generate_input(config, atoms, frame_index, force=args.force)
+        slurm_path = generate_slurm(config, frame_index, args.orca_command, force=args.force)
         generated.append(inp_path)
+        generated_slurms.append(slurm_path)
         print(f"Prepared {inp_path}")
+        print(f"Prepared {slurm_path}")
 
     if args.generate_only or task_index is None:
-        print(f"Generated {len(generated)} input files")
+        print(f"Generated {len(generated)} input files and {len(generated_slurms)} Slurm files")
         return
 
     run_orca(config, generated[0], args.orca_command, resume=args.resume, force=args.force)
