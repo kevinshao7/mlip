@@ -3,7 +3,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=24
 #SBATCH --mem=64G
-#SBATCH --time=1:00:00
+#SBATCH --time=6:00:00
 #SBATCH --output=/ptmp/kshao/mlip/outputsfull/slurm/slurm-%x-%j.out
 #SBATCH --error=/ptmp/kshao/mlip/outputsfull/slurm/slurm-%x-%j.err
 
