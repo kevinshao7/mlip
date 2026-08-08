@@ -2,8 +2,7 @@
 """Extract H2-formation and unbiased cutoff clusters for DFT fine-tuning.
 
 The output is an extended XYZ geometry set for later ORCA labeling. Clusters are
-built from complete covalent fragments nearest to the H2 pair or unbiased center
-atom; fragments are never truncated to enforce the atom-count limit.
+built from local environments around the H2 pair or unbiased center atom.
 """
 
 from __future__ import annotations
@@ -400,6 +399,42 @@ def select_nearest_fragments(
     return selected_indices, final_positions, radius
 
 
+def select_h2_environment(
+    frame: FrameData,
+    seed_indices: tuple[int, int],
+    environment_radius: float,
+    completion_radius: float,
+) -> tuple[np.ndarray, np.ndarray, float]:
+    seed_i, seed_j = (int(seed_indices[0]), int(seed_indices[1]))
+    h2_vector = minimum_image_vectors(frame.positions[seed_i], frame.positions[[seed_j]], frame.cell)[0]
+    center = frame.positions[seed_i] + 0.5 * h2_vector
+
+    relative_to_i = minimum_image_vectors(frame.positions[seed_i], frame.positions, frame.cell)
+    relative_to_j = minimum_image_vectors(frame.positions[seed_j], frame.positions, frame.cell)
+    distances_to_pair = np.minimum(
+        np.linalg.norm(relative_to_i, axis=1),
+        np.linalg.norm(relative_to_j, axis=1),
+    )
+    selected = set(int(index) for index in np.flatnonzero(distances_to_pair <= environment_radius))
+    selected.update((seed_i, seed_j))
+
+    distances = pairwise_distances_mic(frame.positions, frame.cell)
+    frontier = list(selected)
+    while frontier:
+        current = frontier.pop(0)
+        for neighbor in np.flatnonzero(distances[current] <= completion_radius):
+            neighbor = int(neighbor)
+            if neighbor in selected:
+                continue
+            selected.add(neighbor)
+            frontier.append(neighbor)
+
+    selected_indices = np.array(sorted(selected), dtype=int)
+    relative_positions = minimum_image_vectors(center, frame.positions[selected_indices], frame.cell)
+    radius = float(np.max(np.linalg.norm(relative_positions, axis=1))) if selected_indices.size else 0.0
+    return selected_indices, relative_positions, radius
+
+
 def cluster_from_request(
     frame: FrameData,
     request: ExtractionRequest,
@@ -410,9 +445,12 @@ def cluster_from_request(
     spin_multiplicity: int,
     source_xyz: Path,
     h2_cutoff: float,
+    h2_environment_radius: float,
+    h2_completion_radius: float,
 ) -> tuple[Atoms, float]:
     current_h2 = False
     seed_distance = np.nan
+    cluster_build_rule = "nearest_complete_covalent_fragments"
     if len(request.seed_atoms) == 2:
         seed_i, seed_j = request.seed_atoms
         h2_vector = minimum_image_vectors(frame.positions[int(seed_i)], frame.positions[[int(seed_j)]], frame.cell)[0]
@@ -424,16 +462,23 @@ def cluster_from_request(
             (int(seed_i), int(seed_j)),
             h2_cutoff,
         )
+        selected, relative_positions, radius = select_h2_environment(
+            frame,
+            (int(seed_i), int(seed_j)),
+            h2_environment_radius,
+            h2_completion_radius,
+        )
+        cluster_build_rule = "h2_pair_4A_environment_with_1p5A_recursive_completion"
     else:
         center = frame.positions[int(request.seed_atoms[0])]
+        selected, relative_positions, radius = select_nearest_fragments(
+            frame,
+            request.seed_atoms,
+            center,
+            max_atoms,
+            min_atoms,
+        )
 
-    selected, relative_positions, radius = select_nearest_fragments(
-        frame,
-        request.seed_atoms,
-        center,
-        max_atoms,
-        min_atoms,
-    )
     cluster = Atoms(frame.symbols[selected].tolist(), positions=relative_positions, pbc=False)
     cluster.set_cell([vacuum, vacuum, vacuum])
     cluster.positions += 0.5 * vacuum
@@ -447,8 +492,10 @@ def cluster_from_request(
             "seed_distance_A": float(seed_distance),
             "h2_present_current_frame": bool(current_h2),
             "environment_radius_A": float(radius),
-            "cluster_build_rule": "nearest_complete_covalent_fragments",
-            "max_atoms_rule": "reject_not_truncate_fragments",
+            "cluster_build_rule": cluster_build_rule,
+            "h2_environment_radius_A": float(h2_environment_radius) if len(request.seed_atoms) == 2 else np.nan,
+            "h2_completion_radius_A": float(h2_completion_radius) if len(request.seed_atoms) == 2 else np.nan,
+            "max_atoms_rule": "not_applied_to_h2_radius_clusters" if len(request.seed_atoms) == 2 else "reject_not_truncate_fragments",
             "charge": int(charge),
             "spin": int(spin_multiplicity),
         }
@@ -501,6 +548,8 @@ def unbiased_cluster_from_frame(
                 spin_multiplicity,
                 source_xyz,
                 h2_cutoff,
+                np.nan,
+                np.nan,
             )
         except ValueError:
             continue
@@ -554,6 +603,8 @@ def extract_h2_window_clusters(
     spin_multiplicity: int,
     target_events: int,
     h2_cutoff: float,
+    h2_environment_radius: float,
+    h2_completion_radius: float,
 ) -> tuple[list[tuple[ExtractionRequest, Atoms, float]], list[H2Event], set[int]]:
     requests_by_frame: dict[int, list[ExtractionRequest]] = {}
     failures: dict[int, list[str]] = {}
@@ -586,6 +637,8 @@ def extract_h2_window_clusters(
                     spin_multiplicity,
                     xyz_path,
                     h2_cutoff,
+                    h2_environment_radius,
+                    h2_completion_radius,
                 )
             except ValueError as exc:
                 failures.setdefault(int(request.event_id), []).append(str(exc))
@@ -694,7 +747,7 @@ def main() -> None:
         default=100,
         help="Candidate H2 events to scan before selecting the first complete valid windows.",
     )
-    parser.add_argument("--frames-per-event", type=int, default=10, help="Frames ending at each event frame.")
+    parser.add_argument("--frames-per-event", type=int, default=20, help="Frames ending at each event frame.")
     parser.add_argument("--unbiased-clusters", type=int, default=100)
     parser.add_argument(
         "--h2-cutoff",
@@ -710,6 +763,18 @@ def main() -> None:
         help="Reject small components; invalid H2 windows/unbiased clusters are resampled.",
     )
     parser.add_argument("--vacuum", type=float, default=24.0)
+    parser.add_argument(
+        "--h2-environment-radius",
+        type=float,
+        default=4.0,
+        help="For H2 windows, include all atoms within this Angstrom radius of either event H atom.",
+    )
+    parser.add_argument(
+        "--h2-completion-radius",
+        type=float,
+        default=1.5,
+        help="For H2 windows, recursively include atoms within this Angstrom distance of selected atoms.",
+    )
     parser.add_argument("--event-stride", type=int, default=1)
     parser.add_argument("--min-event-gap", type=int, default=50)
     parser.add_argument("--max-scan-frames", type=int, default=None)
@@ -744,6 +809,10 @@ def main() -> None:
         parser.error("--sample-start-fraction must be in [0, 1)")
     if args.h2_cutoff <= 0:
         parser.error("--h2-cutoff must be positive")
+    if args.h2_environment_radius <= 0:
+        parser.error("--h2-environment-radius must be positive")
+    if args.h2_completion_radius <= 0:
+        parser.error("--h2-completion-radius must be positive")
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.summary.parent.mkdir(parents=True, exist_ok=True)
@@ -791,6 +860,8 @@ def main() -> None:
         args.spin,
         args.events,
         args.h2_cutoff,
+        args.h2_environment_radius,
+        args.h2_completion_radius,
     )
     status(
         f"Selected {len(selected_events)} complete H2 events: "
@@ -839,7 +910,9 @@ def main() -> None:
                 "n_N": symbols.count("N"),
                 "n_S": symbols.count("S"),
                 "environment_radius_A": f"{environment_radius:.6g}",
-                "cluster_build_rule": "nearest_complete_covalent_fragments",
+                "cluster_build_rule": cluster.info.get("cluster_build_rule", ""),
+                "h2_environment_radius_A": f"{cluster.info.get('h2_environment_radius_A', np.nan):.8g}",
+                "h2_completion_radius_A": f"{cluster.info.get('h2_completion_radius_A', np.nan):.8g}",
                 "h2_definition": "" if request.event_id is None else "mutual_nearest_neighbor_HH_not_O_N_S",
                 "charge": args.charge,
                 "spin": args.spin,
