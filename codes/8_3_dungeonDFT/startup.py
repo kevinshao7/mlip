@@ -39,6 +39,10 @@ EXPECTED_TOTAL = 200
 BASIS_FILE = "def2-tzvpd.bas"
 THREADS = "24"
 DEFAULT_ORCA_COMMAND = "orca_qc"
+SYSTEM_OPENMPI_DIRS = (
+    Path("/usr/lib64/openmpi"),
+    Path("/opt/nvidia/hpc_sdk/Linux_x86_64/26.3/comm_libs/13.1/hpcx/hpcx-2.25.1/ompi"),
+)
 
 FINAL_ENERGY_MARKER = "FINAL SINGLE POINT ENERGY"
 NORMAL_TERMINATION_MARKER = "ORCA TERMINATED NORMALLY"
@@ -162,16 +166,44 @@ def prepare_outputs(jobs: list[OrcaInput], resume: bool, force: bool) -> None:
         fail(f"Output already exists: {job.out_path}. Use --resume to skip completed outputs or --force to overwrite.")
 
 
-def orca_env() -> dict[str, str]:
+def prepend_env_path(env: dict[str, str], name: str, path: Path) -> None:
+    value = str(path)
+    existing = env.get(name, "")
+    parts = [part for part in existing.split(os.pathsep) if part]
+    if value not in parts:
+        env[name] = os.pathsep.join([value, *parts])
+
+
+def add_orca_runtime_paths(env: dict[str, str], orca_command: str) -> None:
+    """Expose ORCA and OpenMPI shared libraries needed by local ORCA 6.1.x."""
+    command_path = Path(orca_command).expanduser()
+    if command_path.is_absolute() and command_path.exists():
+        orca_dir = command_path.resolve().parent
+        prepend_env_path(env, "PATH", orca_dir)
+        lib_dir = orca_dir / "lib"
+        if lib_dir.is_dir():
+            prepend_env_path(env, "LD_LIBRARY_PATH", lib_dir)
+
+    for mpi_dir in SYSTEM_OPENMPI_DIRS:
+        bin_dir = mpi_dir / "bin"
+        lib_dir = mpi_dir / "lib"
+        if bin_dir.is_dir():
+            prepend_env_path(env, "PATH", bin_dir)
+        if lib_dir.is_dir():
+            prepend_env_path(env, "LD_LIBRARY_PATH", lib_dir)
+
+
+def orca_env(orca_command: str) -> dict[str, str]:
     env = os.environ.copy()
     env["OMP_NUM_THREADS"] = THREADS
     env["MKL_NUM_THREADS"] = THREADS
     env["OPENBLAS_NUM_THREADS"] = THREADS
+    add_orca_runtime_paths(env, orca_command)
     return env
 
 
-def validate_orca_command(orca_command: str) -> str:
-    resolved = shutil.which(orca_command)
+def validate_orca_command(orca_command: str, env: dict[str, str]) -> str:
+    resolved = shutil.which(orca_command, path=env.get("PATH"))
     if resolved is None:
         fail(
             f"ORCA executable was not found on PATH: {orca_command!r}. "
@@ -279,10 +311,10 @@ def main() -> None:
             print(f"{job.index:03d} {job.inp_path}")
         return
 
-    orca_command = validate_orca_command(args.orca_command)
+    env = orca_env(args.orca_command)
+    orca_command = validate_orca_command(args.orca_command, env)
     prepare_outputs(shard, resume=args.resume, force=args.force)
 
-    env = orca_env()
     for job in shard:
         if should_skip_completed(job, resume=args.resume):
             continue
