@@ -230,9 +230,8 @@ def relative_to_mlip(path: Path) -> str:
 
 def slurm_text(config: MachineConfig, frame_index: int, orca_command: str) -> str:
     stem = stem_for_frame(config, frame_index)
-    single_frame_spec = f"{frame_index},{frame_index + 1}"
-    startup_rel = relative_to_mlip(SCRIPT_DIR / "startup.py")
     job_dir_rel = relative_to_mlip(config.job_dir)
+    output_dir_rel = relative_to_mlip(config.output_dir)
     slurm_out_dir = f"{DEFAULT_HPC_MLIP_DIR}/outputsfull/slurm"
     return f"""#!/bin/bash -l
 #SBATCH --job-name={stem}
@@ -249,12 +248,33 @@ module purge
 module load orca/6.1.1
 
 MLIP_DIR=${{MLIP_DIR:-{DEFAULT_HPC_MLIP_DIR}}}
-STARTUP="$MLIP_DIR/{startup_rel}"
+INPUT_PATH="$MLIP_DIR/{job_dir_rel}/{stem}.inp"
+OUTPUT_DIR="$MLIP_DIR/{output_dir_rel}"
+OUTPUT_PATH="$OUTPUT_DIR/{stem}.out"
+ORCA_COMMAND={orca_command!r}
 
 mkdir -p "$MLIP_DIR/outputsfull/slurm"
-cd "$MLIP_DIR/{job_dir_rel}"
+mkdir -p "$OUTPUT_DIR"
 
-python "$STARTUP" --machine {config.name} --frames {single_frame_spec!r} --task-index {frame_index} --orca-command {orca_command!r} --resume
+if [[ ! -f "$INPUT_PATH" ]]; then
+    echo "Missing ORCA input: $INPUT_PATH" >&2
+    exit 1
+fi
+
+if [[ -f "$OUTPUT_PATH" ]] && grep -q "{FINAL_ENERGY_MARKER}" "$OUTPUT_PATH" && grep -q "{NORMAL_TERMINATION_MARKER}" "$OUTPUT_PATH"; then
+    echo "Skipping completed $OUTPUT_PATH"
+    exit 0
+fi
+
+export OMP_NUM_THREADS={THREADS}
+export MKL_NUM_THREADS={THREADS}
+export OPENBLAS_NUM_THREADS={THREADS}
+
+cd "$OUTPUT_DIR"
+$ORCA_COMMAND "$INPUT_PATH" > "$OUTPUT_PATH"
+
+grep -q "{FINAL_ENERGY_MARKER}" "$OUTPUT_PATH"
+grep -q "{NORMAL_TERMINATION_MARKER}" "$OUTPUT_PATH"
 """
 
 
