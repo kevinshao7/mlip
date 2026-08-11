@@ -3,6 +3,8 @@
 #SBATCH --partition=standard
 #SBATCH --mail-type=END
 #SBATCH --mail-user=ks2120@cam.ac.uk
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=24
 #SBATCH -n 24
 #SBATCH --exclude=bhc0020,bhc0021,bhc0025
 #SBATCH --time=12:00:00
@@ -42,7 +44,9 @@ if [[ ! -f "$BASIS_PATH" ]]; then
     echo "Missing ORCA basis file: $BASIS_PATH" >&2
     exit 1
 fi
-cp "$BASIS_PATH" "$OUTPUT_DIR/def2-tzvpd.bas"
+if [[ ! -f "$OUTPUT_DIR/def2-tzvpd.bas" ]]; then
+    cp "$BASIS_PATH" "$OUTPUT_DIR/def2-tzvpd.bas"
+fi
 
 if [[ -f "$OUTPUT_PATH" ]] && grep -q "FINAL SINGLE POINT ENERGY" "$OUTPUT_PATH" && grep -q "ORCA TERMINATED NORMALLY" "$OUTPUT_PATH"; then
     echo "Skipping completed $OUTPUT_PATH"
@@ -52,6 +56,9 @@ fi
 export OMP_NUM_THREADS=24
 export MKL_NUM_THREADS=24
 export OPENBLAS_NUM_THREADS=24
+export OMPI_MCA_btl=^openib
+export OMPI_MCA_orte_base_help_aggregate=0
+
 
 cd "$OUTPUT_DIR"
 $ORCA_COMMAND "$INPUT_PATH" > "$OUTPUT_PATH"

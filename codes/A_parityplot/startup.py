@@ -77,6 +77,8 @@ class MachineConfig:
         slurm_exclude=None,
         slurm_output=None,
         slurm_error=None,
+        slurm_nodes=None,
+        slurm_ntasks_per_node=None,
         slurm_use_cpus_per_task=True,
         threads=THREADS,
         orca_module=DEFAULT_ORCA_MODULE,
@@ -96,6 +98,8 @@ class MachineConfig:
         self.slurm_exclude = slurm_exclude
         self.slurm_output = slurm_output
         self.slurm_error = slurm_error
+        self.slurm_nodes = slurm_nodes
+        self.slurm_ntasks_per_node = slurm_ntasks_per_node
         self.slurm_use_cpus_per_task = slurm_use_cpus_per_task
         self.threads = threads
         self.orca_module = orca_module
@@ -141,6 +145,8 @@ MACHINES = {
         slurm_exclude="bhc0020,bhc0021,bhc0025",
         slurm_output="{stem}.slurmlog.txt",
         slurm_error="{stem}.slurmerr.txt",
+        slurm_nodes=1,
+        slurm_ntasks_per_node=24,
         slurm_use_cpus_per_task=False,
         slurm_memory=None,
         threads=24,
@@ -301,6 +307,10 @@ def slurm_text(config: MachineConfig, frame_index: int, orca_command: str) -> st
     mail_type_line = f"#SBATCH --mail-type={config.slurm_mail_type}\n" if config.slurm_mail_type else ""
     mail_user_line = f"#SBATCH --mail-user={config.slurm_mail_user}\n" if config.slurm_mail_user else ""
     exclude_line = f"#SBATCH --exclude={config.slurm_exclude}\n" if config.slurm_exclude else ""
+    nodes_line = f"#SBATCH --nodes={config.slurm_nodes}\n" if config.slurm_nodes else ""
+    ntasks_per_node_line = (
+        f"#SBATCH --ntasks-per-node={config.slurm_ntasks_per_node}\n" if config.slurm_ntasks_per_node else ""
+    )
     ntasks_line = f"#SBATCH -n {config.threads}\n" if not config.slurm_use_cpus_per_task else "#SBATCH -n 1\n"
     long_ntasks_line = "#SBATCH --ntasks=1\n" if config.slurm_use_cpus_per_task else ""
     cpus_line = f"#SBATCH --cpus-per-task={config.threads}\n" if config.slurm_use_cpus_per_task else ""
@@ -327,9 +337,15 @@ def slurm_text(config: MachineConfig, frame_index: int, orca_command: str) -> st
         "    exit 1\n"
         "fi"
     )
+    mpi_env_block = (
+        "export OMPI_MCA_btl=^openib\n"
+        "export OMPI_MCA_orte_base_help_aggregate=0\n"
+        if config.name == "bluehive"
+        else ""
+    )
     return f"""#!/bin/bash
 #SBATCH --job-name={stem}
-{partition_line}{account_line}{mail_type_line}{mail_user_line}{ntasks_line}{long_ntasks_line}{cpus_line}{mem_line}{exclude_line}\
+{partition_line}{account_line}{mail_type_line}{mail_user_line}{nodes_line}{ntasks_per_node_line}{ntasks_line}{long_ntasks_line}{cpus_line}{mem_line}{exclude_line}\
 #SBATCH --time={config.slurm_time}
 {output_line.rstrip()}
 {error_line.rstrip()}
@@ -360,7 +376,9 @@ if [[ ! -f "$BASIS_PATH" ]]; then
     echo "Missing ORCA basis file: $BASIS_PATH" >&2
     exit 1
 fi
-cp "$BASIS_PATH" "$OUTPUT_DIR/{BASIS_FILE}"
+if [[ ! -f "$OUTPUT_DIR/{BASIS_FILE}" ]]; then
+    cp "$BASIS_PATH" "$OUTPUT_DIR/{BASIS_FILE}"
+fi
 
 if [[ -f "$OUTPUT_PATH" ]] && grep -q "{FINAL_ENERGY_MARKER}" "$OUTPUT_PATH" && grep -q "{NORMAL_TERMINATION_MARKER}" "$OUTPUT_PATH"; then
     echo "Skipping completed $OUTPUT_PATH"
@@ -370,6 +388,7 @@ fi
 export OMP_NUM_THREADS={config.threads}
 export MKL_NUM_THREADS={config.threads}
 export OPENBLAS_NUM_THREADS={config.threads}
+{mpi_env_block}
 
 cd "$OUTPUT_DIR"
 $ORCA_COMMAND "$INPUT_PATH" > "$OUTPUT_PATH"
