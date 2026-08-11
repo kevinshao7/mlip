@@ -11,15 +11,18 @@
 
 set -euo pipefail
 
-module purge
-module load orca/6.1.1
-
 MLIP_DIR="${MLIP_DIR:-/gpfs/fs2/scratch/kshao4/mlip}"
 INPUT_PATH="$MLIP_DIR/codes/A_parityplot/8_5_bluehiveDFT/r09_hot_w_isolatedH_bluehive_075.inp"
 OUTPUT_DIR="$MLIP_DIR/outputsfull/A_parityplot/8_5_bluehiveDFT"
 OUTPUT_PATH="$OUTPUT_DIR/r09_hot_w_isolatedH_bluehive_075.out"
-ORCA_COMMAND='orca'
-ORCA_COMMAND="$(command -v "$ORCA_COMMAND")"
+ORCA_COMMAND='/software/orca/6.1.1/orca'
+if [[ "$ORCA_COMMAND" != /* ]]; then
+    ORCA_COMMAND="$(command -v "$ORCA_COMMAND")"
+fi
+if [[ -z "$ORCA_COMMAND" || ! -x "$ORCA_COMMAND" ]]; then
+    echo "ORCA executable is not available: /software/orca/6.1.1/orca" >&2
+    exit 1
+fi
 
 echo "MLIP_DIR=$MLIP_DIR"
 echo "ORCA_COMMAND=$ORCA_COMMAND"

@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
-"""Generate and run ORCA jobs for isolated-H validation clusters.
-
-Examples:
+r"""Generate and run ORCA jobs for isolated-H validation clusters.
+  
+  
+  grep -n "module\|for candidate\|bash -l\|software/modules" 8_5_bluehiveDFT/r09_hot_w_isolatedH_bluehive_000.slurm
+  grep -n "ORCA_COMMAND" 8_5_bluehiveDFT/r09_hot_w_isolatedH_bluehive_000.slurm
+  
+  
+  Examples:
     python startup.py --machine bluehive --frames 0,180 --force
 
 for f in 8_5_bluehiveDFT/r09_hot_w_isolatedH_bluehive_*.slurm; do sbatch "$f"; done
@@ -19,7 +24,6 @@ import os
 import shutil
 import subprocess
 import sys
-from dataclasses import dataclass
 from pathlib import Path
 
 from ase import Atoms
@@ -59,25 +63,46 @@ FORMAL_CHARGES = {
 }
 
 
-@dataclass(frozen=True)
 class MachineConfig:
-    name: str
-    job_dir: Path
-    output_dir: Path
-    stem_prefix: str
-    slurm_time: str = "6:00:00"
-    slurm_memory: str | None = "64G"
-    slurm_partition: str | None = None
-    slurm_account: str | None = None
-    slurm_mail_type: str | None = None
-    slurm_mail_user: str | None = None
-    slurm_exclude: str | None = None
-    slurm_output: str | None = None
-    slurm_error: str | None = None
-    slurm_use_cpus_per_task: bool = True
-    threads: int = THREADS
-    orca_module: str = DEFAULT_ORCA_MODULE
-    hpc_mlip_dir: str = DEFAULT_HPC_MLIP_DIR
+    def __init__(
+        self,
+        name,
+        job_dir,
+        output_dir,
+        stem_prefix,
+        slurm_time="6:00:00",
+        slurm_memory="64G",
+        slurm_partition=None,
+        slurm_account=None,
+        slurm_mail_type=None,
+        slurm_mail_user=None,
+        slurm_exclude=None,
+        slurm_output=None,
+        slurm_error=None,
+        slurm_use_cpus_per_task=True,
+        threads=THREADS,
+        orca_module=DEFAULT_ORCA_MODULE,
+        orca_path=None,
+        hpc_mlip_dir=DEFAULT_HPC_MLIP_DIR,
+    ):
+        self.name = name
+        self.job_dir = job_dir
+        self.output_dir = output_dir
+        self.stem_prefix = stem_prefix
+        self.slurm_time = slurm_time
+        self.slurm_memory = slurm_memory
+        self.slurm_partition = slurm_partition
+        self.slurm_account = slurm_account
+        self.slurm_mail_type = slurm_mail_type
+        self.slurm_mail_user = slurm_mail_user
+        self.slurm_exclude = slurm_exclude
+        self.slurm_output = slurm_output
+        self.slurm_error = slurm_error
+        self.slurm_use_cpus_per_task = slurm_use_cpus_per_task
+        self.threads = threads
+        self.orca_module = orca_module
+        self.orca_path = orca_path
+        self.hpc_mlip_dir = hpc_mlip_dir
 
 
 MACHINES = {
@@ -121,7 +146,8 @@ MACHINES = {
         slurm_use_cpus_per_task=False,
         slurm_memory=None,
         threads=24,
-        orca_module="orca/6.1.1",
+        orca_module=None,
+        orca_path="/software/orca/6.1.1/orca",
         hpc_mlip_dir="/gpfs/fs2/scratch/kshao4/mlip",
     ),
 }
@@ -291,6 +317,18 @@ def slurm_text(config: MachineConfig, frame_index: int, orca_command: str) -> st
         if config.slurm_error
         else f"#SBATCH --error={slurm_out_dir}/{stem}-%j.err\n"
     )
+    module_block = f"module purge\nmodule load {config.orca_module}\n\n" if config.orca_module else ""
+    configured_orca_command = config.orca_path or orca_command
+    orca_command_block = (
+        f"ORCA_COMMAND={configured_orca_command!r}\n"
+        "if [[ \"$ORCA_COMMAND\" != /* ]]; then\n"
+        "    ORCA_COMMAND=\"$(command -v \"$ORCA_COMMAND\")\"\n"
+        "fi\n"
+        "if [[ -z \"$ORCA_COMMAND\" || ! -x \"$ORCA_COMMAND\" ]]; then\n"
+        f"    echo \"ORCA executable is not available: {configured_orca_command}\" >&2\n"
+        "    exit 1\n"
+        "fi"
+    )
     return f"""#!/bin/bash
 #SBATCH --job-name={stem}
 {partition_line}{account_line}{mail_type_line}{mail_user_line}{ntasks_line}{long_ntasks_line}{cpus_line}{mem_line}{exclude_line}\
@@ -300,15 +338,11 @@ def slurm_text(config: MachineConfig, frame_index: int, orca_command: str) -> st
 
 set -euo pipefail
 
-module purge
-module load {config.orca_module}
-
 MLIP_DIR="${{MLIP_DIR:-{config.hpc_mlip_dir}}}"
 INPUT_PATH="$MLIP_DIR/{job_dir_rel}/{stem}.inp"
 OUTPUT_DIR="$MLIP_DIR/{output_dir_rel}"
 OUTPUT_PATH="$OUTPUT_DIR/{stem}.out"
-ORCA_COMMAND={orca_command!r}
-ORCA_COMMAND="$(command -v "$ORCA_COMMAND")"
+{module_block}{orca_command_block}
 
 echo "MLIP_DIR=$MLIP_DIR"
 echo "ORCA_COMMAND=$ORCA_COMMAND"
