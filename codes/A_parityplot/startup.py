@@ -2,13 +2,9 @@
 """Generate and run ORCA jobs for isolated-H validation clusters.
 
 Examples:
-    python startup.py --machine viper --frames 0,100
-    python startup.py --machine raven --frames 100,180
-    python startup.py --machine viper --frames 0,100 --task-index 0 --resume
+    python startup.py --machine greatlakes --frames 0,180 --force
 
-for f in 8_1_viperDFT/r09_hot_w_isolatedH_viper_*.slurm; do sbatch "$f"; done
-
-for f in 8_2_ravenDFT/r09_hot_w_isolatedH_raven_*.slurm; do sbatch "$f"; done
+for f in 8_4_greatlakesDFT/r09_hot_w_isolatedH_greatlakes_*.slurm; do sbatch "$f"; done
 
 The frame range is half-open: --frames 0,100 means cluster frames 0 through 99.
 Running without --task-index writes one .inp and one .slurm file per selected frame.
@@ -41,9 +37,10 @@ FAIRCHEM_ORCA_BASIS = (
 )
 BASIS_FILE = "def2-tzvpd.bas"
 DEFAULT_ORCA_COMMAND = "orca"
-THREADS = 24
+THREADS = 12
 MULTIPLICITY = 1
-DEFAULT_HPC_MLIP_DIR = "/ptmp/kshao/mlip"
+DEFAULT_HPC_MLIP_DIR = "/home/kevinsh/kevinsh/mlip"
+DEFAULT_ORCA_MODULE = "orca/6.0.1"
 FINAL_ENERGY_MARKER = "FINAL SINGLE POINT ENERGY"
 NORMAL_TERMINATION_MARKER = "ORCA TERMINATED NORMALLY"
 
@@ -84,6 +81,14 @@ MACHINES = {
         job_dir=AP_DIR / "8_2_ravenDFT",
         output_dir=MLIP_DIR / "outputsfull" / "A_parityplot" / "8_2_ravenDFT",
         stem_prefix="r09_hot_w_isolatedH_raven",
+    ),
+    "greatlakes": MachineConfig(
+        name="greatlakes",
+        job_dir=AP_DIR / "8_4_greatlakesDFT",
+        output_dir=MLIP_DIR / "outputsfull" / "A_parityplot" / "8_4_greatlakesDFT",
+        stem_prefix="r09_hot_w_isolatedH_greatlakes",
+        slurm_time="6:00:00",
+        slurm_memory="64G",
     ),
 }
 
@@ -245,7 +250,7 @@ def slurm_text(config: MachineConfig, frame_index: int, orca_command: str) -> st
 set -euo pipefail
 
 module purge
-module load orca/6.1.1
+module load {DEFAULT_ORCA_MODULE}
 
 MLIP_DIR=${{MLIP_DIR:-{DEFAULT_HPC_MLIP_DIR}}}
 INPUT_PATH="$MLIP_DIR/{job_dir_rel}/{stem}.inp"
