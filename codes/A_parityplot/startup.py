@@ -90,9 +90,9 @@ MACHINES = {
         output_dir=MLIP_DIR / "outputsfull" / "A_parityplot" / "8_4_greatlakesDFT",
         stem_prefix="r09_hot_w_isolatedH_greatlakes",
         slurm_time="6:00:00",
-        slurm_memory="64G",
+        slurm_memory="31G",
         slurm_partition="standard",
-        slurm_account="chengcli1",
+        slurm_account="chengcli0",
     ),
 }
 

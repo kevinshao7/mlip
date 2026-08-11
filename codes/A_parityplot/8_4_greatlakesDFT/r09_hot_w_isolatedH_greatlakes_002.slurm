@@ -1,11 +1,11 @@
 #!/bin/bash -l
 #SBATCH --job-name=r09_hot_w_isolatedH_greatlakes_002
 #SBATCH --partition=standard
-#SBATCH --account=chengcli1
+#SBATCH --account=chengcli0
 #SBATCH -n 1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=12
-#SBATCH --mem=64G
+#SBATCH --mem=31G
 #SBATCH --time=6:00:00
 #SBATCH --output=/home/kevinsh/kevinsh/mlip/outputsfull/slurm/r09_hot_w_isolatedH_greatlakes_002-%j.out
 #SBATCH --error=/home/kevinsh/kevinsh/mlip/outputsfull/slurm/r09_hot_w_isolatedH_greatlakes_002-%j.err
