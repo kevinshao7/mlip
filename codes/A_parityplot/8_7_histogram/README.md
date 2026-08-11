@@ -8,10 +8,10 @@ python codes/A_parityplot/8_7_histogram/plot_mlip_dft_errors.py --model polar1m
 python codes/A_parityplot/8_7_histogram/plot_mlip_dft_errors.py --model off
 ```
 
-The script expects MLIP prediction CSVs from:
+The script expects MLIP prediction CSVs in:
 
-```bash
-python codes/A_parityplot/8_6_mlippred/predict_singlepoints.py --model polar1s --frames 0,180 --force
+```text
+codes/A_parityplot/8_6b_mlippredout/<model>/
 ```
 
 Outputs go to:
@@ -29,11 +29,18 @@ Four plots are written:
 <model>_fractional_energy_error_hist.png
 ```
 
+The force plots use magnitudes. The energy plots are signed per-atom errors:
+`(E_MLIP - E_DFT) / natoms` in eV/atom and the corresponding signed fractional
+per-atom error.
+
 Force histograms count atoms and use three colors:
 
 - target isolated H atom
 - nearest atom to the target isolated H atom
 - all other atoms
+
+Force plots are split into two stacked subplots with shared x-axis bins:
+all other atoms on top, and target isolated H plus nearest atom on the bottom.
 
 The target isolated H is identified as the H atom at the centered cluster
 position `(12,12,12)`, not as atom index 0. This matches the cluster extraction

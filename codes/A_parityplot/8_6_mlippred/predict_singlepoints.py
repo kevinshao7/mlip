@@ -34,7 +34,6 @@ DEFAULT_CACHE_DIR = REPO_ROOT / "outputsfull" / ".cache"
 DEFAULT_DEVICE = os.environ.get("MLIP_MACE_DEVICE", "cuda")
 DEFAULT_DTYPE = "float32"
 DEFAULT_FRAMES = "0,180"
-DEFAULT_CHARGE = 0
 DEFAULT_SPIN = 1
 DEFAULT_EXTERNAL_FIELD = (0.0, 0.0, 0.0)
 FORMAL_CHARGES = {"O": -2.0, "H": 1.0}
@@ -90,7 +89,15 @@ def parse_args() -> argparse.Namespace:
         help="Half-open frame range start,stop. Default: 0,180.",
     )
     parser.add_argument("--stride", type=positive_int, default=1)
-    parser.add_argument("--charge", type=int, default=DEFAULT_CHARGE, help="Total charge for MACE-POLAR.")
+    parser.add_argument(
+        "--charge",
+        type=int,
+        default=None,
+        help=(
+            "Override total system charge for MACE-POLAR. By default the charge is computed per frame "
+            "from formal atom charges O=-2 and H=+1, matching startup.py/ORCA input generation."
+        ),
+    )
     parser.add_argument("--spin", type=int, default=DEFAULT_SPIN, help="Spin multiplicity for MACE-POLAR.")
     parser.add_argument("--external-field", type=external_field, default=DEFAULT_EXTERNAL_FIELD)
     parser.add_argument("--force", action="store_true", help="Overwrite existing outputs for this model.")
@@ -164,19 +171,30 @@ def formal_charges_for(atoms: Atoms) -> np.ndarray:
     return np.array([FORMAL_CHARGES[symbol] for symbol in symbols], dtype=float)
 
 
-def prepare_atoms(atoms: Atoms, args: argparse.Namespace, calculator: Any) -> Atoms:
+def frame_charge_setting(args: argparse.Namespace, formal_charges: np.ndarray) -> int:
+    if args.charge is not None:
+        return int(args.charge)
+    formal_sum = float(np.sum(formal_charges))
+    rounded = int(round(formal_sum))
+    if not np.isclose(formal_sum, rounded, atol=1.0e-8):
+        raise ValueError(f"Formal charge sum is not integral: {formal_sum}")
+    return rounded
+
+
+def prepare_atoms(atoms: Atoms, args: argparse.Namespace, calculator: Any) -> tuple[Atoms, int]:
     atoms = atoms.copy()
     formal_charges = formal_charges_for(atoms)
+    charge_setting = frame_charge_setting(args, formal_charges)
     atoms.set_initial_charges(formal_charges)
     atoms.set_array("formal_charge_e", formal_charges)
 
     if MODEL_CONFIGS[args.model]["kind"] == "polar":
-        atoms.info["charge"] = args.charge
+        atoms.info["charge"] = charge_setting
         atoms.info["spin"] = args.spin
         atoms.info["external_field"] = list(args.external_field)
 
     atoms.calc = calculator
-    return atoms
+    return atoms, charge_setting
 
 
 def as_numpy(value: Any) -> np.ndarray:
@@ -279,6 +297,7 @@ SUMMARY_FIELDS = [
     "max_force_eV_A",
     "rms_force_eV_A",
     "formal_charge_sum_e",
+    "mlip_charge_setting_e",
     "predicted_charge_sum_e",
     "status",
     "error",
@@ -321,7 +340,7 @@ def evaluate(args: argparse.Namespace) -> tuple[int, tuple[Path, Path, Path]]:
             continue
 
         try:
-            atoms = prepare_atoms(raw_atoms, args, calculator)
+            atoms, charge_setting = prepare_atoms(raw_atoms, args, calculator)
             energy_ev = float(atoms.get_potential_energy())
             forces = np.asarray(atoms.get_forces(), dtype=float)
             max_force, rms_force = force_stats(forces)
@@ -330,6 +349,7 @@ def evaluate(args: argparse.Namespace) -> tuple[int, tuple[Path, Path, Path]]:
 
             atoms.info["mlip_model_key"] = args.model
             atoms.info["mlip_model_name"] = config["model_name"]
+            atoms.info["mlip_charge_setting_e"] = charge_setting
             atoms.info["mlip_energy_eV"] = energy_ev
             atoms.arrays["mlip_forces_eV_A"] = forces
             if predicted_charges is not None:
@@ -352,6 +372,7 @@ def evaluate(args: argparse.Namespace) -> tuple[int, tuple[Path, Path, Path]]:
                     "max_force_eV_A": f"{max_force:.12g}",
                     "rms_force_eV_A": f"{rms_force:.12g}",
                     "formal_charge_sum_e": f"{float(np.sum(formal_charges)):.12g}",
+                    "mlip_charge_setting_e": charge_setting,
                     "predicted_charge_sum_e": ""
                     if predicted_charges is None
                     else f"{float(np.sum(predicted_charges)):.12g}",
@@ -405,6 +426,7 @@ def evaluate(args: argparse.Namespace) -> tuple[int, tuple[Path, Path, Path]]:
                     "max_force_eV_A": "",
                     "rms_force_eV_A": "",
                     "formal_charge_sum_e": "",
+                    "mlip_charge_setting_e": "",
                     "predicted_charge_sum_e": "",
                     "status": "error",
                     "error": str(exc),

@@ -29,7 +29,7 @@ ORCA_NORMAL_TERMINATION = "ORCA TERMINATED NORMALLY"
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[2]
 DEFAULT_DFT_DIR = REPO_ROOT / "outputsfull" / "A_parityplot" / "8_5_bluehiveDFT"
-DEFAULT_MLIP_ROOT = REPO_ROOT / "outputsfull" / "A_parityplot" / "8_6_mlippred"
+DEFAULT_MLIP_ROOT = REPO_ROOT / "codes" / "A_parityplot" / "8_6b_mlippredout"
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "outputsfull" / "A_parityplot" / "8_7_histogram"
 DEFAULT_ATOMIC_REFERENCE = REPO_ROOT / "codes" / "7_7b_clustervalidation" / "atomizationenergies.txt"
 MODEL_LABELS = {
@@ -249,7 +249,7 @@ def collect_errors(
 ) -> tuple[dict[str, list[float]], dict[str, list[float]], list[float], list[float], list[int]]:
     force_abs_by_class = {label: [] for label in ATOM_CLASS_COLORS}
     force_frac_by_class = {label: [] for label in ATOM_CLASS_COLORS}
-    energy_abs: list[float] = []
+    energy_signed: list[float] = []
     energy_frac: list[float] = []
     matched_frames: list[int] = []
 
@@ -278,15 +278,16 @@ def collect_errors(
             ref_sum = reference_sum(dft_symbols, references)
             dft_energy -= ref_sum
             mlip_energy -= ref_sum
-        absolute_energy_error = abs(mlip_energy - dft_energy)
-        fractional_energy_error = absolute_energy_error / max(abs(dft_energy), fractional_eps)
-        energy_abs.append(float(absolute_energy_error))
+        natoms = len(dft_symbols)
+        signed_energy_error = (mlip_energy - dft_energy) / natoms
+        fractional_energy_error = signed_energy_error / max(abs(dft_energy / natoms), fractional_eps)
+        energy_signed.append(float(signed_energy_error))
         energy_frac.append(float(fractional_energy_error))
         matched_frames.append(frame)
 
     if not matched_frames:
         raise RuntimeError("No common complete frames found between DFT outputs and MLIP predictions")
-    return force_abs_by_class, force_frac_by_class, energy_abs, energy_frac, matched_frames
+    return force_abs_by_class, force_frac_by_class, energy_signed, energy_frac, matched_frames
 
 
 def finite_values(values: list[float]) -> np.ndarray:
@@ -301,21 +302,53 @@ def plot_force_histogram(
     output_path: Path,
     bins: int,
 ) -> None:
-    fig, ax = plt.subplots(figsize=(8.2, 5.4), constrained_layout=True)
-    plotted = False
-    for label, color in ATOM_CLASS_COLORS.items():
+    finite_groups = [finite_values(values_by_class[label]) for label in ATOM_CLASS_COLORS]
+    finite_groups = [values for values in finite_groups if values.size]
+    if not finite_groups:
+        raise RuntimeError(f"No finite values to plot for {output_path}")
+    all_values = np.concatenate(finite_groups)
+
+    if float(np.min(all_values)) == float(np.max(all_values)):
+        center = float(all_values[0])
+        width = max(abs(center) * 0.05, 1.0e-8)
+        bin_edges = np.linspace(center - width, center + width, bins + 1)
+    else:
+        bin_edges = np.linspace(float(np.min(all_values)), float(np.max(all_values)), bins + 1)
+
+    fig, axes = plt.subplots(2, 1, figsize=(8.4, 7.2), sharex=True, constrained_layout=True)
+    top_ax, bottom_ax = axes
+
+    top_label = "all other atoms"
+    top_values = finite_values(values_by_class[top_label])
+    if top_values.size:
+        top_ax.hist(
+            top_values,
+            bins=bin_edges,
+            histtype="stepfilled",
+            alpha=0.62,
+            color=ATOM_CLASS_COLORS[top_label],
+            edgecolor=ATOM_CLASS_COLORS[top_label],
+            label=top_label,
+        )
+    top_ax.set_ylabel("Number of atoms")
+    top_ax.set_title(title)
+    top_ax.legend(frameon=False)
+    top_ax.grid(True, color="0.88", linewidth=0.7)
+
+    plotted_bottom = False
+    for label in ("target isolated H", "nearest atom"):
         values = finite_values(values_by_class[label])
         if values.size == 0:
             continue
-        ax.hist(values, bins=bins, histtype="stepfilled", alpha=0.48, color=color, edgecolor=color, label=label)
-        plotted = True
-    if not plotted:
-        raise RuntimeError(f"No finite values to plot for {output_path}")
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel("Number of atoms")
-    ax.set_title(title)
-    ax.legend(frameon=False)
-    ax.grid(True, color="0.88", linewidth=0.7)
+        color = ATOM_CLASS_COLORS[label]
+        bottom_ax.hist(values, bins=bin_edges, histtype="stepfilled", alpha=0.58, color=color, edgecolor=color, label=label)
+        plotted_bottom = True
+    if not plotted_bottom:
+        raise RuntimeError(f"No target/nearest finite values to plot for {output_path}")
+    bottom_ax.set_xlabel(xlabel)
+    bottom_ax.set_ylabel("Number of atoms")
+    bottom_ax.legend(frameon=False)
+    bottom_ax.grid(True, color="0.88", linewidth=0.7)
     fig.savefig(output_path, dpi=220)
     plt.close(fig)
 
@@ -372,7 +405,7 @@ def main() -> int:
     dft = load_dft_outputs(args.dft_dir)
     mlip_summary = load_mlip_summary(summary_csv)
     mlip_forces = load_mlip_forces(force_csv)
-    force_abs, force_frac, energy_abs, energy_frac, frames = collect_errors(
+    force_abs, force_frac, energy_signed, energy_frac, frames = collect_errors(
         dft, mlip_summary, mlip_forces, references, args.fractional_eps, args.target_position
     )
 
@@ -396,16 +429,16 @@ def main() -> int:
         args.force_bins,
     )
     plot_energy_histogram(
-        energy_abs,
-        f"Absolute {reference_label} energy error |E_MLIP - E_DFT| (eV)",
-        f"{args.model}: absolute energy errors ({len(frames)} frames)",
+        energy_signed,
+        f"Signed {reference_label} energy error (E_MLIP - E_DFT) / atom (eV/atom)",
+        f"{args.model}: signed energy errors per atom ({len(frames)} frames)",
         model_output_dir / f"{prefix}absolute_energy_error_hist.png",
         args.energy_bins,
     )
     plot_energy_histogram(
         energy_frac,
-        f"Fractional {reference_label} energy error |E_MLIP - E_DFT| / |E_DFT|",
-        f"{args.model}: fractional energy errors ({len(frames)} frames)",
+        f"Signed fractional {reference_label} energy error per atom",
+        f"{args.model}: signed fractional energy errors per atom ({len(frames)} frames)",
         model_output_dir / f"{prefix}fractional_energy_error_hist.png",
         args.energy_bins,
     )

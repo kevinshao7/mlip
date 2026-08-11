@@ -23,3 +23,10 @@ outputsfull/A_parityplot/8_6_mlippred/<model>/
 Each run writes a frame-level `*_singlepoints.csv`, atom/force-level `*_forces.csv`,
 and a predicted `*.xyz` trajectory unless `--no-extxyz` is set. Formal charges
 are hard-coded as `O=-2` and `H=+1`.
+
+For MACE-POLAR, the system charge is computed separately for each frame from
+that formal charge sum. This matches the ORCA input generation in `startup.py`
+instead of incorrectly using charge `0` for every frame. The applied MLIP charge
+is written to `mlip_charge_setting_e` in the summary CSV and the extxyz metadata.
+Use `--charge <int>` only when intentionally overriding every frame to one fixed
+charge for a diagnostic run.

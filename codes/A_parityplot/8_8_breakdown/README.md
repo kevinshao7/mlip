@@ -1,0 +1,75 @@
+# 8_8 MLIP Target-H Breakdown
+
+Run from the repository root:
+
+```bash
+python codes/A_parityplot/8_8_breakdown/plot_mace_off_target_h_breakdown.py
+```
+
+By default this processes all three models:
+
+```text
+off, polar1s, polar1m
+```
+
+To run one model:
+
+```bash
+python codes/A_parityplot/8_8_breakdown/plot_mace_off_target_h_breakdown.py --model polar1s
+```
+
+The script reads:
+
+```text
+codes/A_parityplot/8_6b_mlippredout/<model>/*_forces.csv
+codes/A_parityplot/8_6b_mlippredout/<model>/*_singlepoints.csv
+outputsfull/A_parityplot/8_5_bluehiveDFT/*.out
+```
+
+It identifies the isolated H as the H atom at `(12,12,12)`, finds the nearest
+other atom, and uses blue points when the nearest atom is oxygen and red points
+when the nearest atom is hydrogen.
+
+The x axis is always isolated-H to nearest-atom separation in Angstrom.
+
+For each model, the script writes:
+
+```text
+outputsfull/A_parityplot/8_8_breakdown/<model>/<model>_target_h_breakdown.csv
+outputsfull/A_parityplot/8_8_breakdown/<model>/<model>_target_h_longitudinal_force_error_abs.png
+outputsfull/A_parityplot/8_8_breakdown/<model>/<model>_target_h_longitudinal_force_error_fractional.png
+outputsfull/A_parityplot/8_8_breakdown/<model>/<model>_target_h_perpendicular_force_error_abs.png
+outputsfull/A_parityplot/8_8_breakdown/<model>/<model>_target_h_perpendicular_force_error_fractional.png
+outputsfull/A_parityplot/8_8_breakdown/<model>/<model>_total_energy_error_signed.png
+outputsfull/A_parityplot/8_8_breakdown/<model>/<model>_total_energy_error_fractional.png
+outputsfull/A_parityplot/8_8_breakdown/<model>/<model>_per_atom_energy_error_signed.png
+outputsfull/A_parityplot/8_8_breakdown/<model>/<model>_per_atom_energy_error_fractional.png
+```
+
+Force errors are decomposed along the isolated-H to nearest-atom vector. Energy
+errors are signed as `E_MLIP - E_DFT`; by default they are atom-reference
+subtracted using `codes/7_7b_clustervalidation/atomizationenergies.txt`.
+
+## Charge-Combo Energy Diagnostic
+
+To remake the signed fractional per-atom energy plot colored by MLIP/DFT charge
+pair:
+
+```bash
+python codes/A_parityplot/8_8_breakdown/plot_charge_combo_energy_diagnostic.py --model polar1m
+```
+
+By default, this treats the MLIP charge as the MACE-POLAR run setting
+`--mlip-charge-setting 0`, which is the suspected mismatch. To color by the
+formal charge sum in the MLIP summary CSV instead:
+
+```bash
+python codes/A_parityplot/8_8_breakdown/plot_charge_combo_energy_diagnostic.py --model polar1m --mlip-charge-source formal
+```
+
+Outputs:
+
+```text
+outputsfull/A_parityplot/8_8_breakdown/<model>/<model>_per_atom_energy_fractional_by_charge_combo_mlip_charge_setting.png
+outputsfull/A_parityplot/8_8_breakdown/<model>/<model>_per_atom_energy_fractional_by_charge_combo_mlip_charge_formal.png
+```
