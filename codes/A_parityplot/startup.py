@@ -2,9 +2,9 @@
 """Generate and run ORCA jobs for isolated-H validation clusters.
 
 Examples:
-    python startup.py --machine greatlakes --frames 0,180 --force
+    python startup.py --machine bluehive --frames 0,180 --force
 
-for f in 8_4_greatlakesDFT/r09_hot_w_isolatedH_greatlakes_*.slurm; do sbatch "$f"; done
+for f in 8_5_bluehiveDFT/r09_hot_w_isolatedH_bluehive_*.slurm; do sbatch "$f"; done
 
 The frame range is half-open: --frames 0,100 means cluster frames 0 through 99.
 Running without --task-index writes one .inp and one .slurm file per selected frame.
@@ -37,7 +37,7 @@ FAIRCHEM_ORCA_BASIS = (
 )
 BASIS_FILE = "def2-tzvpd.bas"
 DEFAULT_ORCA_COMMAND = "orca"
-THREADS = 12
+THREADS = 24
 MULTIPLICITY = 1
 DEFAULT_HPC_MLIP_DIR = "/home/kevinsh/kevinsh/mlip"
 DEFAULT_ORCA_MODULE = "orca/6.0.1"
@@ -66,9 +66,18 @@ class MachineConfig:
     output_dir: Path
     stem_prefix: str
     slurm_time: str = "6:00:00"
-    slurm_memory: str = "64G"
+    slurm_memory: str | None = "64G"
     slurm_partition: str | None = None
     slurm_account: str | None = None
+    slurm_mail_type: str | None = None
+    slurm_mail_user: str | None = None
+    slurm_exclude: str | None = None
+    slurm_output: str | None = None
+    slurm_error: str | None = None
+    slurm_use_cpus_per_task: bool = True
+    threads: int = THREADS
+    orca_module: str = DEFAULT_ORCA_MODULE
+    hpc_mlip_dir: str = DEFAULT_HPC_MLIP_DIR
 
 
 MACHINES = {
@@ -93,6 +102,27 @@ MACHINES = {
         slurm_memory="31G",
         slurm_partition="standard",
         slurm_account="chengcli0",
+        threads=12,
+        orca_module="orca/6.0.1",
+        hpc_mlip_dir="/home/kevinsh/kevinsh/mlip",
+    ),
+    "bluehive": MachineConfig(
+        name="bluehive",
+        job_dir=AP_DIR / "8_5_bluehiveDFT",
+        output_dir=MLIP_DIR / "outputsfull" / "A_parityplot" / "8_5_bluehiveDFT",
+        stem_prefix="r09_hot_w_isolatedH_bluehive",
+        slurm_time="12:00:00",
+        slurm_partition="standard",
+        slurm_mail_type="END",
+        slurm_mail_user="ks2120@cam.ac.uk",
+        slurm_exclude="bhc0020,bhc0021,bhc0025",
+        slurm_output="{stem}.slurmlog.txt",
+        slurm_error="{stem}.slurmerr.txt",
+        slurm_use_cpus_per_task=False,
+        slurm_memory=None,
+        threads=24,
+        orca_module="orca/6.1.1",
+        hpc_mlip_dir="/gpfs/fs2/scratch/kshao4/mlip",
     ),
 }
 
@@ -165,7 +195,7 @@ def load_fairchem_orca_calc():
     return module
 
 
-def make_input_with_fairchem(atoms: Atoms, work_dir: Path) -> str:
+def make_input_with_fairchem(atoms: Atoms, work_dir: Path, threads: int) -> str:
     orca_calc = load_fairchem_orca_calc()
     charge = formal_charge(atom_tuples(atoms))
     from ase.calculators.orca import OrcaProfile
@@ -193,7 +223,7 @@ def make_input_with_fairchem(atoms: Atoms, work_dir: Path) -> str:
     transient_input.unlink()
     lines = text.splitlines()
     if lines and not any(line.strip().lower().startswith("%pal") for line in lines):
-        lines.insert(1, f"%pal nprocs {THREADS} end")
+        lines.insert(1, f"%pal nprocs {threads} end")
         text = "\n".join(lines) + "\n"
     return text
 
@@ -226,7 +256,7 @@ def generate_input(config: MachineConfig, atoms: Atoms, frame_index: int, force:
     inp_path = config.job_dir / f"{stem}.inp"
     if inp_path.exists() and not force:
         return inp_path
-    write_text_lf(inp_path, make_input_with_fairchem(atoms, config.job_dir))
+    write_text_lf(inp_path, make_input_with_fairchem(atoms, config.job_dir, config.threads))
     return inp_path
 
 
@@ -241,29 +271,49 @@ def slurm_text(config: MachineConfig, frame_index: int, orca_command: str) -> st
     stem = stem_for_frame(config, frame_index)
     job_dir_rel = relative_to_mlip(config.job_dir)
     output_dir_rel = relative_to_mlip(config.output_dir)
-    slurm_out_dir = f"{DEFAULT_HPC_MLIP_DIR}/outputsfull/slurm"
+    slurm_out_dir = f"{config.hpc_mlip_dir}/outputsfull/slurm"
     partition_line = f"#SBATCH --partition={config.slurm_partition}\n" if config.slurm_partition else ""
     account_line = f"#SBATCH --account={config.slurm_account}\n" if config.slurm_account else ""
+    mail_type_line = f"#SBATCH --mail-type={config.slurm_mail_type}\n" if config.slurm_mail_type else ""
+    mail_user_line = f"#SBATCH --mail-user={config.slurm_mail_user}\n" if config.slurm_mail_user else ""
+    exclude_line = f"#SBATCH --exclude={config.slurm_exclude}\n" if config.slurm_exclude else ""
+    ntasks_line = f"#SBATCH -n {config.threads}\n" if not config.slurm_use_cpus_per_task else "#SBATCH -n 1\n"
+    long_ntasks_line = "#SBATCH --ntasks=1\n" if config.slurm_use_cpus_per_task else ""
+    cpus_line = f"#SBATCH --cpus-per-task={config.threads}\n" if config.slurm_use_cpus_per_task else ""
+    mem_line = f"#SBATCH --mem={config.slurm_memory}\n" if config.slurm_memory else ""
+    output_line = (
+        f"#SBATCH -o {config.slurm_output.format(stem=stem)}\n"
+        if config.slurm_output
+        else f"#SBATCH --output={slurm_out_dir}/{stem}-%j.out\n"
+    )
+    error_line = (
+        f"#SBATCH -e {config.slurm_error.format(stem=stem)}\n"
+        if config.slurm_error
+        else f"#SBATCH --error={slurm_out_dir}/{stem}-%j.err\n"
+    )
     return f"""#!/bin/bash -l
 #SBATCH --job-name={stem}
-{partition_line}{account_line}#SBATCH -n 1
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task={THREADS}
-#SBATCH --mem={config.slurm_memory}
+{partition_line}{account_line}{mail_type_line}{mail_user_line}{ntasks_line}{long_ntasks_line}{cpus_line}{mem_line}{exclude_line}\
 #SBATCH --time={config.slurm_time}
-#SBATCH --output={slurm_out_dir}/{stem}-%j.out
-#SBATCH --error={slurm_out_dir}/{stem}-%j.err
+{output_line.rstrip()}
+{error_line.rstrip()}
 
 set -euo pipefail
 
 module purge
-module load {DEFAULT_ORCA_MODULE}
+module load {config.orca_module}
 
-MLIP_DIR=${{MLIP_DIR:-{DEFAULT_HPC_MLIP_DIR}}}
+MLIP_DIR="${{MLIP_DIR:-{config.hpc_mlip_dir}}}"
 INPUT_PATH="$MLIP_DIR/{job_dir_rel}/{stem}.inp"
 OUTPUT_DIR="$MLIP_DIR/{output_dir_rel}"
 OUTPUT_PATH="$OUTPUT_DIR/{stem}.out"
 ORCA_COMMAND={orca_command!r}
+ORCA_COMMAND="$(command -v "$ORCA_COMMAND")"
+
+echo "MLIP_DIR=$MLIP_DIR"
+echo "ORCA_COMMAND=$ORCA_COMMAND"
+echo "INPUT_PATH=$INPUT_PATH"
+echo "OUTPUT_PATH=$OUTPUT_PATH"
 
 mkdir -p "$MLIP_DIR/outputsfull/slurm"
 mkdir -p "$OUTPUT_DIR"
@@ -278,9 +328,9 @@ if [[ -f "$OUTPUT_PATH" ]] && grep -q "{FINAL_ENERGY_MARKER}" "$OUTPUT_PATH" && 
     exit 0
 fi
 
-export OMP_NUM_THREADS={THREADS}
-export MKL_NUM_THREADS={THREADS}
-export OPENBLAS_NUM_THREADS={THREADS}
+export OMP_NUM_THREADS={config.threads}
+export MKL_NUM_THREADS={config.threads}
+export OPENBLAS_NUM_THREADS={config.threads}
 
 cd "$OUTPUT_DIR"
 $ORCA_COMMAND "$INPUT_PATH" > "$OUTPUT_PATH"
@@ -319,9 +369,9 @@ def run_orca(config: MachineConfig, inp_path: Path, orca_command: str, resume: b
             fail(f"Output already exists or is incomplete: {out_path}. Use --resume or --force.")
 
     env = os.environ.copy()
-    env["OMP_NUM_THREADS"] = str(THREADS)
-    env["MKL_NUM_THREADS"] = str(THREADS)
-    env["OPENBLAS_NUM_THREADS"] = str(THREADS)
+    env["OMP_NUM_THREADS"] = str(config.threads)
+    env["MKL_NUM_THREADS"] = str(config.threads)
+    env["OPENBLAS_NUM_THREADS"] = str(config.threads)
     config.output_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"Running {inp_path.name} -> {out_path}", flush=True)
