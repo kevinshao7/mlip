@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-MLIP_DIR="${MLIP_DIR:-/ptmp/kshao/mlip}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MLIP_DIR="${MLIP_DIR:-$(cd "$SCRIPT_DIR/../../.." && pwd)}"
 INPUT_DIR="$MLIP_DIR/codes/A_parityplot/8_6_dart10"
 OUTPUT_DIR="$MLIP_DIR/outputsfull/A_parityplot/8_6_dart10"
 ORCA_COMMAND=orca_qc

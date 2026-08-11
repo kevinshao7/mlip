@@ -18,13 +18,13 @@ Prepare a four-machine split for frames 0-180:
 
 Then run one shell command on each machine. Each command runs its assigned ORCA
 jobs in series, with no Python command involved:
-    cd /ptmp/kshao/mlip/codes/A_parityplot/8_4_stormy && bash run_stormy.sh
-    cd /ptmp/kshao/mlip/codes/A_parityplot/8_5_dart9 && bash run_dart9.sh
-    cd /ptmp/kshao/mlip/codes/A_parityplot/8_6_dart10 && bash run_dart10.sh
-    cd /ptmp/kshao/mlip/codes/A_parityplot/8_7_dart11 && bash run_dart11.sh
+    cd codes/A_parityplot/8_4_stormy && bash run_stormy.sh
+    cd codes/A_parityplot/8_5_dart9 && bash run_dart9.sh
+    cd codes/A_parityplot/8_6_dart10 && bash run_dart10.sh
+    cd codes/A_parityplot/8_7_dart11 && bash run_dart11.sh
 
 If all four folders are on one host and you intentionally want one serial run:
-    cd /ptmp/kshao/mlip/codes/A_parityplot && bash run_all_dart_serial.sh
+    cd codes/A_parityplot && bash run_all_dart_serial.sh
 
 The frame range is half-open: --frames 0,25 means cluster frames 0 through 24.
 """
@@ -177,7 +177,8 @@ def runner_text(
     return f"""#!/usr/bin/env bash
 set -euo pipefail
 
-MLIP_DIR="${{MLIP_DIR:-{hpc_mlip_dir}}}"
+SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
+MLIP_DIR="${{MLIP_DIR:-$(cd "$SCRIPT_DIR/../../.." && pwd)}}"
 INPUT_DIR="$MLIP_DIR/{job_dir_rel}"
 OUTPUT_DIR="$MLIP_DIR/{output_dir_rel}"
 ORCA_COMMAND={shell_quote(orca_command)}
@@ -248,7 +249,8 @@ def write_master_runner(machine_names: list[str], hpc_mlip_dir: str) -> Path:
     lines = [
         "#!/usr/bin/env bash",
         "set -euo pipefail",
-        f'MLIP_DIR="${{MLIP_DIR:-{hpc_mlip_dir}}}"',
+        'SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"',
+        'MLIP_DIR="${MLIP_DIR:-$(cd "$SCRIPT_DIR/../.." && pwd)}"',
         "",
     ]
     for name in machine_names:
@@ -455,8 +457,7 @@ def main() -> None:
             )
             total_inputs += len(generated)
             if script_path:
-                hpc_job_dir = f"{args.hpc_mlip_dir}/{startup.relative_to_mlip(MACHINES[name].job_dir)}"
-                print(f"HPC one-liner: cd {hpc_job_dir} && bash {script_path.name}")
+                print(f"Runner: cd {startup.relative_to_mlip(MACHINES[name].job_dir)} && bash {script_path.name}")
 
         if args.dry_run:
             return
@@ -464,7 +465,7 @@ def main() -> None:
         print()
         print(f"Generated {total_inputs} input files")
         print(f"Prepared {master}")
-        print(f"Single-host serial runner: cd {args.hpc_mlip_dir}/{startup.relative_to_mlip(AP_DIR)} && bash {master.name}")
+        print(f"Single-host serial runner: cd {startup.relative_to_mlip(AP_DIR)} && bash {master.name}")
         return
 
     startup.load_fairchem_orca_calc()
@@ -488,10 +489,9 @@ def main() -> None:
         return
 
     if args.generate_only:
-        hpc_job_dir = f"{args.hpc_mlip_dir}/{startup.relative_to_mlip(config.job_dir)}"
         print(f"Generated {len(generated)} input files")
         if script_path:
-            print(f"HPC one-liner: cd {hpc_job_dir} && bash {script_path.name}")
+            print(f"Runner: cd {startup.relative_to_mlip(config.job_dir)} && bash {script_path.name}")
         return
 
     for inp_path in generated:
