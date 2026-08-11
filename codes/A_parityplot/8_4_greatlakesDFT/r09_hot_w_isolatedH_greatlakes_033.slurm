@@ -1,18 +1,21 @@
 #!/bin/bash -l
 #SBATCH --job-name=r09_hot_w_isolatedH_greatlakes_033
+#SBATCH --partition=standard
+#SBATCH --account=chengcli1
+#SBATCH -n 1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=12
 #SBATCH --mem=64G
 #SBATCH --time=6:00:00
-#SBATCH --output=/home/kevinsh/mlip/outputsfull/slurm/r09_hot_w_isolatedH_greatlakes_033-%j.out
-#SBATCH --error=/home/kevinsh/mlip/outputsfull/slurm/r09_hot_w_isolatedH_greatlakes_033-%j.err
+#SBATCH --output=/home/kevinsh/kevinsh/mlip/outputsfull/slurm/r09_hot_w_isolatedH_greatlakes_033-%j.out
+#SBATCH --error=/home/kevinsh/kevinsh/mlip/outputsfull/slurm/r09_hot_w_isolatedH_greatlakes_033-%j.err
 
 set -euo pipefail
 
 module purge
 module load orca/6.0.1
 
-MLIP_DIR=${MLIP_DIR:-/home/kevinsh/mlip}
+MLIP_DIR=${MLIP_DIR:-/home/kevinsh/kevinsh/mlip}
 INPUT_PATH="$MLIP_DIR/codes/A_parityplot/8_4_greatlakesDFT/r09_hot_w_isolatedH_greatlakes_033.inp"
 OUTPUT_DIR="$MLIP_DIR/outputsfull/A_parityplot/8_4_greatlakesDFT"
 OUTPUT_PATH="$OUTPUT_DIR/r09_hot_w_isolatedH_greatlakes_033.out"
