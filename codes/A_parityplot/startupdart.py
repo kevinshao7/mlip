@@ -182,13 +182,20 @@ MLIP_DIR="${{MLIP_DIR:-$(cd "$SCRIPT_DIR/../../.." && pwd)}}"
 INPUT_DIR="$MLIP_DIR/{job_dir_rel}"
 OUTPUT_DIR="$MLIP_DIR/{output_dir_rel}"
 ORCA_COMMAND={shell_quote(orca_command)}
-FORCE="${{FORCE:-0}}"
+BASIS_FILE="{startup.BASIS_FILE}"
+FORCE="${{FORCE:-1}}"
 
 export OMP_NUM_THREADS={threads}
 export MKL_NUM_THREADS={threads}
 export OPENBLAS_NUM_THREADS={threads}
 
 {setup_lines}mkdir -p "$OUTPUT_DIR"
+if [[ -f "$INPUT_DIR/$BASIS_FILE" ]]; then
+    cp "$INPUT_DIR/$BASIS_FILE" "$OUTPUT_DIR/$BASIS_FILE"
+else
+    echo "Missing ORCA basis file: $INPUT_DIR/$BASIS_FILE" >&2
+    exit 1
+fi
 cd "$OUTPUT_DIR"
 
 STEMS=(

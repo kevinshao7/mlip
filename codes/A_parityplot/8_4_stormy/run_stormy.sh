@@ -6,13 +6,20 @@ MLIP_DIR="${MLIP_DIR:-$(cd "$SCRIPT_DIR/../../.." && pwd)}"
 INPUT_DIR="$MLIP_DIR/codes/A_parityplot/8_4_stormy"
 OUTPUT_DIR="$MLIP_DIR/outputsfull/A_parityplot/8_4_stormy"
 ORCA_COMMAND=orca_qc
-FORCE="${FORCE:-0}"
+BASIS_FILE="def2-tzvpd.bas"
+FORCE="${FORCE:-1}"
 
 export OMP_NUM_THREADS=12
 export MKL_NUM_THREADS=12
 export OPENBLAS_NUM_THREADS=12
 
 mkdir -p "$OUTPUT_DIR"
+if [[ -f "$INPUT_DIR/$BASIS_FILE" ]]; then
+    cp "$INPUT_DIR/$BASIS_FILE" "$OUTPUT_DIR/$BASIS_FILE"
+else
+    echo "Missing ORCA basis file: $INPUT_DIR/$BASIS_FILE" >&2
+    exit 1
+fi
 cd "$OUTPUT_DIR"
 
 STEMS=(
