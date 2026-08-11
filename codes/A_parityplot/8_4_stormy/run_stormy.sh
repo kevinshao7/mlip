@@ -13,6 +13,15 @@ export OMP_NUM_THREADS=12
 export MKL_NUM_THREADS=12
 export OPENBLAS_NUM_THREADS=12
 
+if ! type module >/dev/null 2>&1; then
+    [[ -f /etc/profile.d/modules.sh ]] && source /etc/profile.d/modules.sh
+    [[ -f /usr/share/Modules/init/bash ]] && source /usr/share/Modules/init/bash
+fi
+module load mpi/openmpi-x86_64
+if ! command -v mpirun >/dev/null 2>&1; then
+    echo "mpirun not found after module setup; load the correct MPI module or pass --module." >&2
+    exit 1
+fi
 mkdir -p "$OUTPUT_DIR"
 if [[ -f "$INPUT_DIR/$BASIS_FILE" ]]; then
     cp "$INPUT_DIR/$BASIS_FILE" "$OUTPUT_DIR/$BASIS_FILE"

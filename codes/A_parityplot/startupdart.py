@@ -48,6 +48,7 @@ DEFAULT_CLUSTER_XYZ = startup.DEFAULT_CLUSTER_XYZ
 DEFAULT_ORCA_COMMAND = "orca_qc"
 DEFAULT_THREADS = 12
 DEFAULT_HPC_MLIP_DIR = startup.DEFAULT_HPC_MLIP_DIR
+DEFAULT_MODULES = ["mpi/openmpi-x86_64"]
 
 
 MACHINES = {
@@ -161,15 +162,26 @@ def runner_text(
     stems = [startup.stem_for_frame(config, frame_index) for frame_index in frame_indices]
     stem_lines = "\n".join(f"    {shell_quote(stem)}" for stem in stems)
 
-    module_lines = []
+    module_lines = [
+        'if ! type module >/dev/null 2>&1; then',
+        '    [[ -f /etc/profile.d/modules.sh ]] && source /etc/profile.d/modules.sh',
+        '    [[ -f /usr/share/Modules/init/bash ]] && source /usr/share/Modules/init/bash',
+        "fi",
+    ]
     for module in modules:
         module = module.strip()
         if module:
-            module_lines.append(
-                f"type module >/dev/null 2>&1 && module load {shell_quote(module)}"
-            )
+            module_lines.append(f"module load {shell_quote(module)}")
     if pre_command:
         module_lines.append(pre_command)
+    module_lines.extend(
+        [
+            'if ! command -v mpirun >/dev/null 2>&1; then',
+            '    echo "mpirun not found after module setup; load the correct MPI module or pass --module." >&2',
+            "    exit 1",
+            "fi",
+        ]
+    )
     setup_lines = "\n".join(module_lines)
     if setup_lines:
         setup_lines += "\n"
@@ -411,9 +423,13 @@ def main() -> None:
     parser.add_argument(
         "--module",
         action="append",
-        default=[],
-        help="Optional environment module to load before each ORCA run. Repeat for multiple modules.",
+        default=None,
+        help=(
+            "Environment module to load before each ORCA run. Repeat for multiple modules. "
+            f"Default: {', '.join(DEFAULT_MODULES)}"
+        ),
     )
+    parser.add_argument("--no-modules", action="store_true", help="Do not load default MPI modules.")
     parser.add_argument(
         "--pre-command",
         default=None,
@@ -433,6 +449,9 @@ def main() -> None:
 
     if args.threads < 1:
         fail("--threads must be at least 1")
+    modules = [] if args.no_modules else list(DEFAULT_MODULES)
+    if args.module is not None:
+        modules = args.module
 
     if args.prepare_all and args.machine:
         fail("Use either --prepare-all or --machine, not both")
@@ -455,7 +474,7 @@ def main() -> None:
                 args.clusters,
                 None,
                 args.orca_command,
-                args.module,
+                modules,
                 args.pre_command,
                 args.threads,
                 args.hpc_mlip_dir,
@@ -484,7 +503,7 @@ def main() -> None:
         args.clusters,
         args.task_indices,
         args.orca_command,
-        args.module,
+        modules,
         args.pre_command,
         args.threads,
         args.hpc_mlip_dir,
