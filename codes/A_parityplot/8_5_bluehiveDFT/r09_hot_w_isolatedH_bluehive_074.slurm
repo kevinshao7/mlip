@@ -13,8 +13,10 @@ set -euo pipefail
 
 MLIP_DIR="${MLIP_DIR:-/gpfs/fs2/scratch/kshao4/mlip}"
 INPUT_PATH="$MLIP_DIR/codes/A_parityplot/8_5_bluehiveDFT/r09_hot_w_isolatedH_bluehive_074.inp"
+INPUT_DIR="$MLIP_DIR/codes/A_parityplot/8_5_bluehiveDFT"
 OUTPUT_DIR="$MLIP_DIR/outputsfull/A_parityplot/8_5_bluehiveDFT"
 OUTPUT_PATH="$OUTPUT_DIR/r09_hot_w_isolatedH_bluehive_074.out"
+BASIS_PATH="$INPUT_DIR/def2-tzvpd.bas"
 ORCA_COMMAND='/software/orca/6.1.1/orca'
 if [[ "$ORCA_COMMAND" != /* ]]; then
     ORCA_COMMAND="$(command -v "$ORCA_COMMAND")"
@@ -36,6 +38,11 @@ if [[ ! -f "$INPUT_PATH" ]]; then
     echo "Missing ORCA input: $INPUT_PATH" >&2
     exit 1
 fi
+if [[ ! -f "$BASIS_PATH" ]]; then
+    echo "Missing ORCA basis file: $BASIS_PATH" >&2
+    exit 1
+fi
+cp "$BASIS_PATH" "$OUTPUT_DIR/def2-tzvpd.bas"
 
 if [[ -f "$OUTPUT_PATH" ]] && grep -q "FINAL SINGLE POINT ENERGY" "$OUTPUT_PATH" && grep -q "ORCA TERMINATED NORMALLY" "$OUTPUT_PATH"; then
     echo "Skipping completed $OUTPUT_PATH"

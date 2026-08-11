@@ -2,9 +2,7 @@
 r"""Generate and run ORCA jobs for isolated-H validation clusters.
   
   
-  grep -n "module\|for candidate\|bash -l\|software/modules" 8_5_bluehiveDFT/r09_hot_w_isolatedH_bluehive_000.slurm
-  grep -n "ORCA_COMMAND" 8_5_bluehiveDFT/r09_hot_w_isolatedH_bluehive_000.slurm
-  
+  grep -n "BASIS_PATH\|def2-tzvpd.bas\|cp " 8_5_bluehiveDFT/r09_hot_w_isolatedH_bluehive_000.slurm
   
   Examples:
     python startup.py --machine bluehive --frames 0,180 --force
@@ -340,8 +338,10 @@ set -euo pipefail
 
 MLIP_DIR="${{MLIP_DIR:-{config.hpc_mlip_dir}}}"
 INPUT_PATH="$MLIP_DIR/{job_dir_rel}/{stem}.inp"
+INPUT_DIR="$MLIP_DIR/{job_dir_rel}"
 OUTPUT_DIR="$MLIP_DIR/{output_dir_rel}"
 OUTPUT_PATH="$OUTPUT_DIR/{stem}.out"
+BASIS_PATH="$INPUT_DIR/{BASIS_FILE}"
 {module_block}{orca_command_block}
 
 echo "MLIP_DIR=$MLIP_DIR"
@@ -356,6 +356,11 @@ if [[ ! -f "$INPUT_PATH" ]]; then
     echo "Missing ORCA input: $INPUT_PATH" >&2
     exit 1
 fi
+if [[ ! -f "$BASIS_PATH" ]]; then
+    echo "Missing ORCA basis file: $BASIS_PATH" >&2
+    exit 1
+fi
+cp "$BASIS_PATH" "$OUTPUT_DIR/{BASIS_FILE}"
 
 if [[ -f "$OUTPUT_PATH" ]] && grep -q "{FINAL_ENERGY_MARKER}" "$OUTPUT_PATH" && grep -q "{NORMAL_TERMINATION_MARKER}" "$OUTPUT_PATH"; then
     echo "Skipping completed $OUTPUT_PATH"
