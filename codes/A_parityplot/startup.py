@@ -291,7 +291,7 @@ def slurm_text(config: MachineConfig, frame_index: int, orca_command: str) -> st
         if config.slurm_error
         else f"#SBATCH --error={slurm_out_dir}/{stem}-%j.err\n"
     )
-    return f"""#!/bin/bash -l
+    return f"""#!/bin/bash
 #SBATCH --job-name={stem}
 {partition_line}{account_line}{mail_type_line}{mail_user_line}{ntasks_line}{long_ntasks_line}{cpus_line}{mem_line}{exclude_line}\
 #SBATCH --time={config.slurm_time}

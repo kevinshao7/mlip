@@ -1,4 +1,4 @@
-#!/bin/bash -l
+#!/bin/bash
 #SBATCH --job-name=r09_hot_w_isolatedH_bluehive_159
 #SBATCH --partition=standard
 #SBATCH --mail-type=END
