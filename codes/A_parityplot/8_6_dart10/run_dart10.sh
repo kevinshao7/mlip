@@ -14,12 +14,30 @@ export MKL_NUM_THREADS=12
 export OPENBLAS_NUM_THREADS=12
 
 if ! type module >/dev/null 2>&1; then
+    [[ -f /etc/profile ]] && source /etc/profile
+    [[ -f "$HOME/.bashrc" ]] && source "$HOME/.bashrc"
+    [[ -f "$HOME/.bash_profile" ]] && source "$HOME/.bash_profile"
     [[ -f /etc/profile.d/modules.sh ]] && source /etc/profile.d/modules.sh
     [[ -f /usr/share/Modules/init/bash ]] && source /usr/share/Modules/init/bash
 fi
-module load mpi/openmpi-x86_64
+if type module >/dev/null 2>&1; then
+    module load mpi/mpich-x86_64
+else
+    echo "module command not found; skipping module load mpi/mpich-x86_64" >&2
+fi
+if [[ -n "${MPI_BIN_DIR:-}" ]]; then
+    export PATH="$MPI_BIN_DIR:$PATH"
+fi
 if ! command -v mpirun >/dev/null 2>&1; then
-    echo "mpirun not found after module setup; load the correct MPI module or pass --module." >&2
+    for candidate in /usr/lib64/mpich/bin /usr/lib/x86_64-linux-gnu/mpich/bin /usr/local/mpich/bin /opt/mpich/bin /usr/lib64/openmpi/bin /usr/lib/x86_64-linux-gnu/openmpi/bin /usr/local/openmpi/bin /opt/openmpi/bin; do
+        if [[ -x "$candidate/mpirun" ]]; then
+            export PATH="$candidate:$PATH"
+            break
+        fi
+    done
+fi
+if ! command -v mpirun >/dev/null 2>&1; then
+    echo "mpirun not found. Load mpi/mpich-x86_64 or set MPI_BIN_DIR=/path/to/mpi/bin before running this script." >&2
     exit 1
 fi
 mkdir -p "$OUTPUT_DIR"

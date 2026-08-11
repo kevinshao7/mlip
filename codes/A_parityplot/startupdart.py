@@ -11,7 +11,7 @@ Examples:
     python startupdart.py --machine stormy --frames 0,45 --generate-only
     python startupdart.py --machine dart9 --frames 0,25 --resume
     python startupdart.py --machine dart10 --frames 25,50
-    python startupdart.py --machine dart11 --frames 50,75 --module mpi/openmpi-x86_64
+    python startupdart.py --machine dart11 --frames 50,75 --module mpi/mpich-x86_64
 
 Prepare a four-machine split for frames 0-180:
     python startupdart.py --prepare-all --frames 0,180 --force
@@ -48,7 +48,7 @@ DEFAULT_CLUSTER_XYZ = startup.DEFAULT_CLUSTER_XYZ
 DEFAULT_ORCA_COMMAND = "orca_qc"
 DEFAULT_THREADS = 12
 DEFAULT_HPC_MLIP_DIR = startup.DEFAULT_HPC_MLIP_DIR
-DEFAULT_MODULES = ["mpi/openmpi-x86_64"]
+DEFAULT_MODULES = ["mpi/mpich-x86_64"]
 
 
 MACHINES = {
@@ -164,6 +164,9 @@ def runner_text(
 
     module_lines = [
         'if ! type module >/dev/null 2>&1; then',
+        '    [[ -f /etc/profile ]] && source /etc/profile',
+        '    [[ -f "$HOME/.bashrc" ]] && source "$HOME/.bashrc"',
+        '    [[ -f "$HOME/.bash_profile" ]] && source "$HOME/.bash_profile"',
         '    [[ -f /etc/profile.d/modules.sh ]] && source /etc/profile.d/modules.sh',
         '    [[ -f /usr/share/Modules/init/bash ]] && source /usr/share/Modules/init/bash',
         "fi",
@@ -171,13 +174,32 @@ def runner_text(
     for module in modules:
         module = module.strip()
         if module:
-            module_lines.append(f"module load {shell_quote(module)}")
+            module_lines.extend(
+                [
+                    "if type module >/dev/null 2>&1; then",
+                    f"    module load {shell_quote(module)}",
+                    "else",
+                    f'    echo "module command not found; skipping module load {module}" >&2',
+                    "fi",
+                ]
+            )
     if pre_command:
         module_lines.append(pre_command)
     module_lines.extend(
         [
+            'if [[ -n "${MPI_BIN_DIR:-}" ]]; then',
+            '    export PATH="$MPI_BIN_DIR:$PATH"',
+            "fi",
             'if ! command -v mpirun >/dev/null 2>&1; then',
-            '    echo "mpirun not found after module setup; load the correct MPI module or pass --module." >&2',
+            '    for candidate in /usr/lib64/mpich/bin /usr/lib/x86_64-linux-gnu/mpich/bin /usr/local/mpich/bin /opt/mpich/bin /usr/lib64/openmpi/bin /usr/lib/x86_64-linux-gnu/openmpi/bin /usr/local/openmpi/bin /opt/openmpi/bin; do',
+            '        if [[ -x "$candidate/mpirun" ]]; then',
+            '            export PATH="$candidate:$PATH"',
+            "            break",
+            "        fi",
+            "    done",
+            "fi",
+            'if ! command -v mpirun >/dev/null 2>&1; then',
+            '    echo "mpirun not found. Load mpi/mpich-x86_64 or set MPI_BIN_DIR=/path/to/mpi/bin before running this script." >&2',
             "    exit 1",
             "fi",
         ]
@@ -426,7 +448,7 @@ def main() -> None:
         default=None,
         help=(
             "Environment module to load before each ORCA run. Repeat for multiple modules. "
-            f"Default: {', '.join(DEFAULT_MODULES)}"
+            "Default: none."
         ),
     )
     parser.add_argument("--no-modules", action="store_true", help="Do not load default MPI modules.")
@@ -525,7 +547,7 @@ def main() -> None:
             config,
             inp_path,
             args.orca_command,
-            args.module,
+            modules,
             args.pre_command,
             args.threads,
             resume=args.resume,
