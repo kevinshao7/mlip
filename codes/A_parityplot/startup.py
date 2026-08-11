@@ -67,6 +67,8 @@ class MachineConfig:
     stem_prefix: str
     slurm_time: str = "6:00:00"
     slurm_memory: str = "64G"
+    slurm_partition: str | None = None
+    slurm_account: str | None = None
 
 
 MACHINES = {
@@ -89,6 +91,8 @@ MACHINES = {
         stem_prefix="r09_hot_w_isolatedH_greatlakes",
         slurm_time="6:00:00",
         slurm_memory="64G",
+        slurm_partition="standard",
+        slurm_account="chengcli1",
     ),
 }
 
@@ -238,8 +242,11 @@ def slurm_text(config: MachineConfig, frame_index: int, orca_command: str) -> st
     job_dir_rel = relative_to_mlip(config.job_dir)
     output_dir_rel = relative_to_mlip(config.output_dir)
     slurm_out_dir = f"{DEFAULT_HPC_MLIP_DIR}/outputsfull/slurm"
+    partition_line = f"#SBATCH --partition={config.slurm_partition}\n" if config.slurm_partition else ""
+    account_line = f"#SBATCH --account={config.slurm_account}\n" if config.slurm_account else ""
     return f"""#!/bin/bash -l
 #SBATCH --job-name={stem}
+{partition_line}{account_line}#SBATCH -n 1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task={THREADS}
 #SBATCH --mem={config.slurm_memory}
