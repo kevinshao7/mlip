@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Generate BlueHive ORCA input and Slurm files from base templates."""
-"""
-• for f in expand/*.slurm; do sbatch "$f"; done
+"""Generate BlueHive ORCA input and Slurm files from base templates.
 
+Submit generated jobs with:
+    for f in expand/*.slurm; do sbatch "$f"; done
 """
 from __future__ import annotations
 

@@ -13,6 +13,9 @@
 
 set -euo pipefail
 
+module purge
+module load orca/6.1.1
+
 MLIP_DIR="${MLIP_DIR:-/gpfs/fs2/scratch/kshao4/mlip}"
 INPUT_PATH="$MLIP_DIR/codes/A_parityplot/8_5_bluehiveDFT/expand/r09_hot_w_isolatedH_bluehive_161.inp"
 INPUT_DIR="$MLIP_DIR/codes/A_parityplot/8_5_bluehiveDFT"
@@ -28,11 +31,16 @@ if [[ -z "$ORCA_COMMAND" || ! -x "$ORCA_COMMAND" ]]; then
     echo "ORCA executable is not available: ${ORCA_COMMAND:-unset}" >&2
     exit 1
 fi
+if ! command -v mpirun >/dev/null 2>&1; then
+    echo "mpirun is not available after loading orca/6.1.1" >&2
+    exit 1
+fi
 
 echo "MLIP_DIR=$MLIP_DIR"
 echo "ORCA_COMMAND=$ORCA_COMMAND"
 echo "INPUT_PATH=$INPUT_PATH"
 echo "OUTPUT_PATH=$OUTPUT_PATH"
+echo "mpirun=$(command -v mpirun)"
 
 mkdir -p "$MLIP_DIR/outputsfull/slurm"
 mkdir -p "$OUTPUT_DIR"
