@@ -21,8 +21,8 @@ python codes/A_parityplot/8_8_breakdown/plot_mace_off_target_h_breakdown.py --mo
 The script reads:
 
 ```text
-codes/A_parityplot/8_6b_mlippredout/<model>/*_forces.csv
-codes/A_parityplot/8_6b_mlippredout/<model>/*_singlepoints.csv
+codes/A_parityplot/8_6b_mlippredout2/<model>/*_forces.csv
+codes/A_parityplot/8_6b_mlippredout2/<model>/*_singlepoints.csv
 outputsfull/A_parityplot/8_5_bluehiveDFT/*.out
 ```
 
@@ -46,30 +46,36 @@ outputsfull/A_parityplot/8_8_breakdown/<model>/<model>_per_atom_energy_error_sig
 outputsfull/A_parityplot/8_8_breakdown/<model>/<model>_per_atom_energy_error_fractional.png
 ```
 
-Force errors are decomposed along the isolated-H to nearest-atom vector. Energy
-errors are signed as `E_MLIP - E_DFT`; by default they are atom-reference
-subtracted using `codes/7_7b_clustervalidation/atomizationenergies.txt`.
+Force errors are decomposed along the isolated-H to nearest-atom vector. The
+longitudinal force error plots are signed projected errors. Positive means
+`F_MLIP - F_DFT` points from the isolated H toward its nearest atom, so MLIP is
+more attractive than the DFT baseline and the DFT baseline is more repulsive
+along that isolated-H to nearest-atom axis. The perpendicular force plots remain
+magnitudes because there is no unique scalar sign for the perpendicular vector
+component. Energy errors are signed as `E_MLIP - E_DFT`; by default they are
+atom-reference subtracted using
+`codes/7_7b_clustervalidation/atomizationenergies.txt`.
 
-## Charge-Combo Energy Diagnostic
+## Charge-Colored Breakdown Diagnostic
 
-To remake the signed fractional per-atom energy plot colored by MLIP/DFT charge
-pair:
+To make the same eight target-H breakdown plots, but color points by total
+system charge instead of nearest atom type:
 
 ```bash
 python codes/A_parityplot/8_8_breakdown/plot_charge_combo_energy_diagnostic.py --model polar1m
 ```
 
-By default, this treats the MLIP charge as the MACE-POLAR run setting
-`--mlip-charge-setting 0`, which is the suspected mismatch. To color by the
-formal charge sum in the MLIP summary CSV instead:
+By default this uses `mlip_charge_setting_e` from the fixed MLIP summary CSV.
+Other available charge sources:
 
 ```bash
-python codes/A_parityplot/8_8_breakdown/plot_charge_combo_energy_diagnostic.py --model polar1m --mlip-charge-source formal
+python codes/A_parityplot/8_8_breakdown/plot_charge_combo_energy_diagnostic.py --model polar1m --charge-source dft
+python codes/A_parityplot/8_8_breakdown/plot_charge_combo_energy_diagnostic.py --model polar1m --charge-source formal
 ```
 
 Outputs:
 
 ```text
-outputsfull/A_parityplot/8_8_breakdown/<model>/<model>_per_atom_energy_fractional_by_charge_combo_mlip_charge_setting.png
-outputsfull/A_parityplot/8_8_breakdown/<model>/<model>_per_atom_energy_fractional_by_charge_combo_mlip_charge_formal.png
+outputsfull/A_parityplot/8_8_breakdown/<model>/charge_colored/<model>_target_h_breakdown_by_total_charge.csv
+outputsfull/A_parityplot/8_8_breakdown/<model>/charge_colored/<model>_*.png
 ```

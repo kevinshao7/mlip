@@ -30,7 +30,7 @@ EPS = 1.0e-12
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[2]
 DEFAULT_DFT_DIR = REPO_ROOT / "outputsfull" / "A_parityplot" / "8_5_bluehiveDFT"
-DEFAULT_MLIP_ROOT = REPO_ROOT / "codes" / "A_parityplot" / "8_6b_mlippredout"
+DEFAULT_MLIP_ROOT = REPO_ROOT / "codes" / "A_parityplot" / "8_6b_mlippredout2"
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "outputsfull" / "A_parityplot" / "8_8_breakdown"
 DEFAULT_ATOMIC_REFERENCE = REPO_ROOT / "codes" / "7_7b_clustervalidation" / "atomizationenergies.txt"
 MODEL_CONFIGS = {
@@ -39,6 +39,10 @@ MODEL_CONFIGS = {
     "polar1m": {"label": "mace_polar_1m", "title": "MACE-POLAR 1m"},
 }
 NEAREST_COLORS = {"O": "#1f77b4", "H": "#d62728"}
+SIGNED_LONGITUDINAL_KEYS = {
+    "force_error_longitudinal_eV_A",
+    "force_error_longitudinal_fractional",
+}
 
 
 def status(message: str) -> None:
@@ -245,7 +249,7 @@ def force_component_errors(
     return {
         "force_error_longitudinal_eV_A": error_longitudinal,
         "force_error_longitudinal_abs_eV_A": abs_longitudinal,
-        "force_error_longitudinal_fractional": abs_longitudinal / max(abs(dft_longitudinal), fractional_eps),
+        "force_error_longitudinal_fractional": error_longitudinal / max(abs(dft_longitudinal), fractional_eps),
         "force_error_perpendicular_abs_eV_A": abs_perpendicular,
         "force_error_perpendicular_fractional": abs_perpendicular / max(float(np.linalg.norm(dft_perp_vec)), fractional_eps),
         "dft_force_longitudinal_eV_A": dft_longitudinal,
@@ -338,28 +342,49 @@ def scatter_by_nearest(ax: plt.Axes, records: list[dict[str, object]], y_key: st
         ax.scatter(x, y, s=34, alpha=0.78, color="#7f7f7f", edgecolor="white", linewidth=0.35, label=f"nearest {symbol}")
 
 
+def annotate_outlier_frames(ax: plt.Axes, records: list[dict[str, object]], y_key: str, count: int = 3) -> None:
+    finite_records = [record for record in records if np.isfinite(float(record[y_key]))]
+    outliers = sorted(finite_records, key=lambda record: abs(float(record[y_key])), reverse=True)[:count]
+    for offset, record in enumerate(outliers):
+        x = float(record["nearest_separation_A"])
+        y = float(record[y_key])
+        ax.annotate(
+            f"f{int(record['frame'])}",
+            xy=(x, y),
+            xytext=(6, 7 + 8 * offset),
+            textcoords="offset points",
+            fontsize=8,
+            color="0.12",
+            arrowprops={"arrowstyle": "-", "color": "0.35", "linewidth": 0.65},
+            bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.72, "pad": 1.2},
+        )
+
+
 def plot_scatter(path: Path, records: list[dict[str, object]], y_key: str, ylabel: str, title: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fig, ax = plt.subplots(figsize=(7.8, 5.5), constrained_layout=True)
     scatter_by_nearest(ax, records, y_key)
+    if y_key in SIGNED_LONGITUDINAL_KEYS:
+        ax.axhline(0.0, color="0.25", linewidth=0.8, linestyle="--", alpha=0.7)
     ax.set_xlabel("Separation between isolated H and nearest atom (A)")
     ax.set_ylabel(ylabel)
     ax.set_title(title)
     ax.grid(True, color="0.88", linewidth=0.7)
     ax.legend(frameon=False)
+    annotate_outlier_frames(ax, records, y_key)
     fig.savefig(path, dpi=220)
     plt.close(fig)
 
 
 PLOTS = [
     (
-        "force_error_longitudinal_abs_eV_A",
-        "Isolated-H longitudinal force error magnitude (eV/A)",
+        "force_error_longitudinal_eV_A",
+        "Signed isolated-H longitudinal force error (eV/A)\npositive = MLIP more attractive than DFT",
         "target_h_longitudinal_force_error_abs.png",
     ),
     (
         "force_error_longitudinal_fractional",
-        "Isolated-H fractional longitudinal force error",
+        "Signed isolated-H fractional longitudinal force error\npositive = MLIP more attractive than DFT",
         "target_h_longitudinal_force_error_fractional.png",
     ),
     (

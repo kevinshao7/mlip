@@ -29,7 +29,7 @@ ORCA_NORMAL_TERMINATION = "ORCA TERMINATED NORMALLY"
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[2]
 DEFAULT_DFT_DIR = REPO_ROOT / "outputsfull" / "A_parityplot" / "8_5_bluehiveDFT"
-DEFAULT_MLIP_ROOT = REPO_ROOT / "codes" / "A_parityplot" / "8_6b_mlippredout"
+DEFAULT_MLIP_ROOT = REPO_ROOT / "codes" / "A_parityplot" / "8_6b_mlippredout2"
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "outputsfull" / "A_parityplot" / "8_7_histogram"
 DEFAULT_ATOMIC_REFERENCE = REPO_ROOT / "codes" / "7_7b_clustervalidation" / "atomizationenergies.txt"
 MODEL_LABELS = {
@@ -246,11 +246,17 @@ def collect_errors(
     references: dict[str, float] | None,
     fractional_eps: float,
     target_position: tuple[float, float, float],
-) -> tuple[dict[str, list[float]], dict[str, list[float]], list[float], list[float], list[int]]:
-    force_abs_by_class = {label: [] for label in ATOM_CLASS_COLORS}
-    force_frac_by_class = {label: [] for label in ATOM_CLASS_COLORS}
-    energy_signed: list[float] = []
-    energy_frac: list[float] = []
+) -> tuple[
+    dict[str, list[dict[str, float | int]]],
+    dict[str, list[dict[str, float | int]]],
+    list[dict[str, float | int]],
+    list[dict[str, float | int]],
+    list[int],
+]:
+    force_abs_by_class: dict[str, list[dict[str, float | int]]] = {label: [] for label in ATOM_CLASS_COLORS}
+    force_frac_by_class: dict[str, list[dict[str, float | int]]] = {label: [] for label in ATOM_CLASS_COLORS}
+    energy_signed: list[dict[str, float | int]] = []
+    energy_frac: list[dict[str, float | int]] = []
     matched_frames: list[int] = []
 
     common_frames = sorted(set(dft) & set(mlip_summary) & set(mlip_forces))
@@ -268,9 +274,13 @@ def collect_errors(
         force_errors = np.linalg.norm(mlip_forces_array - dft_forces, axis=1)
         dft_force_magnitudes = np.linalg.norm(dft_forces, axis=1)
         force_fractional = force_errors / np.maximum(dft_force_magnitudes, fractional_eps)
-        for atom_class, absolute_error, fractional_error in zip(classes, force_errors, force_fractional):
-            force_abs_by_class[atom_class].append(float(absolute_error))
-            force_frac_by_class[atom_class].append(float(fractional_error))
+        for atom_index, (atom_class, absolute_error, fractional_error) in enumerate(zip(classes, force_errors, force_fractional)):
+            force_abs_by_class[atom_class].append(
+                {"frame": frame, "atom_index": atom_index, "value": float(absolute_error)}
+            )
+            force_frac_by_class[atom_class].append(
+                {"frame": frame, "atom_index": atom_index, "value": float(fractional_error)}
+            )
 
         dft_energy = float(dft_record["energy_ev"])
         mlip_energy = float(mlip_summary[frame]["energy_eV"])
@@ -281,8 +291,8 @@ def collect_errors(
         natoms = len(dft_symbols)
         signed_energy_error = (mlip_energy - dft_energy) / natoms
         fractional_energy_error = signed_energy_error / max(abs(dft_energy / natoms), fractional_eps)
-        energy_signed.append(float(signed_energy_error))
-        energy_frac.append(float(fractional_energy_error))
+        energy_signed.append({"frame": frame, "value": float(signed_energy_error)})
+        energy_frac.append({"frame": frame, "value": float(fractional_energy_error)})
         matched_frames.append(frame)
 
     if not matched_frames:
@@ -290,13 +300,42 @@ def collect_errors(
     return force_abs_by_class, force_frac_by_class, energy_signed, energy_frac, matched_frames
 
 
-def finite_values(values: list[float]) -> np.ndarray:
-    array = np.asarray(values, dtype=float)
+def finite_values(values: list[float] | list[dict[str, float | int]]) -> np.ndarray:
+    if values and isinstance(values[0], dict):
+        array = np.asarray([float(record["value"]) for record in values], dtype=float)
+    else:
+        array = np.asarray(values, dtype=float)
     return array[np.isfinite(array)]
 
 
+def top_outliers(records: list[dict[str, float | int]], count: int = 3) -> list[dict[str, float | int]]:
+    finite = [record for record in records if np.isfinite(float(record["value"]))]
+    return sorted(finite, key=lambda record: abs(float(record["value"])), reverse=True)[:count]
+
+
+def annotate_histogram_outliers(ax: plt.Axes, records: list[dict[str, float | int]], y_fraction: float) -> None:
+    ymin, ymax = ax.get_ylim()
+    y = ymin + y_fraction * (ymax - ymin)
+    for rank, record in enumerate(top_outliers(records), start=1):
+        value = float(record["value"])
+        frame = int(record["frame"])
+        ax.axvline(value, color="0.2", linewidth=0.85, linestyle="--", alpha=0.7)
+        ax.text(
+            value,
+            y,
+            f"f{frame}",
+            rotation=90,
+            va="top",
+            ha="right",
+            fontsize=8,
+            color="0.15",
+            bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.7, "pad": 1.2},
+        )
+        y -= 0.09 * (ymax - ymin)
+
+
 def plot_force_histogram(
-    values_by_class: dict[str, list[float]],
+    values_by_class: dict[str, list[dict[str, float | int]]],
     xlabel: str,
     title: str,
     output_path: Path,
@@ -334,6 +373,7 @@ def plot_force_histogram(
     top_ax.set_title(title)
     top_ax.legend(frameon=False)
     top_ax.grid(True, color="0.88", linewidth=0.7)
+    annotate_histogram_outliers(top_ax, values_by_class[top_label], 0.92)
 
     plotted_bottom = False
     for label in ("target isolated H", "nearest atom"):
@@ -349,11 +389,19 @@ def plot_force_histogram(
     bottom_ax.set_ylabel("Number of atoms")
     bottom_ax.legend(frameon=False)
     bottom_ax.grid(True, color="0.88", linewidth=0.7)
+    bottom_records = values_by_class["target isolated H"] + values_by_class["nearest atom"]
+    annotate_histogram_outliers(bottom_ax, bottom_records, 0.92)
     fig.savefig(output_path, dpi=220)
     plt.close(fig)
 
 
-def plot_energy_histogram(values: list[float], xlabel: str, title: str, output_path: Path, bins: int) -> None:
+def plot_energy_histogram(
+    values: list[dict[str, float | int]],
+    xlabel: str,
+    title: str,
+    output_path: Path,
+    bins: int,
+) -> None:
     finite = finite_values(values)
     if finite.size == 0:
         raise RuntimeError(f"No finite values to plot for {output_path}")
@@ -363,6 +411,7 @@ def plot_energy_histogram(values: list[float], xlabel: str, title: str, output_p
     ax.set_ylabel("Number of frames")
     ax.set_title(title)
     ax.grid(True, color="0.88", linewidth=0.7)
+    annotate_histogram_outliers(ax, values, 0.92)
     fig.savefig(output_path, dpi=220)
     plt.close(fig)
 

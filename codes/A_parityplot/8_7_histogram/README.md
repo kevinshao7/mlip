@@ -11,7 +11,7 @@ python codes/A_parityplot/8_7_histogram/plot_mlip_dft_errors.py --model off
 The script expects MLIP prediction CSVs in:
 
 ```text
-codes/A_parityplot/8_6b_mlippredout/<model>/
+codes/A_parityplot/8_6b_mlippredout2/<model>/
 ```
 
 Outputs go to:
