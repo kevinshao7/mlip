@@ -60,7 +60,7 @@ test -f "$MLIP_ENV/bin/activate"
 command -v packmol
 
 source "$MLIP_ENV/bin/activate"
-python -c "import ase, mace, mdinterface, torch; print('Python env OK')"
+python -c "import ase, mace, mdinterface, torch, graph_longrange; print('Python env OK')"
 python -c "import shutil; exe=shutil.which('packmol'); print(f'Packmol OK: {exe}'); assert exe"
 
 srun \
