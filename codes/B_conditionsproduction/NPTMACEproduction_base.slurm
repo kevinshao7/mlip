@@ -29,7 +29,7 @@ module load cuda/12.8
 export OMP_NUM_THREADS=1
 export MLIP_MACE_DEVICE=${MLIP_MACE_DEVICE:-cuda}
 export MLIP_ROOT=${MLIP_ROOT:-/dais/fs/scratch/kshao/mlip}
-export MLIP_ENV=${MLIP_ENV:-/dais/fs/scratch/kshao/mlip/.venv}
+export MLIP_ENV=${MLIP_ENV:-/dais/fs/scratch/kshao/mlipenv}
 export PYTHONNOUSERSITE=1
 export PATH="$MLIP_ROOT/packmol:$PATH"
 export XDG_CACHE_HOME="$MLIP_ROOT/outputsfull/.cache"
