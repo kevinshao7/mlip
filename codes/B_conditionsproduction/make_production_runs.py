@@ -16,8 +16,8 @@ PROFILE_CSV = SCRIPT_DIR.parent / "old" / "7_6b_uranusprofile" / "uranus_profile
 OUT_DIR = SCRIPT_DIR / "expand"
 
 SAVE_INTERVAL_STEPS = 5
-# Keep None to inherit the current production length from NPTMACEproduction_base.py.
-MD_STEPS: int | None = None
+# 2 ns at the base script timestep of 0.5 fs/step.
+MD_STEPS: int | None = 4_000_000
 
 PRESSURES_GPA = [100.0, 10.0, 1.0, 0.11]
 TEMPERATURE_COLUMN = "preferred_uranus_temperature_K"
@@ -118,7 +118,8 @@ def make_script(base_text: str, row: dict[str, float], ratio: float) -> str:
         "MD_RESULTS_DIR",
         f'MD_RESULTS_DIR = os.path.join(PROJECT_ROOT, "outputsfull", "conditionsproduction", "{run_id}")',
     )
-    text = replace_assignment(text, "densitygcm3", f"densitygcm3 = {row['density_g_cm3']:.12g} # g/cm3, from Uranus profile source row {int(row['source_row'])}")
+    text = replace_assignment(text, "densitygcm3", "densitygcm3 = 0.2 # initial build density, g/cm3")
+    text = replace_assignment(text, "target_profile_densitygcm3", f"target_profile_densitygcm3 = {row['density_g_cm3']:.12g} # Uranus profile source row {int(row['source_row'])}, g/cm3")
     text = replace_assignment(text, "pressuregpa", f"pressuregpa = {pressure:.12g} # GPa")
     text = replace_assignment(text, "moleculemass", f"moleculemass = {mixture_molar_mass(ratio):.12g} # grams per mol, composition-weighted")
     text = replace_assignment(text, "T_final", f"T_final = {temperature:.12g}  # {TEMPERATURE_COLUMN}")
@@ -127,7 +128,7 @@ def make_script(base_text: str, row: dict[str, float], ratio: float) -> str:
     text = replace_once(text, r"^simbox\.add_solvent\(.*$", ratio_expression(ratio))
     text = replace_call_keyword(text, "s", str(SAVE_INTERVAL_STEPS))
     if MD_STEPS is not None:
-        text = replace_call_keyword(text, "T", str(MD_STEPS))
+        text = replace_assignment(text, "totaltimesteps", f"totaltimesteps = {MD_STEPS}  # 2 ns at 0.5 fs/step")
     return text
 
 

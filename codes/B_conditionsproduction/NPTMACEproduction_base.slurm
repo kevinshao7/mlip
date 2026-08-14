@@ -7,7 +7,7 @@
 #SBATCH --cpus-per-task=12
 #SBATCH --gres=gpu:h200:1
 #SBATCH --mem=250000
-#SBATCH --time=12:00:00
+#SBATCH --time=24:00:00
 
 #SBATCH --chdir=/dais/fs/scratch/kshao/mlip/codes/B_conditionsproduction
 #SBATCH --output=/dais/fs/scratch/kshao/mlip/outputsfull/slurm/%x_%j.out
@@ -57,9 +57,11 @@ nvidia-smi \
 
 test -f "$PYTHON_SCRIPT"
 test -f "$MLIP_ENV/bin/activate"
+command -v packmol
 
 source "$MLIP_ENV/bin/activate"
 python -c "import ase, mace, mdinterface, torch; print('Python env OK')"
+python -c "import shutil; exe=shutil.which('packmol'); print(f'Packmol OK: {exe}'); assert exe"
 
 srun \
     --ntasks="${SLURM_NTASKS:-1}" \
