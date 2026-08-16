@@ -101,10 +101,16 @@ On BlueHive, submit from `codes/C_DFTproduction` with:
 for f in expand/C_DFTprod_cutcluster_group_*.slurm; do sbatch "$f"; done
 ```
 
-The generated grouped Slurm scripts call `/software/orca/6.1.1/orca` directly
-and do not call `module purge` or `module load`, avoiding the module-init
-`unalias sudo` warning. Email notifications are enabled only for the first 10
-and last 10 grouped Slurm files.
+The generated grouped Slurm scripts match the working BlueHive ORCA setup from
+`codes/A_parityplot/8_5_bluehiveDFT`: they run `module purge`, load
+`orca/6.1.1`, verify that `mpirun` is available, then call
+`/software/orca/6.1.1/orca`. Email notifications are enabled only for the first
+10 and last 10 grouped Slurm files.
+
+`expand_dft_jobs.py` renders every grouped Slurm script from `base.slurm` and
+validates the rendered script before writing it. Generation fails if the module
+setup, `mpirun` check, job name, STEM list, ORCA command, or `OUTPUT_PATH`
+assignment/check ordering is wrong.
 
 Each grouped Slurm script checks for completed `.out` files inside the per-STEM
 loop. Do not add a pre-loop `OUTPUT_PATH` completion check: grouped jobs define

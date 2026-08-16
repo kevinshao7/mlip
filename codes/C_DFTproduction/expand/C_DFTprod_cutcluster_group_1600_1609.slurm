@@ -12,6 +12,9 @@
 
 set -euo pipefail
 
+module purge
+module load orca/6.1.1
+
 MLIP_DIR="${MLIP_DIR:-/gpfs/fs2/scratch/kshao4/mlip}"
 INPUT_DIR="$MLIP_DIR/codes/C_DFTproduction"
 OUTPUT_DIR="$MLIP_DIR/outputsfull/C_DFTproduction/dft_outputs"
@@ -37,10 +40,15 @@ if [[ -z "$ORCA_COMMAND" || ! -x "$ORCA_COMMAND" ]]; then
     echo "ORCA executable is not available: ${ORCA_COMMAND:-unset}" >&2
     exit 1
 fi
+if ! command -v mpirun >/dev/null 2>&1; then
+    echo "mpirun is not available after loading orca/6.1.1" >&2
+    exit 1
+fi
 
 echo "MLIP_DIR=$MLIP_DIR"
 echo "ORCA_COMMAND=$ORCA_COMMAND"
 echo "OUTPUT_DIR=$OUTPUT_DIR"
+echo "mpirun=$(command -v mpirun)"
 echo "Running ${#STEMS[@]} sequential ORCA calculation(s)"
 
 mkdir -p "$MLIP_DIR/outputsfull/slurm"

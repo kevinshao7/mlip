@@ -26,6 +26,8 @@ STEM_PREFIX = "C_DFTprod_cutcluster"
 GROUP_PREFIX = "C_DFTprod_cutcluster_group"
 MAIL_USER = "ks2120@cam.ac.uk"
 DEFAULT_GROUP_SIZE = 10
+ORCA_MODULE = "orca/6.1.1"
+ORCA_ABSOLUTE_PATH = "/software/orca/6.1.1/orca"
 
 FORMAL_CHARGES = {
     "H": 1,
@@ -143,6 +145,111 @@ def render_template(template: str, values: dict[str, str]) -> str:
     return text
 
 
+def first_line_number(lines: list[str], pattern: str) -> int:
+    regex = re.compile(pattern)
+    for index, line in enumerate(lines, start=1):
+        if regex.search(line):
+            return index
+    return 0
+
+
+def require_line_order(lines: list[str], ordered_patterns: list[tuple[str, str]]) -> None:
+    previous_line = 0
+    previous_label = "start of file"
+    for label, pattern in ordered_patterns:
+        line_number = first_line_number(lines, pattern)
+        if line_number == 0:
+            fail(f"Rendered Slurm is missing required line: {label}")
+        if line_number <= previous_line:
+            fail(
+                f"Rendered Slurm has {label} on line {line_number}, "
+                f"before {previous_label} on line {previous_line}"
+            )
+        previous_line = line_number
+        previous_label = label
+
+
+def parse_rendered_stem_list(slurm_text: str) -> list[str]:
+    match = re.search(r"(?ms)^STEMS=\(\n(?P<body>.*?)^\)", slurm_text)
+    if not match:
+        fail("Rendered Slurm does not contain a STEMS=(...) block")
+    stems: list[str] = []
+    for raw_line in match.group("body").splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        stem_match = re.fullmatch(r'"([^"]+)"', line)
+        if not stem_match:
+            fail(f"Malformed STEMS entry in rendered Slurm: {raw_line!r}")
+        stems.append(stem_match.group(1))
+    return stems
+
+
+def validate_slurm_template(template: str) -> None:
+    required_placeholders = {"{{STEM}}", "{{MAIL_SETTINGS}}", "{{STEM_LIST}}"}
+    missing = sorted(placeholder for placeholder in required_placeholders if placeholder not in template)
+    if missing:
+        fail(f"Slurm template is missing placeholders: {', '.join(missing)}")
+    forbidden = sorted(set(re.findall(r"{{[A-Z_]+}}", template)) - required_placeholders)
+    if forbidden:
+        fail(f"Slurm template has unsupported placeholders: {', '.join(forbidden)}")
+
+
+def validate_rendered_slurm(slurm_text: str, group_stem: str, expected_stems: list[str]) -> None:
+    if re.search(r"{{[A-Z_]+}}", slurm_text):
+        fail(f"Rendered Slurm for {group_stem} still contains unresolved template placeholders")
+
+    lines = slurm_text.splitlines()
+    stripped_lines = [line.strip() for line in lines]
+    if not lines or lines[0] != "#!/bin/bash":
+        fail(f"Rendered Slurm for {group_stem} must start with #!/bin/bash")
+    if f"#SBATCH --job-name={group_stem}" not in lines:
+        fail(f"Rendered Slurm for {group_stem} has wrong or missing job name")
+    if f"#SBATCH -o {group_stem}.slurmlog.txt" not in lines:
+        fail(f"Rendered Slurm for {group_stem} has wrong or missing Slurm stdout path")
+    if f"#SBATCH -e {group_stem}.slurmerr.txt" not in lines:
+        fail(f"Rendered Slurm for {group_stem} has wrong or missing Slurm stderr path")
+
+    rendered_stems = parse_rendered_stem_list(slurm_text)
+    if rendered_stems != expected_stems:
+        fail(
+            f"Rendered Slurm for {group_stem} has wrong STEMS block: "
+            f"expected {expected_stems!r}, got {rendered_stems!r}"
+        )
+
+    required_exact_lines = [
+        "set -euo pipefail",
+        "module purge",
+        f"module load {ORCA_MODULE}",
+        f'ORCA_COMMAND="${{ORCA_COMMAND:-{ORCA_ABSOLUTE_PATH}}}"',
+        'if ! command -v mpirun >/dev/null 2>&1; then',
+        'echo "mpirun=$(command -v mpirun)"',
+        'INPUT_PATH="$MLIP_DIR/codes/C_DFTproduction/expand/${STEM}.inp"',
+        'OUTPUT_PATH="$OUTPUT_DIR/${STEM}.out"',
+        '"$ORCA_COMMAND" "$INPUT_PATH" > "$OUTPUT_PATH"',
+    ]
+    for required_line in required_exact_lines:
+        if required_line not in stripped_lines:
+            fail(f"Rendered Slurm for {group_stem} is missing required line: {required_line}")
+
+    require_line_order(
+        lines,
+        [
+            ("strict bash mode", r"^set -euo pipefail$"),
+            ("module purge", r"^module purge$"),
+            ("ORCA module load", rf"^module load {re.escape(ORCA_MODULE)}$"),
+            ("ORCA command default", rf'^ORCA_COMMAND="\$\{{ORCA_COMMAND:-{re.escape(ORCA_ABSOLUTE_PATH)}\}}"$'),
+            ("ORCA executable check", r'^\s*echo "ORCA executable is not available:'),
+            ("mpirun availability check", r"^if ! command -v mpirun >/dev/null 2>&1; then$"),
+            ("mpirun log line", r'^echo "mpirun=\$\(command -v mpirun\)"$'),
+            ("per-STEM loop", r'^for STEM in "\$\{STEMS\[@\]\}"; do$'),
+            ("OUTPUT_PATH assignment", r'^\s*OUTPUT_PATH="\$OUTPUT_DIR/\$\{STEM\}\.out"$'),
+            ("OUTPUT_PATH completion check", r'^\s*if \[\[ -f "\$OUTPUT_PATH" \]\]'),
+            ("ORCA run command", r'^\s*"\$ORCA_COMMAND" "\$INPUT_PATH" > "\$OUTPUT_PATH"$'),
+        ],
+    )
+
+
 def write_text_lf(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="\n") as handle:
@@ -184,6 +291,7 @@ def main() -> None:
 
     inp_template = BASE_INP.read_text(encoding="utf-8")
     slurm_template = BASE_SLURM.read_text(encoding="utf-8")
+    validate_slurm_template(slurm_template)
 
     manifest_lines = [
         "frame,stem,input,slurm,charge,multiplicity,n_atoms,sample_kind,source_condensed_frame,sample_order"
@@ -236,7 +344,9 @@ def main() -> None:
             "STEM_LIST": render_stem_list(group_stems),
         }
         slurm_path = OUT_DIR / f"{group_stem}.slurm"
-        write_text_lf(slurm_path, render_template(slurm_template, values))
+        slurm_text = render_template(slurm_template, values)
+        validate_rendered_slurm(slurm_text, group_stem, group_stems)
+        write_text_lf(slurm_path, slurm_text)
         for stem in group_stems:
             slurm_by_stem[stem] = f"expand/{slurm_path.name}"
         print(f"wrote {slurm_path.relative_to(SCRIPT_DIR)} for {len(group)} ORCA input(s)")
