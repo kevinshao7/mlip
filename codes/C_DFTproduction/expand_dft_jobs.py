@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate BlueHive ORCA input and Slurm files for production cut clusters.
+"""Generate BlueHive ORCA input and grouped Slurm files for production cut clusters.
 
 Submit generated jobs with:
     for f in expand/*.slurm; do sbatch "$f"; done
@@ -23,7 +23,9 @@ DEFAULT_CLUSTER_XYZ = (
     / "condition_production_dft_clusters.xyz"
 )
 STEM_PREFIX = "C_DFTprod_cutcluster"
+GROUP_PREFIX = "C_DFTprod_cutcluster_group"
 MAIL_USER = "ks2120@cam.ac.uk"
+DEFAULT_GROUP_SIZE = 10
 
 FORMAL_CHARGES = {
     "H": 1,
@@ -55,10 +57,18 @@ def stem_for_frame(frame_index: int) -> str:
     return f"{STEM_PREFIX}_{frame_index:04d}"
 
 
-def mail_settings_for_frame(frame_index: int, start: int, stop: int) -> str:
-    if frame_index < start + 10 or frame_index >= stop - 10:
+def group_stem_for_frames(first_frame: int, last_frame: int) -> str:
+    return f"{GROUP_PREFIX}_{first_frame:04d}_{last_frame:04d}"
+
+
+def mail_settings_for_group(group_index: int, n_groups: int) -> str:
+    if group_index < 10 or group_index >= n_groups - 10:
         return f"#SBATCH --mail-type=END\n#SBATCH --mail-user={MAIL_USER}"
     return "# Email disabled for middle jobs to avoid notification spam."
+
+
+def render_stem_list(stems: list[str]) -> str:
+    return "\n".join(f'    "{stem}"' for stem in stems)
 
 
 def formal_charge(symbols: list[str]) -> int:
@@ -140,7 +150,7 @@ def write_text_lf(path: Path, text: str) -> None:
 
 
 def remove_stale_generated() -> None:
-    for pattern in (f"{STEM_PREFIX}_*.inp", f"{STEM_PREFIX}_*.slurm"):
+    for pattern in (f"{STEM_PREFIX}_*.inp", f"{STEM_PREFIX}_*.slurm", f"{GROUP_PREFIX}_*.slurm"):
         for path in OUT_DIR.glob(pattern):
             path.unlink()
     manifest = OUT_DIR / "manifest.csv"
@@ -152,6 +162,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--frames", default="all", help="Frame range: all or half-open start,stop")
     parser.add_argument("--clusters", type=Path, default=DEFAULT_CLUSTER_XYZ)
+    parser.add_argument("--group-size", type=int, default=DEFAULT_GROUP_SIZE)
     parser.add_argument("--clean", action="store_true", help="Remove stale generated files in expand/ first.")
     args = parser.parse_args()
 
@@ -161,6 +172,8 @@ def main() -> None:
         fail(f"Missing Slurm template: {BASE_SLURM}")
     if not args.clusters.is_file():
         fail(f"Missing cluster XYZ: {args.clusters}")
+    if args.group_size < 1:
+        fail("--group-size must be >= 1")
 
     frames = read_xyz_frames(args.clusters)
     start, stop = parse_frames(args.frames, len(frames))
@@ -175,6 +188,7 @@ def main() -> None:
     manifest_lines = [
         "frame,stem,input,slurm,charge,multiplicity,n_atoms,sample_kind,source_condensed_frame,sample_order"
     ]
+    frame_records: list[dict[str, object]] = []
     for frame_index in range(start, stop):
         comment, atoms = frames[frame_index]
         metadata = parse_comment_metadata(comment)
@@ -184,27 +198,62 @@ def main() -> None:
         multiplicity = int(metadata.get("spin", spin_from_charge(charge)))
         values = {
             "STEM": stem,
-            "MAIL_SETTINGS": mail_settings_for_frame(frame_index, start, stop),
             "CHARGE": str(charge),
             "MULTIPLICITY": str(multiplicity),
             "COORDINATES": coordinate_block(atoms),
         }
 
         inp_path = OUT_DIR / f"{stem}.inp"
-        slurm_path = OUT_DIR / f"{stem}.slurm"
         write_text_lf(inp_path, render_template(inp_template, values))
-        write_text_lf(slurm_path, render_template(slurm_template, values))
-        manifest_lines.append(
-            f"{frame_index},{stem},expand/{inp_path.name},expand/{slurm_path.name},"
-            f"{charge},{multiplicity},{len(atoms)},"
-            f"{metadata.get('sample_kind', '')},{metadata.get('source_condensed_frame', '')},"
-            f"{metadata.get('sample_order', '')}"
+        frame_records.append(
+            {
+                "frame_index": frame_index,
+                "stem": stem,
+                "input": f"expand/{inp_path.name}",
+                "charge": charge,
+                "multiplicity": multiplicity,
+                "n_atoms": len(atoms),
+                "sample_kind": metadata.get("sample_kind", ""),
+                "source_condensed_frame": metadata.get("source_condensed_frame", ""),
+                "sample_order": metadata.get("sample_order", ""),
+            }
         )
         print(f"wrote {inp_path.relative_to(SCRIPT_DIR)}")
-        print(f"wrote {slurm_path.relative_to(SCRIPT_DIR)}")
+
+    groups = [
+        frame_records[index : index + args.group_size]
+        for index in range(0, len(frame_records), args.group_size)
+    ]
+    slurm_by_stem: dict[str, str] = {}
+    for group_index, group in enumerate(groups):
+        first_frame = int(group[0]["frame_index"])
+        last_frame = int(group[-1]["frame_index"])
+        group_stem = group_stem_for_frames(first_frame, last_frame)
+        group_stems = [str(record["stem"]) for record in group]
+        values = {
+            "STEM": group_stem,
+            "MAIL_SETTINGS": mail_settings_for_group(group_index, len(groups)),
+            "STEM_LIST": render_stem_list(group_stems),
+        }
+        slurm_path = OUT_DIR / f"{group_stem}.slurm"
+        write_text_lf(slurm_path, render_template(slurm_template, values))
+        for stem in group_stems:
+            slurm_by_stem[stem] = f"expand/{slurm_path.name}"
+        print(f"wrote {slurm_path.relative_to(SCRIPT_DIR)} for {len(group)} ORCA input(s)")
+
+    for record in frame_records:
+        stem = str(record["stem"])
+        manifest_lines.append(
+            f"{record['frame_index']},{stem},{record['input']},{slurm_by_stem[stem]},"
+            f"{record['charge']},{record['multiplicity']},{record['n_atoms']},"
+            f"{record['sample_kind']},{record['source_condensed_frame']},{record['sample_order']}"
+        )
 
     write_text_lf(OUT_DIR / "manifest.csv", "\n".join(manifest_lines) + "\n")
-    print(f"Generated {stop - start} input files and {stop - start} Slurm files in {OUT_DIR.name}/")
+    print(
+        f"Generated {stop - start} input files and {len(groups)} grouped Slurm files "
+        f"in {OUT_DIR.name}/; group size {args.group_size}"
+    )
 
 
 if __name__ == "__main__":

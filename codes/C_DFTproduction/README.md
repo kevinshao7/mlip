@@ -79,25 +79,32 @@ first, followed by unbiased random clusters.
 ## DFT job generation
 
 `expand_dft_jobs.py` mirrors the BlueHive ORCA layout from
-`codes/A_parityplot/8_5_bluehiveDFT`. It reads:
+`codes/A_parityplot/8_5_bluehiveDFT`. It writes one ORCA `.inp` per cut
+cluster and grouped Slurm scripts, each running 10 ORCA calculations
+sequentially. It reads:
 
 `mlip/outputsfull/C_DFTproduction/condition_production_dft_clusters.xyz`
 
-and writes ORCA `.inp` plus Slurm `.slurm` files under:
+and writes ORCA `.inp` plus grouped Slurm `.slurm` files under:
 
 `mlip/codes/C_DFTproduction/expand`
 
 Generate all frames:
 
 ```powershell
-C:\Users\shaoq\AppData\Local\Programs\Python\Python312\python.exe .\mlip\codes\C_DFTproduction\expand_dft_jobs.py --clean
+C:\Users\shaoq\AppData\Local\Programs\Python\Python312\python.exe .\mlip\codes\C_DFTproduction\expand_dft_jobs.py --clean --group-size 10
 ```
 
 On BlueHive, submit from `codes/C_DFTproduction` with:
 
 ```bash
-for f in expand/*.slurm; do sbatch "$f"; done
+for f in expand/C_DFTprod_cutcluster_group_*.slurm; do sbatch "$f"; done
 ```
+
+The generated grouped Slurm scripts call `/software/orca/6.1.1/orca` directly
+and do not call `module purge` or `module load`, avoiding the module-init
+`unalias sudo` warning. Email notifications are enabled only for the first 10
+and last 10 grouped Slurm files.
 
 The script prints status for:
 
