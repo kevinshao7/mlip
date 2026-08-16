@@ -7,17 +7,23 @@ Submit generated jobs with:
 from __future__ import annotations
 
 import argparse
+import importlib
+import importlib.util
 import re
 import shlex
+import shutil
+import sys
 from pathlib import Path
+
+from ase import Atoms
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-BASE_INP = SCRIPT_DIR / "base.inp"
 BASE_SLURM = SCRIPT_DIR / "base.slurm"
 OUT_DIR = SCRIPT_DIR / "expand"
+MLIP_DIR = SCRIPT_DIR.parents[1]
 DEFAULT_CLUSTER_XYZ = (
-    SCRIPT_DIR.parents[1]
+    MLIP_DIR
     / "outputsfull"
     / "C_DFTproduction"
     / "condition_production_dft_clusters.xyz"
@@ -28,6 +34,11 @@ MAIL_USER = "ks2120@cam.ac.uk"
 DEFAULT_GROUP_SIZE = 10
 ORCA_MODULE = "orca/6.1.1"
 ORCA_ABSOLUTE_PATH = "/software/orca/6.1.1/orca"
+FAIRCHEM_ORCA_CALC = MLIP_DIR / "fairchem" / "src" / "fairchem" / "data" / "omol" / "orca" / "calc.py"
+FAIRCHEM_SRC = MLIP_DIR / "fairchem" / "src"
+FAIRCHEM_ORCA_BASIS = (
+    MLIP_DIR / "fairchem" / "src" / "fairchem" / "data" / "omol" / "orca" / "basis" / "def2-tzvpd.bas"
+)
 
 FORMAL_CHARGES = {
     "H": 1,
@@ -87,6 +98,13 @@ def spin_from_charge(charge: int) -> int:
     return 2 if charge % 2 else 1
 
 
+def atoms_from_tuples(atoms: list[tuple[str, float, float, float]]) -> Atoms:
+    return Atoms(
+        symbols=[symbol for symbol, _x, _y, _z in atoms],
+        positions=[(x, y, z) for _symbol, x, y, z in atoms],
+    )
+
+
 def parse_comment_metadata(comment: str) -> dict[str, str]:
     metadata: dict[str, str] = {}
     for token in shlex.split(comment):
@@ -95,13 +113,6 @@ def parse_comment_metadata(comment: str) -> dict[str, str]:
         key, value = token.split("=", 1)
         metadata[key] = value
     return metadata
-
-
-def coordinate_block(atoms: list[tuple[str, float, float, float]]) -> str:
-    rows = []
-    for symbol, x, y, z in atoms:
-        rows.append(f"{symbol:<2}  {x:.8f} {y:.8f} {z:.8f}")
-    return "\n".join(rows)
 
 
 def read_xyz_frames(path: Path) -> list[tuple[str, list[tuple[str, float, float, float]]]]:
@@ -133,6 +144,76 @@ def read_xyz_frames(path: Path) -> list[tuple[str, list[tuple[str, float, float,
         frames.append((comment, atoms))
         cursor += n_atoms
     return frames
+
+
+def load_fairchem_orca_calc():
+    if FAIRCHEM_SRC.exists():
+        sys.path.insert(0, str(FAIRCHEM_SRC))
+
+    try:
+        return importlib.import_module("fairchem.data.omol.orca.calc")
+    except ImportError:
+        pass
+
+    if not FAIRCHEM_ORCA_CALC.exists():
+        return None
+
+    spec = importlib.util.spec_from_file_location("fairchem_omol_orca_calc", FAIRCHEM_ORCA_CALC)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Could not load fairchem ORCA calc module from {FAIRCHEM_ORCA_CALC}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def make_input_with_fairchem(
+    orca_calc,
+    atoms: list[tuple[str, float, float, float]],
+    charge: int,
+    multiplicity: int,
+) -> str:
+    from ase.calculators.orca import OrcaProfile
+
+    def compatible_orca_profile(command):
+        if isinstance(command, list):
+            command = command[0] or "orca"
+        return OrcaProfile(command)
+
+    orca_calc.OrcaProfile = compatible_orca_profile
+    transient_input = OUT_DIR / "orca.inp"
+    if transient_input.exists():
+        transient_input.unlink()
+    orca_calc.write_orca_inputs(
+        atoms_from_tuples(atoms),
+        OUT_DIR,
+        charge=charge,
+        mult=multiplicity,
+    )
+    if not transient_input.is_file():
+        fail(f"FairChem did not write expected transient ORCA input: {transient_input}")
+    text = transient_input.read_text(encoding="utf-8")
+    transient_input.unlink()
+    validate_fairchem_input(text, charge, multiplicity)
+    return text
+
+
+def validate_fairchem_input(text: str, charge: int, multiplicity: int) -> None:
+    if re.search(r"{{[A-Z_]+}}", text):
+        fail("FairChem-generated ORCA input still contains template placeholders")
+    stripped_lines = [line.strip() for line in text.splitlines()]
+    required_fragments = [
+        "! wB97M-V def2-TZVPD",
+        "EnGrad",
+        "RIJCOSX",
+        'GTOName "def2-tzvpd.bas"',
+        '%nbo NBOKEYLIST = "$NBO NPA NBO E2PERT 0.1 $END" end',
+        f"*xyz {charge} {multiplicity}",
+    ]
+    for fragment in required_fragments:
+        if fragment not in text:
+            fail(f"FairChem-generated ORCA input is missing expected fragment: {fragment}")
+    if not stripped_lines or stripped_lines[-1] != "*":
+        fail("FairChem-generated ORCA input must end with the ORCA coordinate terminator '*'")
 
 
 def render_template(template: str, values: dict[str, str]) -> str:
@@ -219,8 +300,14 @@ def validate_rendered_slurm(slurm_text: str, group_stem: str, expected_stems: li
 
     required_exact_lines = [
         "set -euo pipefail",
-        "module purge",
-        f"module load {ORCA_MODULE}",
+        "filter_module_stderr() {",
+        'grep -v -F "unalias: sudo: not found" >&2 || true',
+        "set +e",
+        "module purge 2> >(filter_module_stderr)",
+        f"module load {ORCA_MODULE} 2> >(filter_module_stderr)",
+        "MODULE_LOAD_STATUS=$?",
+        "set -e",
+        f'echo "Failed to load {ORCA_MODULE} module" >&2',
         f'ORCA_COMMAND="${{ORCA_COMMAND:-{ORCA_ABSOLUTE_PATH}}}"',
         'if ! command -v mpirun >/dev/null 2>&1; then',
         'echo "mpirun=$(command -v mpirun)"',
@@ -236,8 +323,13 @@ def validate_rendered_slurm(slurm_text: str, group_stem: str, expected_stems: li
         lines,
         [
             ("strict bash mode", r"^set -euo pipefail$"),
-            ("module purge", r"^module purge$"),
-            ("ORCA module load", rf"^module load {re.escape(ORCA_MODULE)}$"),
+            ("module stderr filter", r"^filter_module_stderr\(\) \{$"),
+            ("disable errexit for module setup", r"^set \+e$"),
+            ("module purge", r"^module purge 2> >\(filter_module_stderr\)$"),
+            ("ORCA module load", rf"^module load {re.escape(ORCA_MODULE)} 2> >\(filter_module_stderr\)$"),
+            ("module load status capture", r"^MODULE_LOAD_STATUS=\$\?$"),
+            ("reenable errexit after module setup", r"^set -e$"),
+            ("module load failure check", r'^\s*echo "Failed to load orca/6\.1\.1 module" >&2$'),
             ("ORCA command default", rf'^ORCA_COMMAND="\$\{{ORCA_COMMAND:-{re.escape(ORCA_ABSOLUTE_PATH)}\}}"$'),
             ("ORCA executable check", r'^\s*echo "ORCA executable is not available:'),
             ("mpirun availability check", r"^if ! command -v mpirun >/dev/null 2>&1; then$"),
@@ -273,14 +365,19 @@ def main() -> None:
     parser.add_argument("--clean", action="store_true", help="Remove stale generated files in expand/ first.")
     args = parser.parse_args()
 
-    if not BASE_INP.is_file():
-        fail(f"Missing input template: {BASE_INP}")
     if not BASE_SLURM.is_file():
         fail(f"Missing Slurm template: {BASE_SLURM}")
     if not args.clusters.is_file():
         fail(f"Missing cluster XYZ: {args.clusters}")
     if args.group_size < 1:
         fail("--group-size must be >= 1")
+
+    orca_calc = load_fairchem_orca_calc()
+    if orca_calc is None:
+        fail(
+            "Could not import fairchem.data.omol.orca.calc and could not load it from "
+            f"{FAIRCHEM_ORCA_CALC}"
+        )
 
     frames = read_xyz_frames(args.clusters)
     start, stop = parse_frames(args.frames, len(frames))
@@ -289,9 +386,10 @@ def main() -> None:
     if args.clean:
         remove_stale_generated()
 
-    inp_template = BASE_INP.read_text(encoding="utf-8")
     slurm_template = BASE_SLURM.read_text(encoding="utf-8")
     validate_slurm_template(slurm_template)
+    if FAIRCHEM_ORCA_BASIS.exists():
+        shutil.copy2(FAIRCHEM_ORCA_BASIS, SCRIPT_DIR / FAIRCHEM_ORCA_BASIS.name)
 
     manifest_lines = [
         "frame,stem,input,slurm,charge,multiplicity,n_atoms,sample_kind,source_condensed_frame,sample_order"
@@ -304,15 +402,9 @@ def main() -> None:
         symbols = [symbol for symbol, _x, _y, _z in atoms]
         charge = int(metadata.get("charge", formal_charge(symbols)))
         multiplicity = int(metadata.get("spin", spin_from_charge(charge)))
-        values = {
-            "STEM": stem,
-            "CHARGE": str(charge),
-            "MULTIPLICITY": str(multiplicity),
-            "COORDINATES": coordinate_block(atoms),
-        }
 
         inp_path = OUT_DIR / f"{stem}.inp"
-        write_text_lf(inp_path, render_template(inp_template, values))
+        write_text_lf(inp_path, make_input_with_fairchem(orca_calc, atoms, charge, multiplicity))
         frame_records.append(
             {
                 "frame_index": frame_index,

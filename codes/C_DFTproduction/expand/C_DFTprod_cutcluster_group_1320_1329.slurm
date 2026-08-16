@@ -12,8 +12,19 @@
 
 set -euo pipefail
 
-module purge
-module load orca/6.1.1
+filter_module_stderr() {
+    grep -v -F "unalias: sudo: not found" >&2 || true
+}
+
+set +e
+module purge 2> >(filter_module_stderr)
+module load orca/6.1.1 2> >(filter_module_stderr)
+MODULE_LOAD_STATUS=$?
+set -e
+if [[ "$MODULE_LOAD_STATUS" -ne 0 ]]; then
+    echo "Failed to load orca/6.1.1 module" >&2
+    exit "$MODULE_LOAD_STATUS"
+fi
 
 MLIP_DIR="${MLIP_DIR:-/gpfs/fs2/scratch/kshao4/mlip}"
 INPUT_DIR="$MLIP_DIR/codes/C_DFTproduction"

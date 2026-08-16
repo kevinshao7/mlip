@@ -78,10 +78,10 @@ first, followed by unbiased random clusters.
 
 ## DFT job generation
 
-`expand_dft_jobs.py` mirrors the BlueHive ORCA layout from
-`codes/A_parityplot/8_5_bluehiveDFT`. It writes one ORCA `.inp` per cut
-cluster and grouped Slurm scripts, each running 10 ORCA calculations
-sequentially. It reads:
+`expand_dft_jobs.py` writes one ORCA `.inp` per cut cluster through FairChem's
+`fairchem.data.omol.orca.calc.write_orca_inputs`, then writes grouped Slurm
+scripts from `base.slurm`, each running 10 ORCA calculations sequentially. It
+reads:
 
 `mlip/outputsfull/C_DFTproduction/condition_production_dft_clusters.xyz`
 
@@ -106,6 +106,9 @@ The generated grouped Slurm scripts match the working BlueHive ORCA setup from
 `orca/6.1.1`, verify that `mpirun` is available, then call
 `/software/orca/6.1.1/orca`. Email notifications are enabled only for the first
 10 and last 10 grouped Slurm files.
+
+ORCA input generation fails if FairChem's ORCA writer cannot be imported or if
+a generated `.inp` does not contain the expected FairChem ORCA fragments.
 
 `expand_dft_jobs.py` renders every grouped Slurm script from `base.slurm` and
 validates the rendered script before writing it. Generation fails if the module
