@@ -1,8 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name={{STEM}}
 #SBATCH --partition=standard
-#SBATCH --mail-type=END
-#SBATCH --mail-user=ks2120@cam.ac.uk
+{{MAIL_SETTINGS}}
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=24
 #SBATCH -n 24

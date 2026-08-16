@@ -1,8 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=C_DFTprod_cutcluster_0502
 #SBATCH --partition=standard
-#SBATCH --mail-type=END
-#SBATCH --mail-user=ks2120@cam.ac.uk
+# Email disabled for middle jobs to avoid notification spam.
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=24
 #SBATCH -n 24

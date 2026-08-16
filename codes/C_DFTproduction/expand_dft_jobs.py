@@ -23,6 +23,7 @@ DEFAULT_CLUSTER_XYZ = (
     / "condition_production_dft_clusters.xyz"
 )
 STEM_PREFIX = "C_DFTprod_cutcluster"
+MAIL_USER = "ks2120@cam.ac.uk"
 
 FORMAL_CHARGES = {
     "H": 1,
@@ -52,6 +53,12 @@ def parse_frames(spec: str, n_frames: int) -> tuple[int, int]:
 
 def stem_for_frame(frame_index: int) -> str:
     return f"{STEM_PREFIX}_{frame_index:04d}"
+
+
+def mail_settings_for_frame(frame_index: int, start: int, stop: int) -> str:
+    if frame_index < start + 10 or frame_index >= stop - 10:
+        return f"#SBATCH --mail-type=END\n#SBATCH --mail-user={MAIL_USER}"
+    return "# Email disabled for middle jobs to avoid notification spam."
 
 
 def formal_charge(symbols: list[str]) -> int:
@@ -177,6 +184,7 @@ def main() -> None:
         multiplicity = int(metadata.get("spin", spin_from_charge(charge)))
         values = {
             "STEM": stem,
+            "MAIL_SETTINGS": mail_settings_for_frame(frame_index, start, stop),
             "CHARGE": str(charge),
             "MULTIPLICITY": str(multiplicity),
             "COORDINATES": coordinate_block(atoms),
