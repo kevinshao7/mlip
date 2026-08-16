@@ -73,9 +73,9 @@ if [[ ! -f "$OUTPUT_DIR/def2-tzvpd.bas" ]]; then
     cp "$BASIS_PATH" "$OUTPUT_DIR/def2-tzvpd.bas"
 fi
 
-export OMP_NUM_THREADS=24
-export MKL_NUM_THREADS=24
-export OPENBLAS_NUM_THREADS=24
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
 export OMPI_MCA_btl=^openib
 export OMPI_MCA_orte_base_help_aggregate=0
 

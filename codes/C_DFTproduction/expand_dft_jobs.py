@@ -32,6 +32,7 @@ STEM_PREFIX = "C_DFTprod_cutcluster"
 GROUP_PREFIX = "C_DFTprod_cutcluster_group"
 MAIL_USER = "ks2120@cam.ac.uk"
 DEFAULT_GROUP_SIZE = 10
+ORCA_PAL_NPROCS = 24
 ORCA_MODULE = "orca/6.1.1"
 ORCA_ABSOLUTE_PATH = "/software/orca/6.1.1/orca"
 FAIRCHEM_ORCA_CALC = MLIP_DIR / "fairchem" / "src" / "fairchem" / "data" / "omol" / "orca" / "calc.py"
@@ -191,10 +192,32 @@ def make_input_with_fairchem(
     )
     if not transient_input.is_file():
         fail(f"FairChem did not write expected transient ORCA input: {transient_input}")
-    text = transient_input.read_text(encoding="utf-8")
+    text = ensure_orca_parallel_settings(transient_input.read_text(encoding="utf-8"))
     transient_input.unlink()
     validate_fairchem_input(text, charge, multiplicity)
     return text
+
+
+def ensure_orca_parallel_settings(text: str) -> str:
+    pal_line = f"%pal nprocs {ORCA_PAL_NPROCS} end"
+    lines = text.splitlines()
+    filtered_lines: list[str] = []
+    skip_pal_block = False
+    for line in lines:
+        stripped = line.strip()
+        if skip_pal_block:
+            if stripped.lower() == "end":
+                skip_pal_block = False
+            continue
+        if re.match(r"(?i)^%pal\b", stripped):
+            if stripped.lower() != "end" and not re.search(r"(?i)\bend\b", stripped):
+                skip_pal_block = True
+            continue
+        filtered_lines.append(line)
+
+    insert_at = 1 if filtered_lines and filtered_lines[0].lstrip().startswith("!") else 0
+    filtered_lines.insert(insert_at, pal_line)
+    return "\n".join(filtered_lines) + "\n"
 
 
 def validate_fairchem_input(text: str, charge: int, multiplicity: int) -> None:
@@ -203,6 +226,7 @@ def validate_fairchem_input(text: str, charge: int, multiplicity: int) -> None:
     stripped_lines = [line.strip() for line in text.splitlines()]
     required_fragments = [
         "! wB97M-V def2-TZVPD",
+        f"%pal nprocs {ORCA_PAL_NPROCS} end",
         "EnGrad",
         "RIJCOSX",
         'GTOName "def2-tzvpd.bas"',
@@ -311,6 +335,9 @@ def validate_rendered_slurm(slurm_text: str, group_stem: str, expected_stems: li
         f'ORCA_COMMAND="${{ORCA_COMMAND:-{ORCA_ABSOLUTE_PATH}}}"',
         'if ! command -v mpirun >/dev/null 2>&1; then',
         'echo "mpirun=$(command -v mpirun)"',
+        "export OMP_NUM_THREADS=1",
+        "export MKL_NUM_THREADS=1",
+        "export OPENBLAS_NUM_THREADS=1",
         'INPUT_PATH="$MLIP_DIR/codes/C_DFTproduction/expand/${STEM}.inp"',
         'OUTPUT_PATH="$OUTPUT_DIR/${STEM}.out"',
         '"$ORCA_COMMAND" "$INPUT_PATH" > "$OUTPUT_PATH"',
