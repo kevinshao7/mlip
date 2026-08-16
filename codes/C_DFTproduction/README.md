@@ -106,6 +106,11 @@ and do not call `module purge` or `module load`, avoiding the module-init
 `unalias sudo` warning. Email notifications are enabled only for the first 10
 and last 10 grouped Slurm files.
 
+Each grouped Slurm script checks for completed `.out` files inside the per-STEM
+loop. Do not add a pre-loop `OUTPUT_PATH` completion check: grouped jobs define
+`OUTPUT_PATH` only after selecting the current STEM, and `set -u` will abort on
+an unset `OUTPUT_PATH`.
+
 The script prints status for:
 
 - production-hold stage windows parsed from `.err` files

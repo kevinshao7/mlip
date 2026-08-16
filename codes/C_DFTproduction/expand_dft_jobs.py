@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Generate BlueHive ORCA input and grouped Slurm files for production cut clusters.
-
+  cd /gpfs/fs2/scratch/kshao4/mlip/codes/C_DFTproduction && for f in expand/C_DFTprod_cutcluster_group_*.slurm; do echo "Submitting $f"; sbatch "$f"; done
 Submit generated jobs with:
     for f in expand/*.slurm; do sbatch "$f"; done
 """

@@ -54,11 +54,6 @@ if [[ ! -f "$OUTPUT_DIR/def2-tzvpd.bas" ]]; then
     cp "$BASIS_PATH" "$OUTPUT_DIR/def2-tzvpd.bas"
 fi
 
-if [[ -f "$OUTPUT_PATH" ]] && grep -q "FINAL SINGLE POINT ENERGY" "$OUTPUT_PATH" && grep -q "ORCA TERMINATED NORMALLY" "$OUTPUT_PATH"; then
-    echo "Skipping completed $OUTPUT_PATH"
-    exit 0
-fi
-
 export OMP_NUM_THREADS=24
 export MKL_NUM_THREADS=24
 export OPENBLAS_NUM_THREADS=24
