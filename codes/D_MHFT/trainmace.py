@@ -35,6 +35,13 @@ def build_train_argv(args: argparse.Namespace) -> list[str]:
 
     run_dir = args.run_dir.resolve()
     run_dir.mkdir(parents=True, exist_ok=True)
+    model_dir = run_dir / "models"
+    checkpoints_dir = run_dir / "checkpoints"
+    log_dir = run_dir / "logs"
+    results_dir = run_dir / "results"
+    work_dir = run_dir / "work"
+    for path in (model_dir, checkpoints_dir, log_dir, results_dir, work_dir):
+        path.mkdir(parents=True, exist_ok=True)
 
     argv = [
         "run_train.py",
@@ -67,12 +74,17 @@ def build_train_argv(args: argparse.Namespace) -> list[str]:
         f"--default_dtype={args.default_dtype}",
         f"--device={args.device}",
         f"--num_workers={args.num_workers}",
-        f"--model_dir={path_arg(run_dir / 'models')}",
-        f"--checkpoints_dir={path_arg(run_dir / 'checkpoints')}",
-        f"--log_dir={path_arg(run_dir / 'logs')}",
-        f"--results_dir={path_arg(run_dir / 'results')}",
-        f"--work_dir={path_arg(run_dir / 'work')}",
+        f"--model_dir={path_arg(model_dir)}",
+        f"--checkpoints_dir={path_arg(checkpoints_dir)}",
+        f"--log_dir={path_arg(log_dir)}",
+        f"--results_dir={path_arg(results_dir)}",
+        f"--work_dir={path_arg(work_dir)}",
     ]
+    if args.distributed:
+        argv.append("--distributed")
+        argv.append(f"--launcher={args.launcher}")
+    if args.restart_latest:
+        argv.append("--restart_latest")
     if args.force_mh_ft_lr:
         argv.append("--force_mh_ft_lr=True")
         argv.append(f"--lr={args.lr}")
@@ -114,6 +126,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--default-dtype", default="float32", choices=["float32", "float64"])
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--num-workers", type=int, default=4)
+    parser.add_argument("--distributed", action="store_true")
+    parser.add_argument("--launcher", default="torchrun", choices=["slurm", "torchrun", "mpi", "none"])
+    parser.add_argument("--restart-latest", action="store_true")
     parser.add_argument("--force-mh-ft-lr", action="store_true")
     parser.add_argument("--lr", type=float, default=1.0e-4)
     parser.add_argument("--ema", action="store_true", default=True)
