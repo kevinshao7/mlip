@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Plot molecular species in the final frames of production trajectories.
+"""Analyse molecular species in production trajectories.
 
-By default the final frame of all 20 runs in production_manifest.csv is
-analysed. Independent conditions are processed by eight worker processes.
+Every condensed stride-100 frame is scanned for N/O components without H and
+components containing only H. Final-frame species plots are also produced.
+Independent conditions are processed by eight worker processes by default.
 """
 
 from __future__ import annotations
@@ -36,6 +37,8 @@ DEFAULT_INPUT_DIR = MLIP_DIR / "outputsfull" / "B1_conditionsproduction_stride10
 DEFAULT_MANIFEST = SCRIPT_DIR / "production_manifest.csv"
 DEFAULT_OUTPUT_DIR = SCRIPT_DIR / "final_species_distribution"
 LATTICE_RE = re.compile(r'Lattice="([^"]+)"')
+CONDENSED_OUTPUT_STRIDE = 100
+TARGET_PRESSURE_GPA = 100.0
 
 
 @dataclass(frozen=True)
@@ -55,9 +58,15 @@ def parse_args() -> argparse.Namespace:
     selection.add_argument("--run-id", action="append", help="Run ID to analyse; repeat to select several.")
     selection.add_argument("--all-conditions", action="store_true")
     parser.add_argument("--workers", type=int, default=8, help="Parallel worker processes (default: 8).")
-    parser.add_argument("--oh-cutoff", type=float, default=1.3, help="O-H bond cutoff in Angstrom.")
-    parser.add_argument("--nh-cutoff", type=float, default=1.30, help="N-H bond cutoff in Angstrom.")
-    parser.add_argument("--hh-cutoff", type=float, default=0.1, help="H-H bond cutoff in Angstrom.")
+    parser.add_argument(
+        "--progress-every",
+        type=int,
+        default=10,
+        help="Print all-frame scan progress every N condensed frames (default: 10).",
+    )
+    parser.add_argument("--oh-cutoff", type=float, default=1.45, help="Legacy option; H bonds now use nearest-atom assignment.")
+    parser.add_argument("--nh-cutoff", type=float, default=1.30, help="Legacy option; H bonds now use nearest-atom assignment.")
+    parser.add_argument("--hh-cutoff", type=float, default=0.5, help="Legacy option; H bonds now use nearest-atom assignment.")
     parser.add_argument(
         "--bond-scale",
         type=float,
@@ -85,14 +94,21 @@ def manifest_rows(path: Path) -> list[dict[str, str]]:
 
 def selected_rows(args: argparse.Namespace, rows: list[dict[str, str]]) -> list[dict[str, str]]:
     if args.all_conditions:
-        return rows
-    if not args.run_id:
-        return rows
-    requested = set(args.run_id)
-    selected = [row for row in rows if row["run_id"] in requested]
-    missing = requested - {row["run_id"] for row in selected}
-    if missing:
-        raise ValueError(f"Run IDs absent from manifest: {', '.join(sorted(missing))}")
+        selected = rows
+    elif not args.run_id:
+        selected = rows
+    else:
+        requested = set(args.run_id)
+        selected = [row for row in rows if row["run_id"] in requested]
+        missing = requested - {row["run_id"] for row in selected}
+        if missing:
+            raise ValueError(f"Run IDs absent from manifest: {', '.join(sorted(missing))}")
+
+    selected = [
+        row for row in selected if np.isclose(float(row["pressure_GPa"]), TARGET_PRESSURE_GPA)
+    ]
+    if not selected:
+        raise ValueError(f"No selected manifest conditions are at {TARGET_PRESSURE_GPA:g} GPa")
     return selected
 
 
@@ -149,6 +165,49 @@ def read_last_xyz_frame(path: Path) -> Frame:
     return Frame(tuple(symbols), positions, lattice.reshape(3, 3), comment)
 
 
+def iter_xyz_frames(path: Path):
+    """Yield every frame in an XYZ trajectory without loading it all into memory."""
+    with path.open("r", encoding="utf-8", errors="replace") as handle:
+        frame_index = 0
+        while True:
+            atom_count_line = handle.readline()
+            while atom_count_line and not atom_count_line.strip():
+                atom_count_line = handle.readline()
+            if not atom_count_line:
+                return
+            try:
+                natoms = int(atom_count_line.strip())
+            except ValueError as exc:
+                raise ValueError(
+                    f"Invalid atom count at condensed frame {frame_index} in {path}: "
+                    f"{atom_count_line.strip()!r}"
+                ) from exc
+
+            comment = handle.readline().strip()
+            lattice_match = LATTICE_RE.search(comment)
+            if not lattice_match:
+                raise ValueError(f"Condensed frame {frame_index} in {path} has no Lattice field")
+            lattice = np.fromstring(lattice_match.group(1), sep=" ")
+            if lattice.size != 9:
+                raise ValueError(f"Condensed frame {frame_index} in {path} has an invalid Lattice field")
+
+            symbols: list[str] = []
+            positions = np.empty((natoms, 3), dtype=float)
+            for atom_index in range(natoms):
+                line = handle.readline()
+                if not line:
+                    raise ValueError(f"Incomplete condensed frame {frame_index} in {path}")
+                fields = line.split()
+                if len(fields) < 4:
+                    raise ValueError(
+                        f"Malformed atom {atom_index} in condensed frame {frame_index} of {path}"
+                    )
+                symbols.append(fields[0])
+                positions[atom_index] = [float(value) for value in fields[1:4]]
+            yield frame_index, Frame(tuple(symbols), positions, lattice.reshape(3, 3), comment)
+            frame_index += 1
+
+
 def minimum_image_distances(
     first_positions: np.ndarray,
     second_positions: np.ndarray,
@@ -191,22 +250,51 @@ def molecular_components(
     hh_cutoff: float,
     bond_scale: float,
 ) -> tuple[list[list[int]], float]:
-    """Build an all-atom, periodic, purely distance-based molecular graph."""
+    """Build molecules by assigning every H to its nearest H, O, or N atom.
+
+    Heavy-atom bonds are still identified with the covalent-radius criterion.
+    Hydrogen assignments are unconditional and therefore do not use the H-H,
+    O-H, or N-H cutoffs; each hydrogen contributes exactly one assigned edge.
+    """
     natoms = len(frame.symbols)
     adjacency = [set() for _ in range(natoms)]
     minimum_distance = np.inf
+
+    # Add bonds between non-hydrogen atoms using the usual distance criterion.
     for left in range(natoms - 1):
         distances = minimum_image_distances(
             frame.positions[left : left + 1], frame.positions[left + 1 :], frame.cell
         )[0]
         minimum_distance = min(minimum_distance, float(distances.min()))
         for offset, distance in enumerate(distances, start=left + 1):
+            if "H" in (frame.symbols[left], frame.symbols[offset]):
+                continue
             if distance <= pair_cutoff(
                 frame.symbols[left], frame.symbols[offset],
                 oh_cutoff, nh_cutoff, hh_cutoff, bond_scale,
             ):
                 adjacency[left].add(offset)
                 adjacency[offset].add(left)
+
+    # Assign each hydrogen to one nearest eligible atom.  Turning these
+    # directed assignments into undirected graph edges naturally handles H-H
+    # pairs and chains while preserving the one-assignment-per-H rule.
+    eligible = np.array(
+        [index for index, symbol in enumerate(frame.symbols) if symbol in {"H", "O", "N"}],
+        dtype=int,
+    )
+    for hydrogen in (index for index, symbol in enumerate(frame.symbols) if symbol == "H"):
+        candidates = eligible[eligible != hydrogen]
+        if candidates.size == 0:
+            continue
+        distances = minimum_image_distances(
+            frame.positions[hydrogen : hydrogen + 1],
+            frame.positions[candidates],
+            frame.cell,
+        )[0]
+        nearest = int(candidates[int(np.argmin(distances))])
+        adjacency[hydrogen].add(nearest)
+        adjacency[nearest].add(hydrogen)
 
     unseen = set(range(natoms))
     components: list[list[int]] = []
@@ -230,10 +318,72 @@ def component_formula(frame: Frame, component: list[int]) -> str:
     return "".join(symbol + (str(counts[symbol]) if counts[symbol] > 1 else "") for symbol in order)
 
 
-def analyse_run(task: tuple[dict[str, str], str, float, float, float, float]) -> dict[str, object]:
-    row, trajectory_string, oh_cutoff, nh_cutoff, hh_cutoff, bond_scale = task
+def flagged_component_event(
+    row: dict[str, str], trajectory: Path, frame_index: int, frame: Frame, component: list[int]
+) -> dict[str, object] | None:
+    counts = Counter(frame.symbols[index] for index in component)
+    if counts["H"] == 0 and (counts["N"] > 0 or counts["O"] > 0):
+        event_type = "N_or_O_component_without_H"
+    elif counts["H"] == len(component):
+        event_type = "H_only_component"
+    else:
+        return None
+    return {
+        "run_id": row["run_id"],
+        "pressure_GPa": float(row["pressure_GPa"]),
+        "temperature_K": float(row["temperature_K"]),
+        "ammonia_water_ratio": float(row["ammonia_water_ratio"]),
+        "condensed_frame_index_0based": frame_index,
+        "estimated_original_frame_index_0based": frame_index * CONDENSED_OUTPUT_STRIDE,
+        "condensed_output_stride": CONDENSED_OUTPUT_STRIDE,
+        "event_type": event_type,
+        "species": component_formula(frame, component),
+        "component_size": len(component),
+        "atom_ids_0based": ";".join(map(str, component)),
+        "H_count": counts["H"],
+        "N_count": counts["N"],
+        "O_count": counts["O"],
+        "trajectory": str(trajectory),
+    }
+
+
+def analyse_run(task: tuple[dict[str, str], str, float, float, float, float, int]) -> dict[str, object]:
+    row, trajectory_string, oh_cutoff, nh_cutoff, hh_cutoff, bond_scale, progress_every = task
     trajectory = Path(trajectory_string)
-    frame = read_last_xyz_frame(trajectory)
+    flagged_events: list[dict[str, object]] = []
+    frame = None
+    frame_count = 0
+    print(
+        f"[{row['run_id']}] Starting ALL-FRAME scan of condensed stride-100 trajectory: "
+        f"{trajectory}",
+        flush=True,
+    )
+    for frame_index, current_frame in iter_xyz_frames(trajectory):
+        frame = current_frame
+        frame_count = frame_index + 1
+        current_components, _minimum_distance = molecular_components(
+            current_frame, oh_cutoff, nh_cutoff, hh_cutoff, bond_scale
+        )
+        for component in current_components:
+            event = flagged_component_event(row, trajectory, frame_index, current_frame, component)
+            if event is not None:
+                flagged_events.append(event)
+        if frame_index == 0 or frame_count % progress_every == 0:
+            print(
+                f"[{row['run_id']}] ALL-FRAME progress: processed {frame_count} condensed "
+                f"frame(s); latest zero-based frame index={frame_index}; "
+                f"flagged components so far={len(flagged_events)}",
+                flush=True,
+            )
+    if frame is None:
+        raise ValueError(f"No frames found in {trajectory}")
+    print(
+        f"[{row['run_id']}] Completed ALL-FRAME scan: {frame_count} condensed frame(s), "
+        f"zero-based indices 0..{frame_count - 1}, "
+        f"{len(flagged_events)} flagged component(s)",
+        flush=True,
+    )
+
     elements = Counter(frame.symbols)
     components, minimum_distance = molecular_components(
         frame, oh_cutoff, nh_cutoff, hh_cutoff, bond_scale
@@ -267,6 +417,7 @@ def analyse_run(task: tuple[dict[str, str], str, float, float, float, float]) ->
         "nh_cutoff_A": nh_cutoff,
         "hh_cutoff_A": hh_cutoff,
         "bond_scale": bond_scale,
+        "hydrogen_assignment": "nearest_H_O_or_N",
         "molecular_component_count": len(components),
         "largest_component_atoms": len(largest),
         "largest_component_formula": component_formula(frame, largest),
@@ -274,8 +425,24 @@ def analyse_run(task: tuple[dict[str, str], str, float, float, float, float]) ->
         "isolated_atom_ids": [atom["atom_id"] for atom in isolated_atoms],
         "isolated_atoms": isolated_atoms,
         "minimum_interatomic_distance_A": minimum_distance,
+        "frames_scanned": frame_count,
+        "flagged_event_count": len(flagged_events),
+        "flagged_events": flagged_events,
     }
     return result
+
+
+def write_flagged_events_csv(events: list[dict[str, object]], path: Path) -> None:
+    fields = [
+        "run_id", "pressure_GPa", "temperature_K", "ammonia_water_ratio",
+        "condensed_frame_index_0based", "estimated_original_frame_index_0based",
+        "condensed_output_stride", "event_type", "species", "component_size",
+        "atom_ids_0based", "H_count", "N_count", "O_count", "trajectory",
+    ]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields)
+        writer.writeheader()
+        writer.writerows(events)
 
 
 def write_summary_csv(results: list[dict[str, object]], path: Path) -> None:
@@ -283,9 +450,9 @@ def write_summary_csv(results: list[dict[str, object]], path: Path) -> None:
     fields = [
         "run_id", "pressure_GPa", "temperature_K", "ammonia_water_ratio", "natoms",
         "formula", "molecular_composition", "oh_cutoff_A", "nh_cutoff_A", "hh_cutoff_A",
-        "bond_scale", "molecular_component_count", "largest_component_atoms",
+        "bond_scale", "hydrogen_assignment", "molecular_component_count", "largest_component_atoms",
         "largest_component_formula", "isolated_atom_count", "isolated_atom_ids",
-        "minimum_interatomic_distance_A",
+        "minimum_interatomic_distance_A", "frames_scanned", "flagged_event_count",
     ] + [f"species_{name}" for name in species]
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)
@@ -312,8 +479,7 @@ def plot_result(result: dict[str, object], output_dir: Path, min_count: int) -> 
         f"Final-frame species: {result['run_id']}\n"
         f"P={result['pressure_GPa']:g} GPa, T={result['temperature_K']:g} K, "
         f"NH3/H2O={result['ammonia_water_ratio']:g}; "
-        f"O-H={result['oh_cutoff_A']:.2f} Å, N-H={result['nh_cutoff_A']:.2f} Å, "
-        f"H-H={result['hh_cutoff_A']:.2f} Å"
+        "each H assigned to nearest H/O/N"
     )
     ax.grid(axis="y", alpha=0.25)
     path = output_dir / f"{result['run_id']}_final_species.png"
@@ -331,9 +497,17 @@ def main() -> None:
         or args.hh_cutoff <= 0
         or args.bond_scale <= 0
         or args.min_species_count < 1
+        or args.progress_every < 1
     ):
-        raise ValueError("--workers, cutoffs, and --min-species-count must be positive")
+        raise ValueError(
+            "--workers, --progress-every, cutoffs, and --min-species-count must be positive"
+        )
     rows = selected_rows(args, manifest_rows(args.manifest.resolve()))
+    print(
+        f"Pressure filter active: running only {TARGET_PRESSURE_GPA:g} GPa conditions; "
+        "all other pressures are skipped.",
+        flush=True,
+    )
     tasks = [
         (
             row,
@@ -342,21 +516,33 @@ def main() -> None:
             args.nh_cutoff,
             args.hh_cutoff,
             args.bond_scale,
+            args.progress_every,
         )
         for row in rows
     ]
 
     results: list[dict[str, object]] = []
+    flagged_events: list[dict[str, object]] = []
     # Never create idle processes: the default one-frame/one-condition analysis
     # uses one worker, while multi-condition runs scale up to --workers.
     effective_workers = min(args.workers, len(tasks))
-    print(f"Using {effective_workers} worker process(es) for {len(tasks)} frame(s)")
+    print(
+        f"Using {effective_workers} worker process(es) for {len(tasks)} condition(s). "
+        f"Every condensed frame in every selected condition will be scanned; "
+        f"progress prints every {args.progress_every} frame(s).",
+        flush=True,
+    )
     with ProcessPoolExecutor(max_workers=effective_workers) as executor:
         futures = {executor.submit(analyse_run, task): task[0]["run_id"] for task in tasks}
         for future in as_completed(futures):
             result = future.result()
+            flagged_events.extend(result.pop("flagged_events"))
             results.append(result)
             print(f"Analysed {result['run_id']}: {result['molecular_composition']}")
+            print(
+                f"  Scanned {result['frames_scanned']} condensed stride-100 frames; "
+                f"found {result['flagged_event_count']} flagged component(s)"
+            )
             if result["isolated_atom_ids"]:
                 print(f"  Isolated atom IDs (0-based): {result['isolated_atom_ids']}")
 
@@ -369,6 +555,46 @@ def main() -> None:
         with (output_dir / f"{result['run_id']}_final_species.json").open("w", encoding="utf-8") as handle:
             json.dump(result, handle, indent=2)
     write_summary_csv(results, output_dir / "final_species_summary.csv")
+    flagged_events.sort(
+        key=lambda event: (
+            order[event["run_id"]],
+            event["condensed_frame_index_0based"],
+            event["event_type"],
+            event["atom_ids_0based"],
+        )
+    )
+    write_flagged_events_csv(flagged_events, output_dir / "flagged_components_all_frames.csv")
+    metadata = {
+        "frame_indexing": "ZERO-BASED",
+        "scan_scope": (
+            "ALL condensed frames in EVERY selected condition are scanned. The event CSV is not "
+            "limited to the last frame. Only the separate final-species plots summarize last frames."
+        ),
+        "important_frame_note": (
+            "condensed_frame_index_0based is a ZERO-BASED index into the condensed XYZ "
+            "outputs, which were written with stride 100. It is not the original trajectory "
+            "frame index. estimated_original_frame_index_0based equals "
+            "condensed_frame_index_0based * 100."
+        ),
+        "condensed_output_stride": CONDENSED_OUTPUT_STRIDE,
+        "pressure_filter_GPa": TARGET_PRESSURE_GPA,
+        "atom_indexing": "ZERO-BASED",
+        "event_definitions": {
+            "N_or_O_component_without_H": (
+                "A connected molecular component containing at least one N or O and no H."
+            ),
+            "H_only_component": (
+                "A connected molecular component made only of H atoms, including H, H2, H3, etc."
+            ),
+        },
+        "hydrogen_assignment": (
+            "Each H is assigned to its nearest other H, O, or N using periodic minimum-image distance."
+        ),
+        "event_csv": "flagged_components_all_frames.csv",
+        "event_row_scope": "One row per flagged connected component per condensed frame.",
+    }
+    with (output_dir / "flagged_components_metadata.json").open("w", encoding="utf-8") as handle:
+        json.dump(metadata, handle, indent=2)
     print(f"Wrote statistics and plots to {output_dir}")
 
 
