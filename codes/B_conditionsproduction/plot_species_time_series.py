@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Plot molecular-species counts through time for production trajectories.
 
-The default run analyses every condensed frame of the first manifest condition
-(P100GPa_R0) and uses four worker processes. Raw zero counts remain zero in
-the CSV; zeros are replaced by 0.1 only when drawing the logarithmic plot.
+The default run analyses every condensed frame of all 20 manifest conditions,
+processing conditions sequentially and frames with four worker processes. Raw
+zero counts remain zero in the CSV; zeros are replaced by 0.1 only when drawing
+the logarithmic plot. One CSV and one figure are written per condition.
 """
 
 from __future__ import annotations
@@ -56,7 +57,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--run-id",
         action="append",
-        help="Condition to analyse; repeat for several. Default: first manifest condition only.",
+        help="Restrict analysis to a condition; repeat for several. Default: all conditions.",
     )
     parser.add_argument("--all-conditions", action="store_true")
     parser.add_argument("--workers", type=int, default=4)
@@ -91,7 +92,7 @@ def select_rows(args: argparse.Namespace) -> list[dict[str, str]]:
     if args.all_conditions:
         return rows
     if not args.run_id:
-        return rows[:1]
+        return rows
     requested = set(args.run_id)
     selected = [row for row in rows if row["run_id"] in requested]
     missing = requested - {row["run_id"] for row in selected}
@@ -238,6 +239,13 @@ def plot_time_series(
     selected = [index for index in range(len(names)) if counts[:, index].max() >= min_peak_count]
     if not selected:
         raise ValueError("No species satisfy --min-peak-count")
+    category_order = {
+        "base": 0,
+        "expected_ion": 1,
+        "unexpected_cluster": 2,
+        "improper_species": 3,
+    }
+    selected.sort(key=lambda index: (category_order[species_category(names[index])], names[index]))
 
     fig, ax = plt.subplots(figsize=(13, 7), constrained_layout=True)
     colors = category_colors([names[index] for index in selected])
@@ -284,12 +292,19 @@ def main() -> None:
     rows = select_rows(args)
     output_dir = args.output_dir.resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
-    print(f"Using {args.workers} worker processes", flush=True)
+    print(
+        f"Processing {len(rows)} condition(s) sequentially with "
+        f"{args.workers} frame-analysis worker processes",
+        flush=True,
+    )
     with ProcessPoolExecutor(max_workers=args.workers) as executor:
-        for row in rows:
+        for condition_number, row in enumerate(rows, start=1):
             run_id = row["run_id"]
             trajectory = species_base.trajectory_for_run(args.input_dir.resolve(), run_id)
-            print(f"[{run_id}] Reading {trajectory}", flush=True)
+            print(
+                f"[Condition {condition_number}/{len(rows)}: {run_id}] Reading {trajectory}",
+                flush=True,
+            )
             frame_results = analyse_trajectory(trajectory, args, executor)
             frame_indices, names, counts = species_matrix(frame_results)
             times_ps = frame_indices.astype(float) * args.frame_time_ps
