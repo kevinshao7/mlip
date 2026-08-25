@@ -5,14 +5,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import pickle
 import tarfile
+import tempfile
+import zlib
 from collections.abc import Iterable
 from pathlib import Path
 
 from ase import Atoms
 from ase.data import atomic_numbers
+from ase.db.row import AtomsRow
 from ase.io import read, write
+from ase.io.jsonio import decode
 
 from orca_to_extxyz import DEFAULT_INPUT_DIR, convert_outputs
 
@@ -113,41 +118,132 @@ def iter_atoms_from_object(obj) -> Iterable[Atoms]:
             yield from iter_atoms_from_object(value)
 
 
-def extract_unlabeled_omol_replay(
+def _prepare_replay_atoms(atoms: Atoms, config_type: str, source_file: str) -> Atoms:
+    """Normalize one OMol structure and preserve DFT labels when present."""
+    converted = atoms.copy()
+    metadata = atoms.info.get("data", {})
+    if isinstance(metadata, dict):
+        converted.info.update(metadata)
+    converted.info.pop("data", None)
+
+    if atoms.calc is not None:
+        try:
+            converted.info["REF_energy"] = float(atoms.get_potential_energy())
+        except Exception:
+            pass
+        try:
+            converted.arrays["REF_forces"] = atoms.get_forces().copy()
+        except Exception:
+            pass
+    converted.calc = None
+    converted.set_pbc(False)
+    converted.info.setdefault("charge", 0)
+    converted.info.setdefault("spin", 1)
+    converted.info.setdefault("external_field", [0.0, 0.0, 0.0])
+    converted.info["config_type"] = config_type
+    converted.info["source_file"] = source_file
+    return converted
+
+
+def _iter_aselmdb(path: Path) -> Iterable[Atoms]:
+    """Read ASE-LMDB without requiring fairchem or optional DB server extras."""
+    try:
+        import lmdb
+    except ImportError as exc:
+        raise ImportError("Reading OMol25 .aselmdb shards requires `pip install lmdb`.") from exc
+
+    env = lmdb.open(
+        os.fspath(path), subdir=False, readonly=True, lock=False, readahead=False
+    )
+    try:
+        with env.begin() as transaction:
+            def load(key: str):
+                value = transaction.get(key.encode("ascii"))
+                if value is None:
+                    return None
+                return decode(zlib.decompress(value).decode("utf-8"))
+
+            next_id = load("nextid") or 1
+            deleted_ids = set(load("deleted_ids") or [])
+            for row_id in range(1, int(next_id)):
+                if row_id in deleted_ids:
+                    continue
+                row_dict = load(str(row_id))
+                if row_dict is not None:
+                    yield AtomsRow(row_dict).toatoms(add_additional_information=True)
+    finally:
+        env.close()
+
+
+def extract_omol_replay(
     archive_path: Path,
     output_path: Path,
     max_configs: int,
     config_type: str,
 ) -> int:
     frames: list[Atoms] = []
+    output_path.parent.mkdir(parents=True, exist_ok=True)
     with tarfile.open(archive_path) as archive:
         members = sorted(
             (member for member in archive.getmembers() if member.isfile()),
             key=lambda member: member.name,
         )
         for member in members:
+            if member.name.endswith(".aselmdb-lock"):
+                continue
             extracted = archive.extractfile(member)
             if extracted is None:
                 continue
-            obj = pickle.load(extracted)
-            for atoms in iter_atoms_from_object(obj):
-                converted = atoms.copy()
-                converted.calc = None
-                converted.set_pbc(False)
-                converted.info.setdefault("charge", 0)
-                converted.info.setdefault("spin", 1)
-                converted.info.setdefault("external_field", [0.0, 0.0, 0.0])
-                converted.info["config_type"] = config_type
-                converted.info["source_file"] = member.name
-                frames.append(converted)
-                if len(frames) >= max_configs:
-                    break
+            if member.name.endswith(".aselmdb"):
+                # LMDB needs a seekable file; materialize only the shards needed
+                # to reach max_configs instead of unpacking the complete archive.
+                with tempfile.NamedTemporaryFile(
+                    prefix="omol_replay_",
+                    suffix=".aselmdb",
+                    dir=output_path.parent,
+                    delete=False,
+                ) as destination:
+                    shard_path = Path(destination.name)
+                    try:
+                        while chunk := extracted.read(16 * 1024 * 1024):
+                            destination.write(chunk)
+                    except Exception:
+                        shard_path.unlink(missing_ok=True)
+                        raise
+                try:
+                    atoms_iter = _iter_aselmdb(shard_path)
+                    try:
+                        for atoms in atoms_iter:
+                            frames.append(_prepare_replay_atoms(atoms, config_type, member.name))
+                            if len(frames) >= max_configs:
+                                break
+                    finally:
+                        atoms_iter.close()
+                finally:
+                    shard_path.unlink(missing_ok=True)
+            else:
+                try:
+                    obj = pickle.load(extracted)
+                except (pickle.UnpicklingError, EOFError):
+                    continue
+                for atoms in iter_atoms_from_object(obj):
+                    converted = _prepare_replay_atoms(atoms, config_type, member.name)
+                    frames.append(converted)
+                    if len(frames) >= max_configs:
+                        break
             if len(frames) >= max_configs:
                 break
 
     if not frames:
         raise ValueError(f"No ASE Atoms objects found in {archive_path}")
-    output_path.parent.mkdir(parents=True, exist_ok=True)
+    labeled = sum(
+        "REF_energy" in atoms.info and "REF_forces" in atoms.arrays for atoms in frames
+    )
+    if labeled not in (0, len(frames)):
+        raise ValueError(
+            f"Mixed replay labels are unsafe: {labeled}/{len(frames)} configurations "
+            "have both energy and forces."
+        )
     write(output_path, frames, format="extxyz")
     return len(frames)
 
@@ -214,13 +310,18 @@ def main() -> None:
     )
 
     if not args.skip_omol_replay:
-        n_replay = extract_unlabeled_omol_replay(
+        n_replay = extract_omol_replay(
             args.omol_archive,
             args.replay_output,
             args.max_replay_configs,
             "OMOL25_REPLAY_UNLABELED",
         )
-        print(f"Wrote {n_replay} unlabeled replay configs to {args.replay_output}")
+        first = read(args.replay_output, index=0)
+        label_status = (
+            "labeled" if "REF_energy" in first.info and "REF_forces" in first.arrays
+            else "unlabeled"
+        )
+        print(f"Wrote {n_replay} {label_status} replay configs to {args.replay_output}")
 
 
 if __name__ == "__main__":

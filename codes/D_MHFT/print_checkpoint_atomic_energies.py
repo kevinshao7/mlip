@@ -6,6 +6,8 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import tempfile
+import urllib.request
 from pathlib import Path
 
 import torch
@@ -14,17 +16,27 @@ import torch
 SCRIPT_DIR = Path(__file__).resolve().parent
 MLIP_DIR = SCRIPT_DIR.parents[1]
 MACE_REPO = MLIP_DIR / "mace"
-DEFAULT_CHECKPOINT = MLIP_DIR / "outputsfull" / ".cache" / "mace" / "MACEPOLAR1Smodel"
+DEFAULT_CHECKPOINT_URL = (
+    "https://github.com/ACEsuit/mace-foundations/releases/download/"
+    "mace_polar_1/MACE-POLAR-1-S.model"
+)
 
 
-def load_model(checkpoint: Path):
-    if not checkpoint.is_file():
-        raise FileNotFoundError(f"Checkpoint not found: {checkpoint}")
+def download_model(checkpoint_url: str):
     if not MACE_REPO.is_dir():
         raise FileNotFoundError(f"Local MACE checkout is missing: {MACE_REPO}")
 
     sys.path.insert(0, str(MACE_REPO.resolve()))
-    return torch.load(checkpoint, map_location="cpu", weights_only=False)
+    request = urllib.request.Request(
+        checkpoint_url,
+        headers={"User-Agent": "MACE-checkpoint-energy-reader"},
+    )
+    with tempfile.TemporaryDirectory() as temporary_directory:
+        checkpoint = Path(temporary_directory) / "checkpoint.model"
+        with urllib.request.urlopen(request) as response, checkpoint.open("wb") as output:
+            while chunk := response.read(1024 * 1024):
+                output.write(chunk)
+        return torch.load(checkpoint, map_location="cpu", weights_only=False)
 
 
 def extract_atomic_energies(model) -> dict[int, float]:
@@ -54,7 +66,11 @@ def extract_atomic_energies(model) -> dict[int, float]:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--checkpoint", type=Path, default=DEFAULT_CHECKPOINT)
+    parser.add_argument(
+        "--checkpoint-url",
+        default=DEFAULT_CHECKPOINT_URL,
+        help="Checkpoint URL to download afresh (default: MACE-POLAR-1-S release).",
+    )
     parser.add_argument(
         "--format",
         choices=["json", "lines"],
@@ -66,7 +82,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    model = load_model(args.checkpoint.resolve())
+    model = download_model(args.checkpoint_url)
     atomic_energies = extract_atomic_energies(model)
 
     if args.format == "json":

@@ -22,7 +22,8 @@ This writes:
 - `data\target_all.xyz` from `outputsfull\C_DFTproduction\C_DFTproduction\dft_outputs`
 - `data\target_train.xyz`, `data\target_valid.xyz`, `data\target_test.xyz`
 - `data\target_e0s.json` from `codes\7_7b_clustervalidation\atomizationenergies.txt`
-- `data\omol_replay_unlabeled.xyz` from the OMOL pickle archive
+- `data\omol_replay_unlabeled.xyz` from either an OMol pickle archive or the
+  official sharded ASE-LMDB (`.aselmdb`) archives
 
 The ORCA converter uses ASE's ORCA parser, so energies are written in eV and
 forces in eV/Angstrom. The target labels are `REF_energy` and `REF_forces`.
@@ -39,7 +40,22 @@ nonzero instead of writing a partial dataset.
 The OMOL archive currently present in `outputsfull\C1_omol` contains geometry
 input pickles, not true labeled replay energies/forces. The default training
 command therefore uses `--pseudolabel_replay=True`, so MACE labels replay
-geometries with the starting `polar-1-s` model.
+geometries with the starting `polar-1-s` model. `trainmace.py` now detects
+whether `REF_energy` and `REF_forces` are present: labeled original training
+data is used directly, while unlabeled data is pseudolabeled.
+
+Official OMol25 downloads contain sharded ASE-LMDB files. They can be passed
+without manually extracting the full archive; preparation extracts only enough
+shards to satisfy `--max-replay-configs`:
+
+```powershell
+C:\Users\shaoq\AppData\Local\Programs\Python\Python312\python.exe .\mlip\codes\D_MHFT\prepare_data.py --skip-orca --omol-archive 'C:\path\to\train_4M.tar.gz' --max-replay-configs 10000
+```
+
+Do not use the OMol25 `test` archive as labeled replay data. Its rows contain
+structures and metadata but no DFT energy/force labels; auto mode will therefore
+pseudolabel it. Use a labeled training archive (for example Train 4M) to replay
+the original OMol25 training labels.
 
 If you download a true labeled replay `.xyz` or `.extxyz` from the
 MACE-foundations releases, pass it directly:

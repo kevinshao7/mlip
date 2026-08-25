@@ -27,6 +27,13 @@ def require_file(path: Path, message: str) -> str:
     return path_arg(path)
 
 
+def replay_is_labeled(path: Path) -> bool:
+    from ase.io import read
+
+    atoms = read(path, index=0)
+    return "REF_energy" in atoms.info and "REF_forces" in atoms.arrays
+
+
 def build_train_argv(args: argparse.Namespace) -> list[str]:
     train_file = require_file(args.train_file, "Missing target training extxyz")
     valid_file = require_file(args.valid_file, "Missing target validation extxyz")
@@ -43,6 +50,14 @@ def build_train_argv(args: argparse.Namespace) -> list[str]:
     for path in (model_dir, checkpoints_dir, log_dir, results_dir, work_dir):
         path.mkdir(parents=True, exist_ok=True)
 
+    pseudolabel_replay = args.pseudolabel_replay
+    if pseudolabel_replay == "auto":
+        pseudolabel_replay = "False" if replay_is_labeled(args.pt_train_file) else "True"
+        print(
+            f"Replay labels detected: pseudolabel_replay={pseudolabel_replay} "
+            f"for {args.pt_train_file}"
+        )
+
     argv = [
         "run_train.py",
         f"--name={args.name}",
@@ -52,7 +67,7 @@ def build_train_argv(args: argparse.Namespace) -> list[str]:
         f"--valid_file={valid_file}",
         f"--pt_train_file={pt_train_file}",
         "--multiheads_finetuning=True",
-        f"--pseudolabel_replay={args.pseudolabel_replay}",
+        f"--pseudolabel_replay={pseudolabel_replay}",
         f"--num_samples_pt={args.num_samples_pt}",
         f"--subselect_pt={args.subselect_pt}",
         f"--filter_type_pt={args.filter_type_pt}",
@@ -112,7 +127,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--e0s", type=Path, default=DATA_DIR / "target_e0s.json")
     parser.add_argument("--run-dir", type=Path, default=RUNS_DIR / "polar1s_mhft_orca")
     parser.add_argument("--atomic-numbers", default="[1, 7, 8, 16]")
-    parser.add_argument("--pseudolabel-replay", default="True", choices=["True", "False", "true", "false"])
+    parser.add_argument(
+        "--pseudolabel-replay",
+        default="auto",
+        choices=["auto", "True", "False", "true", "false"],
+        help="Auto uses original OMol25 labels when present, otherwise foundation-model pseudolabels.",
+    )
     parser.add_argument("--num-samples-pt", type=int, default=10000)
     parser.add_argument("--subselect-pt", default="random", choices=["random", "fps"])
     parser.add_argument("--filter-type-pt", default="combinations", choices=["none", "combinations", "inclusive", "exclusive"])
