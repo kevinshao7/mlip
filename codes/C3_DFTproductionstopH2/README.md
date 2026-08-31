@@ -57,7 +57,11 @@ C:\Users\shaoq\AppData\Local\Programs\Python\Python312\python.exe .\mlip\codes\C
 
 ## DFT Job Generation
 
-`expand_dft_jobs.py` reads:
+`expand_dft_jobs.py` is a compatibility launcher for BlueHive, where `python`
+may still point to Python 2. It re-execs the Python 3 implementation in
+`_expand_dft_jobs_py3.py` when needed.
+
+It reads:
 
 `mlip/outputsfull/C3_DFTproductionstopH2/condition_production_stopH2_clusters.xyz`
 
