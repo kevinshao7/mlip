@@ -75,6 +75,12 @@ Generate all frames:
 C:\Users\shaoq\AppData\Local\Programs\Python\Python312\python.exe .\mlip\codes\C3_DFTproductionstopH2\expand_dft_jobs.py --clean --group-size 10
 ```
 
+Regenerate only grouped Slurm scripts from existing `.inp` files:
+
+```bash
+python expand_dft_jobs.py --slurm-only --clean --group-size 10
+```
+
 On BlueHive, after `git pull`, run from `codes/C3_DFTproductionstopH2`:
 
 ```bash

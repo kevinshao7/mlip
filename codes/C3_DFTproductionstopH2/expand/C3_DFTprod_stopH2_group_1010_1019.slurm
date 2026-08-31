@@ -69,8 +69,12 @@ if [[ ! -f "$BASIS_PATH" ]]; then
     echo "Missing ORCA basis file: $BASIS_PATH" >&2
     exit 1
 fi
-if [[ ! -f "$OUTPUT_DIR/def2-tzvpd.bas" ]]; then
-    cp "$BASIS_PATH" "$OUTPUT_DIR/def2-tzvpd.bas"
+TARGET_BASIS="$OUTPUT_DIR/def2-tzvpd.bas"
+if [[ ! -f "$TARGET_BASIS" ]]; then
+    TMP_BASIS="$OUTPUT_DIR/def2-tzvpd.bas.${SLURM_JOB_ID:-$$}.tmp"
+    cp "$BASIS_PATH" "$TMP_BASIS"
+    mv -n "$TMP_BASIS" "$TARGET_BASIS"
+    rm -f "$TMP_BASIS"
 fi
 
 export OMP_NUM_THREADS=1

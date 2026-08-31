@@ -384,12 +384,26 @@ def remove_stale_generated() -> None:
         manifest.unlink()
 
 
+def remove_stale_slurm() -> None:
+    for pattern in (f"{STEM_PREFIX}_*.slurm", f"{GROUP_PREFIX}_*.slurm"):
+        for path in OUT_DIR.glob(pattern):
+            path.unlink()
+    manifest = OUT_DIR / "manifest.csv"
+    if manifest.exists():
+        manifest.unlink()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--frames", default="all", help="Frame range: all or half-open start,stop")
     parser.add_argument("--clusters", type=Path, default=DEFAULT_CLUSTER_XYZ)
     parser.add_argument("--group-size", type=int, default=DEFAULT_GROUP_SIZE)
     parser.add_argument("--clean", action="store_true", help="Remove stale generated files in expand/ first.")
+    parser.add_argument(
+        "--slurm-only",
+        action="store_true",
+        help="Regenerate grouped Slurm files and manifest from existing .inp files without rewriting .inp files.",
+    )
     args = parser.parse_args()
 
     if not BASE_SLURM.is_file():
@@ -399,19 +413,24 @@ def main() -> None:
     if args.group_size < 1:
         fail("--group-size must be >= 1")
 
-    orca_calc = load_fairchem_orca_calc()
-    if orca_calc is None:
-        fail(
-            "Could not import fairchem.data.omol.orca.calc and could not load it from "
-            f"{FAIRCHEM_ORCA_CALC}"
-        )
+    orca_calc = None
+    if not args.slurm_only:
+        orca_calc = load_fairchem_orca_calc()
+        if orca_calc is None:
+            fail(
+                "Could not import fairchem.data.omol.orca.calc and could not load it from "
+                f"{FAIRCHEM_ORCA_CALC}"
+            )
 
     frames = read_xyz_frames(args.clusters)
     start, stop = parse_frames(args.frames, len(frames))
 
     OUT_DIR.mkdir(exist_ok=True)
     if args.clean:
-        remove_stale_generated()
+        if args.slurm_only:
+            remove_stale_slurm()
+        else:
+            remove_stale_generated()
 
     slurm_template = BASE_SLURM.read_text(encoding="utf-8")
     validate_slurm_template(slurm_template)
@@ -431,7 +450,12 @@ def main() -> None:
         multiplicity = int(metadata.get("spin", spin_from_charge(charge)))
 
         inp_path = OUT_DIR / f"{stem}.inp"
-        write_text_lf(inp_path, make_input_with_fairchem(orca_calc, atoms, charge, multiplicity))
+        if args.slurm_only:
+            if not inp_path.is_file():
+                fail(f"--slurm-only requested but existing input is missing: {inp_path}")
+        else:
+            write_text_lf(inp_path, make_input_with_fairchem(orca_calc, atoms, charge, multiplicity))
+            print(f"wrote {inp_path.relative_to(SCRIPT_DIR)}")
         frame_records.append(
             {
                 "frame_index": frame_index,
@@ -445,7 +469,6 @@ def main() -> None:
                 "sample_order": metadata.get("sample_order", ""),
             }
         )
-        print(f"wrote {inp_path.relative_to(SCRIPT_DIR)}")
 
     groups = [
         frame_records[index : index + args.group_size]
@@ -480,7 +503,7 @@ def main() -> None:
 
     write_text_lf(OUT_DIR / "manifest.csv", "\n".join(manifest_lines) + "\n")
     print(
-        f"Generated {stop - start} input files and {len(groups)} grouped Slurm files "
+        f"Generated {0 if args.slurm_only else stop - start} input files and {len(groups)} grouped Slurm files "
         f"in {OUT_DIR.name}/; group size {args.group_size}"
     )
 
