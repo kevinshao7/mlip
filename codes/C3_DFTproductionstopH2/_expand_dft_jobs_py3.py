@@ -96,7 +96,7 @@ def formal_charge(symbols: list[str]) -> int:
 
 
 def spin_from_charge(charge: int) -> int:
-    return 2 if charge % 2 else 1
+    return 1
 
 
 def atoms_from_tuples(atoms: list[tuple[str, float, float, float]]) -> Atoms:
@@ -447,7 +447,7 @@ def main() -> None:
         stem = stem_for_frame(frame_index)
         symbols = [symbol for symbol, _x, _y, _z in atoms]
         charge = int(metadata.get("charge", formal_charge(symbols)))
-        multiplicity = int(metadata.get("spin", spin_from_charge(charge)))
+        multiplicity = 1
 
         inp_path = OUT_DIR / f"{stem}.inp"
         if args.slurm_only:

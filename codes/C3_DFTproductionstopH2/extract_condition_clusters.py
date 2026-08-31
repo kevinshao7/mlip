@@ -473,7 +473,7 @@ def connected_component_from_pair(
 
 def charge_and_spin(symbols: np.ndarray) -> tuple[int, int]:
     charge = int(sum(-2 if symbol == "O" else 1 for symbol in symbols))
-    spin = 2 if charge % 2 else 1
+    spin = 1
     return charge, spin
 
 
