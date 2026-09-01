@@ -16,9 +16,9 @@ def main():
 
     if sys.version_info[0] >= 3:
         sys.path.insert(0, script_dir)
-        import _expand_dft_jobs_py3
+        import mlip.codes.C3_DFTproductionstopH2.expand_dft_jobs_py3 as expand_dft_jobs_py3
 
-        _expand_dft_jobs_py3.main()
+        expand_dft_jobs_py3.main()
         return
 
     candidates = []
