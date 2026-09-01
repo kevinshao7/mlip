@@ -20,7 +20,7 @@ FAIRCHEM_ORCA_BASIS = (
 LOCAL_BASIS = SCRIPT_DIR / "def2-tzvpd.bas"
 RUNS_DIR = SCRIPT_DIR / "runs"
 MANIFEST_PATH = SCRIPT_DIR / "manifest.csv"
-ORCA_PAL_NPROCS = 16
+ORCA_PAL_NPROCS = 8
 
 ATOM_SPECS = [
     {"atom": "H", "charge": 0, "multiplicity": 2},

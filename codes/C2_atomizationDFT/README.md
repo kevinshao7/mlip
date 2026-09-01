@@ -7,18 +7,15 @@ This directory regenerates isolated-atom ORCA reference energies for:
 - `N`
 - `S`
 
-It uses the exact ORCA input template and basis file from:
+It uses FairChem's ORCA writer and stages FairChem's `def2-tzvpd.bas`.
 
-- `/home/kevinsh/mlip/codes/C_DFTproduction/base.inp`
-- `/home/kevinsh/mlip/codes/C_DFTproduction/def2-tzvpd.bas`
-
-That keeps the DFT settings aligned with the production cluster workflow while
-avoiding a separate hand-written atom-specific template.
+That keeps the DFT settings aligned with the production cluster workflow without
+hand-written ORCA input templates. Generated inputs use `%pal nprocs 8 end`.
 
 ## Important
 
-On this HPC machine, the correct execution command is `orca_qc`, not `orca`.
-`run_all.sh` defaults to `ORCA_COMMAND=orca_qc` for that reason.
+Set `ORCA_COMMAND` to the ORCA executable or wrapper available on the machine.
+`run_all.sh` defaults to `orca_qc`.
 
 ## Usage
 
@@ -34,6 +31,13 @@ Run the four ORCA jobs locally with the HPC wrapper command:
 ```bash
 cd /home/kevinsh/mlip/codes/C2_atomizationDFT
 bash run_all.sh
+```
+
+On Windows PowerShell, use the native runner:
+
+```powershell
+Set-Location C:\Users\shaoq\Documents\Mainz\mlip\codes\C2_atomizationDFT
+.\run_all.ps1
 ```
 
 Rewrite the shared reference CSV after the runs finish:
