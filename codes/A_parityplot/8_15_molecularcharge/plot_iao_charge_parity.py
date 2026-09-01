@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Parity plots for ORCA IAO partial charges vs MLIP predicted charges."""
+"""Frame-by-frame charge evolution plots for DFT IAO and MLIP predicted charges."""
 
 from __future__ import annotations
 
@@ -15,10 +15,11 @@ import numpy as np
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-DEFAULT_DFT_DIR = SCRIPT_DIR.parents[2] / "outputsfull" / "A_parityplot" / "8_5_bluehiveDFT"
+DEFAULT_DFT_DIR = SCRIPT_DIR.parents[2] / "outputsfull" / "8_5_bluehiveDFT"
 DEFAULT_MLIP_ROOT = SCRIPT_DIR.parent / "8_6b_mlippredout2"
 DEFAULT_OUTPUT_DIR = SCRIPT_DIR / "outputs"
 EXPECTED_FRAMES = 180
+DEFAULT_FRAMES_PER_INSTANCE = 10
 DEFAULT_BOND_CUTOFF_A = 1.5
 EXPECTED_SPECIES = {"H", "H2", "H2O", "HO", "H3O"}
 
@@ -44,7 +45,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Extract ORCA IAO PARTIAL CHARGES, join them to MLIP predicted_charge_e "
-            "values, and make DFT-vs-MLIP parity plots."
+            "values, and make frame-by-frame DFT and MLIP charge evolution plots."
         )
     )
     parser.add_argument("--dft-dir", type=Path, default=DEFAULT_DFT_DIR)
@@ -52,11 +53,26 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--expected-frames", type=int, default=EXPECTED_FRAMES)
     parser.add_argument(
+        "--frames-per-instance",
+        type=int,
+        default=DEFAULT_FRAMES_PER_INSTANCE,
+        help="Number of frames in each independent H2-formation instance. Default: 10.",
+    )
+    parser.add_argument(
+        "--focus-instance",
+        type=int,
+        default=None,
+        help=(
+            "Instance index to plot. Default: choose the instance with the clearest sustained H2 formation "
+            "from the molecule assignments."
+        ),
+    )
+    parser.add_argument(
         "--model",
         default="all",
         help="MLIP subdirectory to plot, e.g. polar1s, polar1m, off. Default: all.",
     )
-    parser.add_argument("--dpi", type=int, default=250)
+    parser.add_argument("--dpi", type=int, default=400)
     parser.add_argument(
         "--bond-cutoff",
         type=float,
@@ -298,7 +314,11 @@ def assign_molecules(frame_rows: list[dict[str, object]], cutoff_a: float) -> li
     return sorted(components, key=lambda component: min(int(row["atom_index"]) for row in component))
 
 
-def collect_molecules(rows: list[dict[str, object]], bond_cutoff_a: float) -> list[dict[str, object]]:
+def collect_molecules(
+    rows: list[dict[str, object]],
+    bond_cutoff_a: float,
+    frames_per_instance: int,
+) -> list[dict[str, object]]:
     molecule_rows: list[dict[str, object]] = []
     by_frame: dict[int, list[dict[str, object]]] = {}
     for row in rows:
@@ -309,18 +329,36 @@ def collect_molecules(rows: list[dict[str, object]], bond_cutoff_a: float) -> li
         for molecule_index, component in enumerate(assign_molecules(frame_rows, bond_cutoff_a)):
             atom_indices = [int(row["atom_index"]) for row in component]
             symbols = [str(row["symbol"]) for row in component]
+            species = molecule_species(symbols)
+            oxygen_atom_indices = sorted(int(row["atom_index"]) for row in component if row["symbol"] == "O")
+            hydrogen_atom_indices = sorted(int(row["atom_index"]) for row in component if row["symbol"] == "H")
             dft_charge = sum(float(row["dft_iao_charge_e"]) for row in component)
             mlip_charge = sum(float(row["mlip_predicted_charge_e"]) for row in component)
             raw_iao_charge = sum(float(row["dft_raw_iao_charge_e"]) for row in component)
             formal_charge = sum(float(row["formal_charge_e"]) for row in component)
+            instance_index = frame // frames_per_instance
+            local_frame = frame % frames_per_instance
+            if species in {"HO", "H2O", "H3O"} and oxygen_atom_indices:
+                molecule_track_id = f"O:{oxygen_atom_indices[0]}"
+            elif species == "H2" and len(hydrogen_atom_indices) == 2:
+                molecule_track_id = f"H2:{hydrogen_atom_indices[0]}-{hydrogen_atom_indices[1]}"
+            elif species == "H" and len(hydrogen_atom_indices) == 1:
+                molecule_track_id = f"H:{hydrogen_atom_indices[0]}"
+            else:
+                molecule_track_id = "atoms:" + "-".join(str(index) for index in atom_indices)
             molecule_rows.append(
                 {
                     "model": str(component[0]["model"]),
                     "frame": frame,
+                    "instance_index": instance_index,
+                    "local_frame": local_frame,
                     "molecule_index": molecule_index,
-                    "species": molecule_species(symbols),
+                    "species": species,
                     "n_atoms": len(component),
                     "atom_indices": " ".join(str(index) for index in atom_indices),
+                    "oxygen_atom_index": "" if not oxygen_atom_indices else oxygen_atom_indices[0],
+                    "hydrogen_atom_indices": " ".join(str(index) for index in hydrogen_atom_indices),
+                    "molecule_track_id": molecule_track_id,
                     "formula_symbols": " ".join(symbols),
                     "formal_charge_sum_e": formal_charge,
                     "dft_raw_iao_charge_sum_e": raw_iao_charge,
@@ -344,31 +382,6 @@ def write_joined_csv(path: Path, rows: list[dict[str, object]]) -> None:
         writer.writerows(rows)
 
 
-def write_metrics_csv(path: Path, model_rows: dict[str, list[dict[str, object]]]) -> None:
-    fieldnames = ["model", "subset", "n", "mae_e", "rmse_e", "bias_e", "r2"]
-    with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
-        writer.writeheader()
-        for model_key, rows in sorted(model_rows.items()):
-            for subset, subset_rows in [("all", rows), *symbol_subsets(rows)]:
-                row = {"model": model_key, "subset": subset}
-                row.update(metrics(subset_rows))
-                writer.writerow(row)
-
-
-def write_molecule_metrics_csv(path: Path, model_rows: dict[str, list[dict[str, object]]]) -> None:
-    fieldnames = ["model", "subset", "n", "mae_e", "rmse_e", "bias_e", "r2"]
-    with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
-        writer.writeheader()
-        for model_key, rows in sorted(model_rows.items()):
-            subsets = [("all", rows), *species_subsets(rows)]
-            for subset, subset_rows in subsets:
-                row = {"model": model_key, "subset": subset}
-                row.update(metrics(subset_rows))
-                writer.writerow(row)
-
-
 def symbol_subsets(rows: list[dict[str, object]]) -> list[tuple[str, list[dict[str, object]]]]:
     symbols = sorted({str(row["symbol"]) for row in rows})
     return [(symbol, [row for row in rows if row["symbol"] == symbol]) for symbol in symbols]
@@ -379,101 +392,106 @@ def species_subsets(rows: list[dict[str, object]]) -> list[tuple[str, list[dict[
     return [(name, [row for row in rows if row["species"] == name]) for name in species]
 
 
-def axis_limits(rows: list[dict[str, object]]) -> tuple[float, float]:
-    values = [
-        *(float(row["dft_iao_charge_e"]) for row in rows),
-        *(float(row["mlip_predicted_charge_e"]) for row in rows),
-    ]
+def choose_focus_instance(rows: list[dict[str, object]]) -> int:
+    by_instance: dict[int, list[dict[str, object]]] = {}
+    for row in rows:
+        by_instance.setdefault(int(row["instance_index"]), []).append(row)
+
+    candidates: list[tuple[int, int, int, int]] = []
+    for instance_index, instance_rows in by_instance.items():
+        h2_rows = [row for row in instance_rows if row["species"] == "H2"]
+        if not h2_rows:
+            continue
+        local_frames = sorted({int(row["local_frame"]) for row in h2_rows})
+        span = local_frames[-1] - local_frames[0]
+        candidates.append((len(local_frames), span, -instance_index, instance_index))
+
+    if not candidates:
+        raise RuntimeError("No instance contains an H2 molecule; cannot choose a focused H2-formation run")
+    return max(candidates)[3]
+
+
+def charge_limits(rows: list[dict[str, object]], value_keys: list[str]) -> tuple[float, float]:
+    values = [float(row[key]) for row in rows for key in value_keys]
     lo = min(values)
     hi = max(values)
     pad = 0.05 * max(hi - lo, 1.0)
     return lo - pad, hi + pad
 
 
-def plot_parity(path: Path, rows: list[dict[str, object]], title: str, dpi: int) -> None:
+def plot_combined_molecule_charge_evolution(
+    path: Path,
+    dft_rows: list[dict[str, object]],
+    mlip_rows_by_model: dict[str, list[dict[str, object]]],
+    title: str,
+    dft_value_key: str,
+    mlip_value_key: str,
+    ylabel: str,
+    colors: dict[str, str],
+    dpi: int,
+    frames_per_instance: int,
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    fig, ax = plt.subplots(figsize=(6.2, 5.8), constrained_layout=True)
-    colors = {"H": "#1f77b4", "O": "#d62728"}
-    for symbol, subset in symbol_subsets(rows):
-        ax.scatter(
-            [float(row["dft_iao_charge_e"]) for row in subset],
-            [float(row["mlip_predicted_charge_e"]) for row in subset],
-            s=16,
-            alpha=0.68,
-            linewidth=0.2,
-            edgecolor="white",
-            color=colors.get(symbol, "#4c4c4c"),
-            label=f"{symbol} (n={len(subset)})",
-        )
+    fig, axes = plt.subplots(3, 1, figsize=(10.0, 11.0), sharex=True, constrained_layout=True)
+    all_rows = list(dft_rows)
+    for rows in mlip_rows_by_model.values():
+        all_rows.extend(rows)
+    ylo, yhi = charge_limits(all_rows, [dft_value_key, mlip_value_key])
+    panels = [
+        (axes[0], "DFT", dft_rows, dft_value_key),
+        (axes[1], "polar1m", mlip_rows_by_model["polar1m"], mlip_value_key),
+        (axes[2], "polar1s", mlip_rows_by_model["polar1s"], mlip_value_key),
+    ]
+    for ax, panel_title, rows, value_key in panels:
+        subsets: dict[str, list[dict[str, object]]] = {}
+        for row in rows:
+            subsets.setdefault(str(row["species"]), []).append(row)
+        used_labels: set[str] = set()
+        for species in sorted(subsets):
+            subset = sorted(
+                subsets[species],
+                key=lambda row: (
+                    int(row["local_frame"]),
+                    int(row["molecule_index"]),
+                    int(row["frame"]),
+                ),
+            )
+            label = species if species not in used_labels else None
+            used_labels.add(species)
+            ax.scatter(
+                [int(row["local_frame"]) for row in subset],
+                [float(row[value_key]) for row in subset],
+                s=28,
+                alpha=0.9,
+                linewidth=0.2,
+                edgecolor="white",
+                color=colors.get(species, "#4c4c4c"),
+                label=label,
+            )
+            traces: dict[str, list[dict[str, object]]] = {}
+            for row in subset:
+                traces.setdefault(str(row["molecule_track_id"]), []).append(row)
+            for trace_rows in traces.values():
+                ordered = sorted(trace_rows, key=lambda row: int(row["local_frame"]))
+                if len(ordered) < 2:
+                    continue
+                ax.plot(
+                    [int(row["local_frame"]) for row in ordered],
+                    [float(row[value_key]) for row in ordered],
+                    color=colors.get(species, "#4c4c4c"),
+                    alpha=0.75,
+                    linewidth=1.6,
+                )
+        ax.set_ylabel(ylabel)
+        ax.set_ylim(ylo, yhi)
+        ax.set_title(panel_title)
+        ax.grid(True, color="0.88", linewidth=0.7)
+        ax.legend(frameon=False, loc="best", ncol=2)
 
-    lo, hi = axis_limits(rows)
-    ax.plot([lo, hi], [lo, hi], color="0.15", linestyle="--", linewidth=1.0, label="y=x")
-    m = metrics(rows)
-    ax.text(
-        0.04,
-        0.96,
-        f"n={int(m['n'])}\nMAE={m['mae_e']:.4g} e\nRMSE={m['rmse_e']:.4g} e\nR2={m['r2']:.4g}",
-        transform=ax.transAxes,
-        va="top",
-        ha="left",
-        fontsize=9,
-        bbox={"facecolor": "white", "edgecolor": "0.82", "alpha": 0.9, "pad": 4},
-    )
-    ax.set_xlim(lo, hi)
-    ax.set_ylim(lo, hi)
-    ax.set_aspect("equal", adjustable="box")
-    ax.set_xlabel("DFT IAO partial charge (e)")
-    ax.set_ylabel("MLIP predicted charge (e)")
-    ax.set_title(title)
-    ax.grid(True, color="0.88", linewidth=0.7)
-    ax.legend(frameon=False, loc="lower right")
-    fig.savefig(path, dpi=dpi)
-    plt.close(fig)
-
-
-def plot_molecule_parity(path: Path, rows: list[dict[str, object]], title: str, dpi: int) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fig, ax = plt.subplots(figsize=(6.4, 5.9), constrained_layout=True)
-    colors = {
-        "H": "#1f77b4",
-        "H2": "#17becf",
-        "HO": "#2ca02c",
-        "H2O": "#d62728",
-        "H3O": "#9467bd",
-    }
-    for species, subset in species_subsets(rows):
-        ax.scatter(
-            [float(row["dft_iao_charge_e"]) for row in subset],
-            [float(row["mlip_predicted_charge_e"]) for row in subset],
-            s=24,
-            alpha=0.72,
-            linewidth=0.25,
-            edgecolor="white",
-            color=colors.get(species, "#4c4c4c"),
-            label=f"{species} (n={len(subset)})",
-        )
-
-    lo, hi = axis_limits(rows)
-    ax.plot([lo, hi], [lo, hi], color="0.15", linestyle="--", linewidth=1.0, label="y=x")
-    m = metrics(rows)
-    ax.text(
-        0.04,
-        0.96,
-        f"n={int(m['n'])}\nMAE={m['mae_e']:.4g} e\nRMSE={m['rmse_e']:.4g} e\nR2={m['r2']:.4g}",
-        transform=ax.transAxes,
-        va="top",
-        ha="left",
-        fontsize=9,
-        bbox={"facecolor": "white", "edgecolor": "0.82", "alpha": 0.9, "pad": 4},
-    )
-    ax.set_xlim(lo, hi)
-    ax.set_ylim(lo, hi)
-    ax.set_aspect("equal", adjustable="box")
-    ax.set_xlabel("DFT molecule charge from corrected IAO sum (e)")
-    ax.set_ylabel("MLIP molecule predicted charge sum (e)")
-    ax.set_title(title)
-    ax.grid(True, color="0.88", linewidth=0.7)
-    ax.legend(frameon=False, loc="lower right")
+    axes[2].set_xlabel(f"Frame within 10-frame H2-formation instance (0-{frames_per_instance - 1})")
+    axes[2].set_xlim(-0.25, frames_per_instance - 1 + 0.25)
+    axes[2].set_xticks(list(range(frames_per_instance)))
+    fig.suptitle(title)
     fig.savefig(path, dpi=dpi)
     plt.close(fig)
 
@@ -489,14 +507,21 @@ def write_iao_sum_csv(path: Path, sums: dict[int, float]) -> None:
 def main() -> None:
     args = parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
+    if args.frames_per_instance <= 0:
+        raise RuntimeError("--frames-per-instance must be positive")
+    if args.expected_frames % args.frames_per_instance != 0:
+        raise RuntimeError(
+            f"expected_frames={args.expected_frames} is not divisible by "
+            f"frames_per_instance={args.frames_per_instance}"
+        )
 
     status(f"Reading DFT IAO partial charges from {args.dft_dir}")
     dft, iao_sums = load_dft_iao_charges(args.dft_dir, args.expected_frames)
     write_iao_sum_csv(args.output_dir / "dft_iao_charge_sums.csv", iao_sums)
     status(f"Parsed {len(dft)} DFT atom charges across {len(iao_sums)} frames")
 
-    model_rows: dict[str, list[dict[str, object]]] = {}
-    model_molecule_rows: dict[str, list[dict[str, object]]] = {}
+    focused_molecule_rows_by_model: dict[str, list[dict[str, object]]] = {}
+    chosen_focus_instance: int | None = args.focus_instance
     for force_csv in discover_force_csvs(args.mlip_root, args.model):
         model_key = model_key_from_csv(force_csv)
         status(f"Joining MLIP charges for {model_key}: {force_csv.name}")
@@ -511,8 +536,7 @@ def main() -> None:
         if frames != list(range(args.expected_frames)):
             missing = sorted(set(range(args.expected_frames)) - set(frames))
             raise RuntimeError(f"{model_key} joined frames are incomplete; missing={missing}")
-        model_rows[model_key] = rows
-        molecule_rows = collect_molecules(rows, args.bond_cutoff)
+        molecule_rows = collect_molecules(rows, args.bond_cutoff, args.frames_per_instance)
         found_species = {str(row["species"]) for row in molecule_rows}
         unexpected_species = sorted(found_species - EXPECTED_SPECIES)
         missing_species = sorted(EXPECTED_SPECIES - found_species)
@@ -520,21 +544,55 @@ def main() -> None:
             status(f"Warning: {model_key} found unexpected species: {', '.join(unexpected_species)}")
         if missing_species:
             status(f"Warning: {model_key} did not find expected species: {', '.join(missing_species)}")
-        model_molecule_rows[model_key] = molecule_rows
 
         write_joined_csv(args.output_dir / f"{model_key}_dft_iao_vs_mlip_charges.csv", rows)
         write_joined_csv(args.output_dir / f"{model_key}_molecule_dft_iao_vs_mlip_charges.csv", molecule_rows)
-        plot_molecule_parity(
-            args.output_dir / f"{model_key}_molecule_dft_iao_vs_mlip_charge_parity.png",
-            molecule_rows,
-            f"{model_key} molecule charges, cutoff={args.bond_cutoff:g} A",
-            args.dpi,
+        if chosen_focus_instance is None:
+            chosen_focus_instance = choose_focus_instance(molecule_rows)
+        focused_molecule_rows = [row for row in molecule_rows if int(row["instance_index"]) == chosen_focus_instance]
+        if not focused_molecule_rows:
+            raise RuntimeError(f"{model_key} has no molecule rows for focus instance {chosen_focus_instance}")
+        focus_frames = sorted(
+            {int(row["local_frame"]) for row in focused_molecule_rows if str(row["species"]) == "H2"}
         )
+        if focus_frames:
+            status(
+                f"Using {model_key} focus instance {chosen_focus_instance} with H2 on local frames "
+                f"{focus_frames[0]}-{focus_frames[-1]}"
+            )
+        else:
+            status(f"Using {model_key} focus instance {chosen_focus_instance}")
+        focused_molecule_rows_by_model[model_key] = focused_molecule_rows
 
-    if not model_rows:
+    if not focused_molecule_rows_by_model:
         raise RuntimeError("No MLIP models with numeric predicted_charge_e were plotted")
-    write_metrics_csv(args.output_dir / "charge_parity_metrics.csv", model_rows)
-    write_molecule_metrics_csv(args.output_dir / "molecule_charge_parity_metrics.csv", model_molecule_rows)
+    required_models = {"polar1m", "polar1s"}
+    missing_models = sorted(required_models - set(focused_molecule_rows_by_model))
+    if missing_models:
+        raise RuntimeError(f"Combined figure requires models {sorted(required_models)}; missing={missing_models}")
+    if chosen_focus_instance is None:
+        raise RuntimeError("Could not determine a focus instance")
+    plot_combined_molecule_charge_evolution(
+        args.output_dir / f"focused_instance_{chosen_focus_instance}_molecule_charge_evolution.png",
+        focused_molecule_rows_by_model["polar1m"],
+        {
+            "polar1m": focused_molecule_rows_by_model["polar1m"],
+            "polar1s": focused_molecule_rows_by_model["polar1s"],
+        },
+        f"Molecule charges for H2-formation instance {chosen_focus_instance}, cutoff={args.bond_cutoff:g} A",
+        dft_value_key="dft_iao_charge_e",
+        mlip_value_key="mlip_predicted_charge_e",
+        ylabel="Molecular charge (e)",
+        colors={
+            "H": "#E69F00",
+            "H2": "#56B4E9",
+            "HO": "#8C564B",
+            "H2O": "#9467BD",
+            "H3O": "#CC79A7",
+        },
+        dpi=args.dpi,
+        frames_per_instance=args.frames_per_instance,
+    )
     status(f"Wrote plots and CSVs to {args.output_dir}")
 
 
