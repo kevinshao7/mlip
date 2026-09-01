@@ -8,11 +8,9 @@ from __future__ import annotations
 
 import argparse
 import importlib
-import importlib.util
 import re
 import shlex
 import shutil
-import sys
 from pathlib import Path
 
 from ase import Atoms
@@ -35,7 +33,6 @@ DEFAULT_GROUP_SIZE = 10
 ORCA_PAL_NPROCS = 24
 ORCA_MODULE = "orca/6.1.1"
 ORCA_ABSOLUTE_PATH = "/software/orca/6.1.1/orca"
-FAIRCHEM_ORCA_CALC = MLIP_DIR / "fairchem" / "src" / "fairchem" / "data" / "omol" / "orca" / "calc.py"
 FAIRCHEM_SRC = MLIP_DIR / "fairchem" / "src"
 FAIRCHEM_ORCA_BASIS = (
     MLIP_DIR / "fairchem" / "src" / "fairchem" / "data" / "omol" / "orca" / "basis" / "def2-tzvpd.bas"
@@ -95,10 +92,6 @@ def formal_charge(symbols: list[str]) -> int:
     return charge
 
 
-def spin_from_charge(charge: int) -> int:
-    return 2 if charge % 2 else 1
-
-
 def atoms_from_tuples(atoms: list[tuple[str, float, float, float]]) -> Atoms:
     return Atoms(
         symbols=[symbol for symbol, _x, _y, _z in atoms],
@@ -148,23 +141,14 @@ def read_xyz_frames(path: Path) -> list[tuple[str, list[tuple[str, float, float,
 
 
 def load_fairchem_orca_calc():
-    if FAIRCHEM_SRC.exists():
-        sys.path.insert(0, str(FAIRCHEM_SRC))
-
     try:
         return importlib.import_module("fairchem.data.omol.orca.calc")
-    except ImportError:
-        pass
-
-    if not FAIRCHEM_ORCA_CALC.exists():
-        return None
-
-    spec = importlib.util.spec_from_file_location("fairchem_omol_orca_calc", FAIRCHEM_ORCA_CALC)
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"Could not load fairchem ORCA calc module from {FAIRCHEM_ORCA_CALC}")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    except ImportError as exc:
+        fail(
+            "FairChem is required to generate ORCA inputs. Could not import "
+            "fairchem.data.omol.orca.calc; install/activate FairChem before running this script."
+        )
+        raise exc
 
 
 def make_input_with_fairchem(
@@ -400,11 +384,6 @@ def main() -> None:
         fail("--group-size must be >= 1")
 
     orca_calc = load_fairchem_orca_calc()
-    if orca_calc is None:
-        fail(
-            "Could not import fairchem.data.omol.orca.calc and could not load it from "
-            f"{FAIRCHEM_ORCA_CALC}"
-        )
 
     frames = read_xyz_frames(args.clusters)
     start, stop = parse_frames(args.frames, len(frames))
@@ -427,8 +406,8 @@ def main() -> None:
         metadata = parse_comment_metadata(comment)
         stem = stem_for_frame(frame_index)
         symbols = [symbol for symbol, _x, _y, _z in atoms]
-        charge = int(metadata.get("charge", formal_charge(symbols)))
-        multiplicity = int(metadata.get("spin", spin_from_charge(charge)))
+        charge = formal_charge(symbols)
+        multiplicity = 1
 
         inp_path = OUT_DIR / f"{stem}.inp"
         write_text_lf(inp_path, make_input_with_fairchem(orca_calc, atoms, charge, multiplicity))

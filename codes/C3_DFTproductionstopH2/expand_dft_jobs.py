@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """Compatibility launcher for the Python 3 ORCA input generator.
-
+  for f in expand/C3_DFTprod_stopH2_group_*.slurm; do echo "Submitting $f"; sbatch "$f"; done
 BlueHive's ``python`` may be Python 2.  Keep this file parseable there so
 ``python expand_dft_jobs.py`` can re-exec the real Python 3 implementation.
 """

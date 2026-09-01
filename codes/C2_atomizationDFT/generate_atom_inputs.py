@@ -1,17 +1,22 @@
 #!/usr/bin/env python3
-"""Generate isolated-atom ORCA inputs with the C_DFTproduction settings."""
+"""Generate isolated-atom ORCA inputs with FairChem's ORCA writer."""
 
 from __future__ import annotations
 
+import importlib
 import shutil
 import re
 from pathlib import Path
 
+from ase import Atoms
+
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-PRODUCTION_DIR = SCRIPT_DIR.parent / "C_DFTproduction"
-PRODUCTION_TEMPLATE = PRODUCTION_DIR / "base.inp"
-PRODUCTION_BASIS = PRODUCTION_DIR / "def2-tzvpd.bas"
+MLIP_DIR = SCRIPT_DIR.parents[1]
+FAIRCHEM_SRC = MLIP_DIR / "fairchem" / "src"
+FAIRCHEM_ORCA_BASIS = (
+    FAIRCHEM_SRC / "fairchem" / "data" / "omol" / "orca" / "basis" / "def2-tzvpd.bas"
+)
 LOCAL_BASIS = SCRIPT_DIR / "def2-tzvpd.bas"
 RUNS_DIR = SCRIPT_DIR / "runs"
 MANIFEST_PATH = SCRIPT_DIR / "manifest.csv"
@@ -24,49 +29,92 @@ ATOM_SPECS = [
     {"atom": "S", "charge": 0, "multiplicity": 3},
 ]
 
-REQUIRED_FRAGMENTS = [
-    "! wB97M-V def2-TZVPD EnGrad RIJCOSX def2/J NoUseSym DIIS NOSOSCF NormalConv DEFGRID3 ALLPOP",
-    "%pal nprocs 24 end",
-    'GTOName "def2-tzvpd.bas"',
-    '%nbo NBOKEYLIST = "$NBO NPA NBO E2PERT 0.1 $END" end',
-    "{{CHARGE}}",
-    "{{MULTIPLICITY}}",
-    "{{COORDINATES}}",
-]
-
 
 def fail(message: str) -> None:
     raise SystemExit(f"ERROR: {message}")
 
 
-def validate_template(text: str) -> None:
-    for fragment in REQUIRED_FRAGMENTS:
+def load_fairchem_orca_calc():
+    try:
+        return importlib.import_module("fairchem.data.omol.orca.calc")
+    except ImportError as exc:
+        fail(
+            "FairChem is required to generate ORCA inputs. Could not import "
+            "fairchem.data.omol.orca.calc; install/activate FairChem before running this script."
+        )
+        raise exc
+
+
+def ensure_orca_parallel_settings(text: str) -> str:
+    pal_line = f"%pal nprocs {ORCA_PAL_NPROCS} end"
+    lines = text.splitlines()
+    filtered_lines: list[str] = []
+    skip_pal_block = False
+    for line in lines:
+        stripped = line.strip()
+        if skip_pal_block:
+            if stripped.lower() == "end":
+                skip_pal_block = False
+            continue
+        if re.match(r"(?i)^%pal\b", stripped):
+            if stripped.lower() != "end" and not re.search(r"(?i)\bend\b", stripped):
+                skip_pal_block = True
+            continue
+        filtered_lines.append(line)
+
+    insert_at = 1 if filtered_lines and filtered_lines[0].lstrip().startswith("!") else 0
+    filtered_lines.insert(insert_at, pal_line)
+    return "\n".join(filtered_lines) + "\n"
+
+
+def validate_fairchem_input(text: str, charge: int, multiplicity: int, atom: str) -> None:
+    if re.search(r"{{[A-Z_]+}}", text):
+        fail(f"FairChem-generated ORCA input for {atom} contains template placeholders")
+    if "%loc" in text:
+        fail(f"FairChem-generated ORCA input for {atom} unexpectedly contains a %loc block")
+    stripped_lines = [line.strip() for line in text.splitlines()]
+    required_fragments = [
+        "! wB97M-V def2-TZVPD",
+        f"%pal nprocs {ORCA_PAL_NPROCS} end",
+        "EnGrad",
+        "RIJCOSX",
+        'GTOName "def2-tzvpd.bas"',
+        '%nbo NBOKEYLIST = "$NBO NPA NBO E2PERT 0.1 $END" end',
+        f"*xyz {charge} {multiplicity}",
+        f"{atom}   0.0 0.0 0.0",
+    ]
+    for fragment in required_fragments:
         if fragment not in text:
-            fail(f"Production template is missing required fragment: {fragment}")
-    if not text.endswith("\n"):
-        fail(f"Production template must end with a trailing newline: {PRODUCTION_TEMPLATE}")
+            fail(f"FairChem-generated ORCA input for {atom} is missing expected fragment: {fragment}")
+    if not stripped_lines or stripped_lines[-1] != "*":
+        fail(f"FairChem-generated ORCA input for {atom} must end with '*'")
 
 
-def render_input(template: str, charge: int, multiplicity: int, atom: str) -> str:
-    coordinates = f"{atom}   0.00000000   0.00000000   0.00000000"
-    rendered = template.replace("%pal nprocs 24 end", f"%pal nprocs {ORCA_PAL_NPROCS} end")
-    rendered = re.sub(
-        r"\n%loc\s*\n(?:.*\n)*?end\s*\n(?=\*xyz )",
-        "\n",
-        rendered,
+def make_input_with_fairchem(orca_calc, run_dir: Path, atom: str, charge: int, multiplicity: int) -> str:
+    from ase.calculators.orca import OrcaProfile
+
+    def compatible_orca_profile(command):
+        if isinstance(command, list):
+            command = command[0] or "orca"
+        return OrcaProfile(command)
+
+    orca_calc.OrcaProfile = compatible_orca_profile
+    run_dir.mkdir(parents=True, exist_ok=True)
+    transient_input = run_dir / "orca.inp"
+    if transient_input.exists():
+        transient_input.unlink()
+    orca_calc.write_orca_inputs(
+        Atoms(symbols=[atom], positions=[(0.0, 0.0, 0.0)]),
+        run_dir,
+        charge=charge,
+        mult=multiplicity,
     )
-    rendered = rendered.replace("{{CHARGE}}", str(charge))
-    rendered = rendered.replace("{{MULTIPLICITY}}", str(multiplicity))
-    rendered = rendered.replace("{{COORDINATES}}", coordinates)
-    if "{{" in rendered or "}}" in rendered:
-        fail(f"Unresolved placeholders remain in rendered ORCA input for {atom}")
-    if "%loc" in rendered:
-        fail(f"Rendered ORCA input still contains %loc block for {atom}")
-    if f"%pal nprocs {ORCA_PAL_NPROCS} end" not in rendered:
-        fail(f"Rendered ORCA input has wrong %pal setting for {atom}")
-    if f"*xyz {charge} {multiplicity}" not in rendered:
-        fail(f"Rendered ORCA input has wrong *xyz header for {atom}")
-    return rendered
+    if not transient_input.is_file():
+        fail(f"FairChem did not write expected transient ORCA input: {transient_input}")
+    text = ensure_orca_parallel_settings(transient_input.read_text(encoding="utf-8"))
+    transient_input.unlink()
+    validate_fairchem_input(text, charge, multiplicity, atom)
+    return text
 
 
 def write_text_lf(path: Path, text: str) -> None:
@@ -76,14 +124,11 @@ def write_text_lf(path: Path, text: str) -> None:
 
 
 def main() -> None:
-    if not PRODUCTION_TEMPLATE.is_file():
-        fail(f"Missing production template: {PRODUCTION_TEMPLATE}")
-    if not PRODUCTION_BASIS.is_file():
-        fail(f"Missing production basis file: {PRODUCTION_BASIS}")
+    orca_calc = load_fairchem_orca_calc()
+    if not FAIRCHEM_ORCA_BASIS.is_file():
+        fail(f"Missing FairChem ORCA basis file: {FAIRCHEM_ORCA_BASIS}")
 
-    template = PRODUCTION_TEMPLATE.read_text(encoding="utf-8")
-    validate_template(template)
-    shutil.copy2(PRODUCTION_BASIS, LOCAL_BASIS)
+    shutil.copy2(FAIRCHEM_ORCA_BASIS, LOCAL_BASIS)
 
     manifest_lines = ["atom,charge,multiplicity,run_dir,input_path,output_path"]
     for spec in ATOM_SPECS:
@@ -94,7 +139,7 @@ def main() -> None:
         run_dir = RUNS_DIR / atom
         inp_path = run_dir / f"{stem}.inp"
         out_path = run_dir / f"{stem}.out"
-        write_text_lf(inp_path, render_input(template, charge, multiplicity, atom))
+        write_text_lf(inp_path, make_input_with_fairchem(orca_calc, run_dir, atom, charge, multiplicity))
         shutil.copy2(LOCAL_BASIS, run_dir / LOCAL_BASIS.name)
         manifest_lines.append(
             f"{atom},{charge},{multiplicity},{run_dir.relative_to(SCRIPT_DIR)},"
