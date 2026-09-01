@@ -23,6 +23,7 @@ from types import ModuleType
 
 import numpy as np
 from ase import Atoms
+from ase.data import atomic_numbers
 from ase.io import write
 
 
@@ -48,6 +49,12 @@ STAGE_RE = re.compile(r"stage=(?P<stage>[A-Za-z0-9_]+)")
 JOB_ID_RE = re.compile(r"_(\d+)\.err$")
 LATTICE_RE = re.compile(r'Lattice="([^"]+)"')
 WORKER_HELPER: ModuleType | None = None
+FORMAL_CHARGES = {
+    "H": 1,
+    "N": -3,
+    "O": -2,
+    "S": -2,
+}
 
 
 @dataclass(frozen=True)
@@ -344,8 +351,17 @@ def frame_to_helper(frame: FrameData, helper: ModuleType):
 
 
 def charge_and_spin(symbols: np.ndarray) -> tuple[int, int]:
-    charge = int(sum(-2 if symbol == "O" else 1 for symbol in symbols))
-    spin = 2 if charge % 2 else 1
+    charge = 0
+    nuclear_charge = 0
+    for symbol in symbols:
+        symbol = str(symbol)
+        try:
+            charge += FORMAL_CHARGES[symbol]
+            nuclear_charge += int(atomic_numbers[symbol])
+        except KeyError as exc:
+            raise ValueError(f"No formal charge configured for {symbol!r}") from exc
+    n_electrons = nuclear_charge - charge
+    spin = 2 if n_electrons % 2 else 1
     return charge, spin
 
 

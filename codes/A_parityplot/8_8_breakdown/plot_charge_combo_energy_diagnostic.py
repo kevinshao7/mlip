@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""Make target-H breakdown plots colored by total system charge."""
+"""Make target-H breakdown plots colored by formal total system charge."""
 
 from __future__ import annotations
 
 import argparse
 import csv
 import importlib.util
-import re
 from pathlib import Path
 from types import ModuleType
 
@@ -14,7 +13,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-DFT_CHARGE_RE = re.compile(r"Total Charge\s+Charge\s+\.+\s+(-?\d+)")
 CHARGE_COLORS = {
     -2: "#8c564b",
     -1: "#9467bd",
@@ -80,12 +78,9 @@ def parse_args(breakdown: ModuleType) -> argparse.Namespace:
     )
     parser.add_argument(
         "--charge-source",
-        choices=("mlip", "dft", "formal"),
-        default="mlip",
-        help=(
-            "mlip uses mlip_charge_setting_e from the new summary CSV; "
-            "dft parses ORCA Total Charge; formal uses formal_charge_sum_e."
-        ),
+        choices=("formal",),
+        default="formal",
+        help="Formal charge only. Partial/predicted charge sources are deprecated.",
     )
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
@@ -106,32 +101,12 @@ def load_mlip_charges(summary_csv: Path, source: str) -> dict[int, int]:
             if row.get("status") != "ok":
                 continue
             frame = int(row["frame"])
-            if source == "mlip":
-                if "mlip_charge_setting_e" not in row or row["mlip_charge_setting_e"] == "":
-                    raise KeyError(
-                        f"{summary_csv} has no mlip_charge_setting_e column. "
-                        "Regenerate MLIP predictions with the fixed predict_singlepoints.py or use --charge-source formal."
-                    )
-                charges[frame] = int(round(float(row["mlip_charge_setting_e"])))
-            elif source == "formal":
+            if source == "formal":
                 charges[frame] = int(round(float(row["formal_charge_sum_e"])))
             else:
                 raise ValueError(f"Unsupported MLIP charge source: {source}")
     if not charges:
         raise RuntimeError(f"No charges loaded from {summary_csv}")
-    return charges
-
-
-def load_dft_charges(dft_dir: Path, breakdown: ModuleType) -> dict[int, int]:
-    charges: dict[int, int] = {}
-    for path in sorted(dft_dir.glob("*.out")):
-        frame = breakdown.frame_from_dft_path(path)
-        text = path.read_text(encoding="utf-8", errors="ignore")
-        match = DFT_CHARGE_RE.search(text)
-        if match:
-            charges[frame] = int(match.group(1))
-    if not charges:
-        raise RuntimeError(f"No DFT Total Charge lines found in {dft_dir}")
     return charges
 
 
@@ -240,10 +215,7 @@ def run_model(
         args.fractional_eps,
     )
 
-    if args.charge_source == "dft":
-        charges = load_dft_charges(args.dft_dir, breakdown)
-    else:
-        charges = load_mlip_charges(summary_csv, args.charge_source)
+    charges = load_mlip_charges(summary_csv, args.charge_source)
     records = attach_charges(records, charges)
 
     csv_path = output_dir / f"{model_key}_target_h_breakdown_by_total_charge.csv"

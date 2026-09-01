@@ -65,11 +65,10 @@ system charge instead of nearest atom type:
 python codes/A_parityplot/8_8_breakdown/plot_charge_combo_energy_diagnostic.py --model polar1m
 ```
 
-By default this uses `mlip_charge_setting_e` from the fixed MLIP summary CSV.
-Other available charge sources:
+This uses `formal_charge_sum_e` only. Partial/predicted charge sources are
+deprecated and intentionally unavailable:
 
 ```bash
-python codes/A_parityplot/8_8_breakdown/plot_charge_combo_energy_diagnostic.py --model polar1m --charge-source dft
 python codes/A_parityplot/8_8_breakdown/plot_charge_combo_energy_diagnostic.py --model polar1m --charge-source formal
 ```
 

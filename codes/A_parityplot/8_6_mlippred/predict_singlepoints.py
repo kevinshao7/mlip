@@ -36,7 +36,7 @@ DEFAULT_DTYPE = "float32"
 DEFAULT_FRAMES = "0,180"
 DEFAULT_SPIN = 1
 DEFAULT_EXTERNAL_FIELD = (0.0, 0.0, 0.0)
-FORMAL_CHARGES = {"O": -2.0, "H": 1.0}
+FORMAL_CHARGES = {"H": 1.0, "N": -3.0, "O": -2.0, "S": -2.0}
 
 MODEL_CONFIGS = {
     "polar1s": {"kind": "polar", "model_name": "polar-1-s", "label": "mace_polar_1s"},
@@ -203,20 +203,6 @@ def as_numpy(value: Any) -> np.ndarray:
     return np.asarray(value, dtype=float)
 
 
-def maybe_predicted_charges(calculator: Any, natoms: int) -> np.ndarray | None:
-    if "charges" in calculator.results:
-        charges = as_numpy(calculator.results["charges"]).reshape(-1)
-        if charges.shape != (natoms,):
-            raise ValueError(f"calc.results['charges'] has shape {charges.shape}; expected ({natoms},)")
-        return charges
-    if "spin_charge_density" in calculator.results:
-        p_spin = as_numpy(calculator.results["spin_charge_density"])
-        if p_spin.shape[:3] != (natoms, 2, 4):
-            raise ValueError(f"spin_charge_density shape {p_spin.shape}; expected ({natoms}, 2, 4)")
-        return p_spin[:, 0, 0] + p_spin[:, 1, 0]
-    return None
-
-
 def force_stats(forces: np.ndarray) -> tuple[float, float]:
     vector_norms = np.linalg.norm(forces, axis=1)
     max_force = float(np.max(vector_norms)) if vector_norms.size else 0.0
@@ -298,7 +284,6 @@ SUMMARY_FIELDS = [
     "rms_force_eV_A",
     "formal_charge_sum_e",
     "mlip_charge_setting_e",
-    "predicted_charge_sum_e",
     "status",
     "error",
 ]
@@ -311,7 +296,6 @@ FORCE_FIELDS = [
     "y_A",
     "z_A",
     "formal_charge_e",
-    "predicted_charge_e",
     "force_x_eV_A",
     "force_y_eV_A",
     "force_z_eV_A",
@@ -345,15 +329,12 @@ def evaluate(args: argparse.Namespace) -> tuple[int, tuple[Path, Path, Path]]:
             forces = np.asarray(atoms.get_forces(), dtype=float)
             max_force, rms_force = force_stats(forces)
             formal_charges = np.asarray(atoms.arrays["formal_charge_e"], dtype=float)
-            predicted_charges = maybe_predicted_charges(calculator, len(atoms))
 
             atoms.info["mlip_model_key"] = args.model
             atoms.info["mlip_model_name"] = config["model_name"]
             atoms.info["mlip_charge_setting_e"] = charge_setting
             atoms.info["mlip_energy_eV"] = energy_ev
             atoms.arrays["mlip_forces_eV_A"] = forces
-            if predicted_charges is not None:
-                atoms.arrays["mlip_predicted_charge_e"] = predicted_charges
 
             append_row(
                 summary_csv,
@@ -373,9 +354,6 @@ def evaluate(args: argparse.Namespace) -> tuple[int, tuple[Path, Path, Path]]:
                     "rms_force_eV_A": f"{rms_force:.12g}",
                     "formal_charge_sum_e": f"{float(np.sum(formal_charges)):.12g}",
                     "mlip_charge_setting_e": charge_setting,
-                    "predicted_charge_sum_e": ""
-                    if predicted_charges is None
-                    else f"{float(np.sum(predicted_charges)):.12g}",
                     "status": "ok",
                     "error": "",
                 },
@@ -385,7 +363,6 @@ def evaluate(args: argparse.Namespace) -> tuple[int, tuple[Path, Path, Path]]:
             for atom_index, (symbol, position, formal_charge, force) in enumerate(
                 zip(symbols, atoms.positions, formal_charges, forces)
             ):
-                predicted_charge = "" if predicted_charges is None else f"{float(predicted_charges[atom_index]):.12g}"
                 append_row(
                     force_csv,
                     FORCE_FIELDS,
@@ -397,7 +374,6 @@ def evaluate(args: argparse.Namespace) -> tuple[int, tuple[Path, Path, Path]]:
                         "y_A": f"{float(position[1]):.10g}",
                         "z_A": f"{float(position[2]):.10g}",
                         "formal_charge_e": f"{float(formal_charge):.12g}",
-                        "predicted_charge_e": predicted_charge,
                         "force_x_eV_A": f"{float(force[0]):.12g}",
                         "force_y_eV_A": f"{float(force[1]):.12g}",
                         "force_z_eV_A": f"{float(force[2]):.12g}",
@@ -427,7 +403,6 @@ def evaluate(args: argparse.Namespace) -> tuple[int, tuple[Path, Path, Path]]:
                     "rms_force_eV_A": "",
                     "formal_charge_sum_e": "",
                     "mlip_charge_setting_e": "",
-                    "predicted_charge_sum_e": "",
                     "status": "error",
                     "error": str(exc),
                 },

@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Predict MACE-POLAR atomic charges for an ASE-readable trajectory.
+"""DEPRECATED: MACE-POLAR partial-charge prediction workflow.
+
+This script is retained only for historical inspection. Do not use it for new
+DFT/MLIP production or validation; current workflows must use formal integer
+charges only.
 
 Default input is the 20-frame focused H2-formation cluster trajectory extracted
 from the 15 GPa, 300 K r09_hot_w temperature ramp. The script streams frames,
@@ -15,6 +19,11 @@ import os
 import sys
 from pathlib import Path
 from typing import Any
+
+raise SystemExit(
+    "DEPRECATED: predictedcharges.py uses MLIP predicted partial charges. "
+    "Use formal integer charges only."
+)
 
 import numpy as np
 from ase import Atoms

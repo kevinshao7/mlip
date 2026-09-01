@@ -14,6 +14,7 @@ import shutil
 from pathlib import Path
 
 from ase import Atoms
+from ase.data import atomic_numbers
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -90,6 +91,12 @@ def formal_charge(symbols: list[str]) -> int:
         except KeyError as exc:
             raise ValueError(f"No formal charge configured for {symbol!r}") from exc
     return charge
+
+
+def spin_multiplicity(symbols: list[str], charge: int) -> int:
+    nuclear_charge = sum(int(atomic_numbers[symbol]) for symbol in symbols)
+    n_electrons = nuclear_charge - charge
+    return 2 if n_electrons % 2 else 1
 
 
 def atoms_from_tuples(atoms: list[tuple[str, float, float, float]]) -> Atoms:
@@ -407,7 +414,7 @@ def main() -> None:
         stem = stem_for_frame(frame_index)
         symbols = [symbol for symbol, _x, _y, _z in atoms]
         charge = formal_charge(symbols)
-        multiplicity = 1
+        multiplicity = spin_multiplicity(symbols, charge)
 
         inp_path = OUT_DIR / f"{stem}.inp"
         write_text_lf(inp_path, make_input_with_fairchem(orca_calc, atoms, charge, multiplicity))
