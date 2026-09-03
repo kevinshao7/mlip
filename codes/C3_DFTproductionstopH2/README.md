@@ -5,39 +5,33 @@ condensed condition-production trajectories in:
 
 `mlip/outputsfull/B1_conditionsproduction_stride100_xyz`
 
-It uses copied Slurm `.err` files in:
+Only `P100GPa_*` condition trajectories are processed. Every condensed frame
+in those trajectories is eligible. Pressure-ramp, temperature-ramp, and
+`production_hold` labels are not used as masks. Conditions are processed from
+high pressure/high `R` to low pressure/low `R`, and frames are scanned
+latest-first within each condition.
 
-`mlip/outputsfull/slurm`
-
-to identify each condition's `production_hold` window. The first 10% of that
-window is dropped. Conditions are processed from high pressure/high `R` to low
-pressure/low `R`, and eligible condensed XYZ frames are scanned latest-first
-within each condition.
-
-If a condition has no copied `.err` log containing `production_hold`, the
-extractor falls back to scanning that condition's full condensed XYZ instead of
-skipping it. This keeps the high-pressure `P100GPa_*` trajectories active even
-when their Slurm logs are absent.
-
-The cluster logic is the current C3 stop-H2 logic: same-element H2/N2 candidate
-pairs are selected when:
+The replacement extractor searches H-H, O-O, and N-N closest-approach pairs.
+All three pair types use the smaller of the ASE O-H and N-H covalent lengths and
+are selected when:
 
 ```text
-formed_cutoff <= distance <= near_cutoff
+0.8 * min(O-H, N-H) <= distance <= 1.0 * min(O-H, N-H)
 ```
 
-Each accepted cluster is the union of the connected components grown separately
-from the two seed atoms using:
-
-```text
-graph_cutoff = near_graph_cutoff_scale * seed_distance
-```
+Every atom within `1.5 * max(O-H, N-H)` of either seed is forcibly included.
+Starting from that full set, graph-connected atoms are recursively added using
+`1.1 * max(O-H, N-H)` as the edge cutoff. Charge filtering is disabled by
+default; `--max-abs-charge` enables an explicit filter. H-H, O-O, and N-N have
+independent per-frame, per-condition, and global quotas.
+Progress is printed every 50 scanned frames by default; change this with
+`--progress-every`.
 
 Default output:
 
-- `mlip/outputsfull/C3_DFTproductionstopH2/condition_production_stopH2_clusters.xyz`
-- `mlip/outputsfull/C3_DFTproductionstopH2/condition_production_stopH2_clusters_summary.csv`
-- `mlip/outputsfull/C3_DFTproductionstopH2/condition_production_stopH2_stage_windows.csv`
+- `mlip/outputsfull/C3_DFTproductionstopH2_ON/condition_production_ON_closest_approach.xyz`
+- `mlip/outputsfull/C3_DFTproductionstopH2_ON/condition_production_ON_closest_approach_summary.csv`
+- `mlip/outputsfull/C3_DFTproductionstopH2_ON/condition_production_ON_stage_windows.csv`
 
 Run cluster extraction from the repository root:
 
@@ -45,9 +39,9 @@ Run cluster extraction from the repository root:
 C:\Users\shaoq\AppData\Local\Programs\Python\Python312\python.exe .\mlip\codes\C3_DFTproductionstopH2\extract_condition_clusters.py --workers 8
 ```
 
-The default extraction cap is 2000 total clusters, with no more than 400
-clusters contributed by any single condition. Override with
-`--max-total-clusters` and `--max-clusters-per-condition` if needed.
+The defaults cap each pair type independently at 1000 total and 200 per
+condition. Override with `--max-total-per-pair` and
+`--max-per-condition-per-pair` if needed.
 
 Useful one-condition test:
 

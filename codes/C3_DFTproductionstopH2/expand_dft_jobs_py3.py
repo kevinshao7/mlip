@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate BlueHive ORCA input and grouped Slurm files for C3 stop-H2 clusters.
+r"""Generate BlueHive ORCA input and grouped Slurm files for C3 stop-H2 clusters.
   cd /gpfs/fs2/scratch/kshao4/mlip/codes/C3_DFTproductionstopH2 && for f in expand/C3_DFTprod_stopH2_group_*.slurm; do echo "Submitting $f"; sbatch "$f"; done
 Submit generated jobs with:
     for f in expand/*.slurm; do sbatch "$f"; done
@@ -7,7 +7,7 @@ Submit generated jobs with:
 clean and run on bluehive:
  python3 expand_dft_jobs.py --clean --frames all && rm -rf /gpfs/fs2/scratch/kshao4/mlip/outputsfull/C3_DFTproductionstopH2/dft_outputs /gpfs/fs2/scratch/kshao4/mlip/outputsfull/C3_DFTproductionstopH2/processed_dft_outputs && mkdir -p /gpfs/fs2/scratch/kshao4/mlip/outputsfull/C3_DFTproductionstopH2/dft_outputs && for f in expand/C3_DFTprod_stopH2_group_*.slurm; do echo "Submitting $f"; sbatch "$f"; done
 
-
+& "C:\Program Files\Git\usr\bin\scp.exe" -r "kshao4@bluehive.circ.rochester.edu:/home/kshao4/scratch/mlip/outputsfull/C3_DFTproductionstopH2/dft_outputs/" "C:\Users\shaoq\Documents\Mainz\mlip\outputsfull\C3_DFTproductionstopH2\"
 
 """
 from __future__ import annotations
@@ -30,8 +30,8 @@ MLIP_DIR = SCRIPT_DIR.parents[1]
 DEFAULT_CLUSTER_XYZ = (
     MLIP_DIR
     / "outputsfull"
-    / "C3_DFTproductionstopH2"
-    / "condition_production_stopH2_clusters.xyz"
+    / "C3_DFTproductionstopH2_ON"
+    / "condition_production_ON_closest_approach.xyz"
 )
 STEM_PREFIX = "C3_DFTprod_stopH2"
 GROUP_PREFIX = "C3_DFTprod_stopH2_group"

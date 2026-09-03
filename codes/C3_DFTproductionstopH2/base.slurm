@@ -28,7 +28,7 @@ fi
 
 MLIP_DIR="${MLIP_DIR:-/gpfs/fs2/scratch/kshao4/mlip}"
 INPUT_DIR="$MLIP_DIR/codes/C3_DFTproductionstopH2"
-OUTPUT_DIR="$MLIP_DIR/outputsfull/C3_DFTproductionstopH2/dft_outputs"
+OUTPUT_DIR="$MLIP_DIR/outputsfull/C3_DFTproductionstopH2_ON/dft_outputs"
 BASIS_PATH="$INPUT_DIR/def2-tzvpd.bas"
 ORCA_COMMAND="${ORCA_COMMAND:-/software/orca/6.1.1/orca}"
 STEMS=(
@@ -93,7 +93,9 @@ for STEM in "${STEMS[@]}"; do
     fi
 
     if [[ -f "$OUTPUT_PATH" ]] && grep -q "FINAL SINGLE POINT ENERGY" "$OUTPUT_PATH" && grep -q "ORCA TERMINATED NORMALLY" "$OUTPUT_PATH"; then
-        OUTPUT_CHARGE="$(awk '/Total Charge[[:space:]]+Charge/ { charge=$NF } END { print charge }' "$OUTPUT_PATH")"
+        # Use the first General Settings value. Never use a population-analysis
+        # "total charge" or metadata from a newly regenerated input.
+        OUTPUT_CHARGE="$(awk '/Total Charge[[:space:]]+Charge[[:space:]]+\.\.\.\./ { print $NF; exit }' "$OUTPUT_PATH")"
         if [[ "$OUTPUT_CHARGE" == "$EXPECTED_CHARGE" ]]; then
             echo "Skipping completed $OUTPUT_PATH (verified charge $OUTPUT_CHARGE)"
             continue
@@ -110,7 +112,7 @@ for STEM in "${STEMS[@]}"; do
     fi
     grep -q "FINAL SINGLE POINT ENERGY" "$TEMP_OUTPUT_PATH"
     grep -q "ORCA TERMINATED NORMALLY" "$TEMP_OUTPUT_PATH"
-    OUTPUT_CHARGE="$(awk '/Total Charge[[:space:]]+Charge/ { charge=$NF } END { print charge }' "$TEMP_OUTPUT_PATH")"
+    OUTPUT_CHARGE="$(awk '/Total Charge[[:space:]]+Charge[[:space:]]+\.\.\.\./ { print $NF; exit }' "$TEMP_OUTPUT_PATH")"
     if [[ "$OUTPUT_CHARGE" != "$EXPECTED_CHARGE" ]]; then
         rm -f "$TEMP_OUTPUT_PATH"
         echo "Charge verification failed for $STEM: ORCA reported ${OUTPUT_CHARGE:-unknown}, expected $EXPECTED_CHARGE" >&2
