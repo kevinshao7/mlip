@@ -3,6 +3,12 @@
   cd /gpfs/fs2/scratch/kshao4/mlip/codes/C3_DFTproductionstopH2 && for f in expand/C3_DFTprod_stopH2_group_*.slurm; do echo "Submitting $f"; sbatch "$f"; done
 Submit generated jobs with:
     for f in expand/*.slurm; do sbatch "$f"; done
+
+clean and run on bluehive:
+ python3 expand_dft_jobs.py --clean --frames all && rm -rf /gpfs/fs2/scratch/kshao4/mlip/outputsfull/C3_DFTproductionstopH2/dft_outputs /gpfs/fs2/scratch/kshao4/mlip/outputsfull/C3_DFTproductionstopH2/processed_dft_outputs && mkdir -p /gpfs/fs2/scratch/kshao4/mlip/outputsfull/C3_DFTproductionstopH2/dft_outputs && for f in expand/C3_DFTprod_stopH2_group_*.slurm; do echo "Submitting $f"; sbatch "$f"; done
+
+
+
 """
 from __future__ import annotations
 
@@ -331,7 +337,10 @@ def validate_rendered_slurm(slurm_text: str, group_stem: str, expected_stems: li
         "export OPENBLAS_NUM_THREADS=1",
         'INPUT_PATH="$MLIP_DIR/codes/C3_DFTproductionstopH2/expand/${STEM}.inp"',
         'OUTPUT_PATH="$OUTPUT_DIR/${STEM}.out"',
-        '"$ORCA_COMMAND" "$INPUT_PATH" > "$OUTPUT_PATH"',
+        'TEMP_OUTPUT_PATH="$OUTPUT_DIR/${STEM}.out.tmp.$$"',
+        'EXPECTED_CHARGE="$(awk \'tolower($1) == "*xyz" { print $2; exit }\' "$INPUT_PATH")"',
+        'if ! "$ORCA_COMMAND" "$INPUT_PATH" > "$TEMP_OUTPUT_PATH"; then',
+        'mv -f "$TEMP_OUTPUT_PATH" "$OUTPUT_PATH"',
     ]
     for required_line in required_exact_lines:
         if required_line not in stripped_lines:
@@ -354,8 +363,10 @@ def validate_rendered_slurm(slurm_text: str, group_stem: str, expected_stems: li
             ("mpirun log line", r'^echo "mpirun=\$\(command -v mpirun\)"$'),
             ("per-STEM loop", r'^for STEM in "\$\{STEMS\[@\]\}"; do$'),
             ("OUTPUT_PATH assignment", r'^\s*OUTPUT_PATH="\$OUTPUT_DIR/\$\{STEM\}\.out"$'),
+            ("input-charge extraction", r'^\s*EXPECTED_CHARGE="\$\(awk '),
             ("OUTPUT_PATH completion check", r'^\s*if \[\[ -f "\$OUTPUT_PATH" \]\]'),
-            ("ORCA run command", r'^\s*"\$ORCA_COMMAND" "\$INPUT_PATH" > "\$OUTPUT_PATH"$'),
+            ("ORCA run command", r'^\s*if ! "\$ORCA_COMMAND" "\$INPUT_PATH" > "\$TEMP_OUTPUT_PATH"; then$'),
+            ("verified output replacement", r'^\s*mv -f "\$TEMP_OUTPUT_PATH" "\$OUTPUT_PATH"$'),
         ],
     )
 

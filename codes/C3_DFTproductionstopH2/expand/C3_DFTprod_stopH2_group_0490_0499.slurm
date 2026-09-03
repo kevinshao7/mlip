@@ -88,20 +88,43 @@ cd "$OUTPUT_DIR"
 for STEM in "${STEMS[@]}"; do
     INPUT_PATH="$MLIP_DIR/codes/C3_DFTproductionstopH2/expand/${STEM}.inp"
     OUTPUT_PATH="$OUTPUT_DIR/${STEM}.out"
+    TEMP_OUTPUT_PATH="$OUTPUT_DIR/${STEM}.out.tmp.$$"
 
     if [[ ! -f "$INPUT_PATH" ]]; then
         echo "Missing ORCA input: $INPUT_PATH" >&2
         exit 1
     fi
 
+    EXPECTED_CHARGE="$(awk 'tolower($1) == "*xyz" { print $2; exit }' "$INPUT_PATH")"
+    if [[ -z "$EXPECTED_CHARGE" ]]; then
+        echo "Could not read *xyz charge from $INPUT_PATH" >&2
+        exit 1
+    fi
+
     if [[ -f "$OUTPUT_PATH" ]] && grep -q "FINAL SINGLE POINT ENERGY" "$OUTPUT_PATH" && grep -q "ORCA TERMINATED NORMALLY" "$OUTPUT_PATH"; then
-        echo "Skipping completed $OUTPUT_PATH"
-        continue
+        OUTPUT_CHARGE="$(awk '/Total Charge[[:space:]]+Charge/ { charge=$NF } END { print charge }' "$OUTPUT_PATH")"
+        if [[ "$OUTPUT_CHARGE" == "$EXPECTED_CHARGE" ]]; then
+            echo "Skipping completed $OUTPUT_PATH (verified charge $OUTPUT_CHARGE)"
+            continue
+        fi
+        echo "Recalculating $STEM: existing output charge ${OUTPUT_CHARGE:-unknown}, expected $EXPECTED_CHARGE"
     fi
 
     echo "Starting $STEM"
-    "$ORCA_COMMAND" "$INPUT_PATH" > "$OUTPUT_PATH"
-    grep -q "FINAL SINGLE POINT ENERGY" "$OUTPUT_PATH"
-    grep -q "ORCA TERMINATED NORMALLY" "$OUTPUT_PATH"
+    rm -f "$TEMP_OUTPUT_PATH"
+    if ! "$ORCA_COMMAND" "$INPUT_PATH" > "$TEMP_OUTPUT_PATH"; then
+        rm -f "$TEMP_OUTPUT_PATH"
+        echo "ORCA failed for $STEM; preserving any existing $OUTPUT_PATH" >&2
+        exit 1
+    fi
+    grep -q "FINAL SINGLE POINT ENERGY" "$TEMP_OUTPUT_PATH"
+    grep -q "ORCA TERMINATED NORMALLY" "$TEMP_OUTPUT_PATH"
+    OUTPUT_CHARGE="$(awk '/Total Charge[[:space:]]+Charge/ { charge=$NF } END { print charge }' "$TEMP_OUTPUT_PATH")"
+    if [[ "$OUTPUT_CHARGE" != "$EXPECTED_CHARGE" ]]; then
+        rm -f "$TEMP_OUTPUT_PATH"
+        echo "Charge verification failed for $STEM: ORCA reported ${OUTPUT_CHARGE:-unknown}, expected $EXPECTED_CHARGE" >&2
+        exit 1
+    fi
+    mv -f "$TEMP_OUTPUT_PATH" "$OUTPUT_PATH"
     echo "Finished $STEM"
 done
