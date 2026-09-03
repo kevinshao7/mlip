@@ -28,10 +28,6 @@ MLIP_DIR = SCRIPT_DIR.parents[1]
 MACE_REPO = MLIP_DIR / "mace"
 CACHE_DIR = MLIP_DIR / "outputsfull" / ".cache"
 DATA_DIR = SCRIPT_DIR / "data"
-# Reuse the immutable target split used by D_MHFT by default.  This makes the
-# naive-versus-multihead comparison a like-for-like comparison without copying
-# the large generated extxyz files into a second workflow directory.
-SOURCE_DATA_DIR = MLIP_DIR / "codes" / "D_MHFT" / "data"
 RUNS_DIR = SCRIPT_DIR / "runs"
 C2_ATOMIZATION_E0S = (
     SCRIPT_DIR.parent / "C2_atomizationDFT"
@@ -122,6 +118,7 @@ def build_train_argv(args: argparse.Namespace) -> list[str]:
         f"--batch_size={args.batch_size}",
         f"--valid_batch_size={args.valid_batch_size}",
         f"--max_num_epochs={args.max_num_epochs}",
+        f"--lr={args.lr}",
         f"--log_interval={args.status_every}",
         f"--seed={args.seed}",
         f"--default_dtype={args.default_dtype}",
@@ -156,8 +153,8 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--name", default="polar1s_naive_orca_dft_e0")
     parser.add_argument("--foundation-model", default="polar-1-s")
-    parser.add_argument("--train-file", type=Path, default=SOURCE_DATA_DIR / "target_train.xyz")
-    parser.add_argument("--valid-file", type=Path, default=SOURCE_DATA_DIR / "target_valid.xyz")
+    parser.add_argument("--train-file", type=Path, default=DATA_DIR / "target_train.xyz")
+    parser.add_argument("--valid-file", type=Path, default=DATA_DIR / "target_valid.xyz")
     parser.add_argument("--run-dir", type=Path, default=RUNS_DIR / "polar1s_naive_orca_dft_e0")
     parser.add_argument(
         "--e0s",
@@ -177,6 +174,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=3)
     parser.add_argument("--default-dtype", default="float32", choices=["float32", "float64"])
     parser.add_argument("--device", default="cuda")
+    # Fine tuning begins from an already accurate foundation checkpoint.  The
+    # MACE base default (1e-2) is a pre-training-scale step and caused the
+    # validation error to jump after the first batch-size-one epoch.
+    parser.add_argument("--lr", type=float, default=1e-5)
     parser.add_argument("--num-workers", type=int, default=4)
     parser.add_argument("--restart-latest", action="store_true")
     parser.add_argument("--ema", action="store_true", default=True)

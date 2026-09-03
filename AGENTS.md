@@ -60,6 +60,31 @@ Compare that value to the MACE-POLAR predicted cluster energy.
 
 ## ORCA Workflow
 
+## CRITICAL DFT INVARIANT — FORMAL CHARGE IS MANDATORY
+
+**Never guess, inherit, or silently trust a charge value when creating, rerunning,
+converting, validating, or training on ORCA DFT data.** Every ORCA input must
+use the molecule's explicitly calculated formal charge, and that same value
+must be retained in the resulting extxyz `charge` metadata.
+
+For the current H/N/O target dataset, the required project convention is:
+
+```text
+formal charge = (+1 × number of H) + (−3 × number of N) + (−2 × number of O)
+```
+
+Before an ORCA run, calculate and record this value in the input. Before data
+conversion or MACE training, recompute it from the structure and require exact
+agreement with both the ORCA-declared total charge and extxyz `charge` field.
+**Reject mismatches from every training, validation, test, and evaluation
+dataset; do not repair them by guessing or carry them forward.** Preserve the
+raw ORCA files for auditability, but never train on charge-inconsistent data.
+
+For a chemistry outside this H/N/O convention, define and document the
+appropriate formal-charge rule before generating DFT inputs; fail validation if
+no rule is available. Charge and spin multiplicity are independent and both
+must be explicitly verified.
+
 Preserve ORCA `.inp`, `.out`, `.property.txt`, and related generated files for reproducibility.
 
 For ORCA outputs, verify both:

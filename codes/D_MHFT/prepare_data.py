@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import pickle
+import random
 import tarfile
 import tempfile
 import zlib
@@ -37,6 +38,7 @@ DEFAULT_ATOMIZATION = (
 DEFAULT_OMOL_ARCHIVE = (
     MLIP_DIR / "outputsfull" / "C1_omol" / "omol25_evaluation_inputs_250915.tar.gz"
 )
+FORMAL_CHARGES = {1: 1, 7: -3, 8: -2}
 
 
 def load_atomization_e0s(path: Path) -> dict[int, float]:
@@ -63,6 +65,28 @@ def write_e0_json(atomization_path: Path, output_path: Path) -> dict[int, float]
     return e0s
 
 
+def formal_charge(frame: Atoms) -> int:
+    """Calculate charge using the project H/N/O formal-charge convention."""
+    unsupported = sorted(set(int(z) for z in frame.numbers) - FORMAL_CHARGES.keys())
+    if unsupported:
+        raise ValueError(f"No formal-charge rule is defined for atomic numbers {unsupported}.")
+    return sum(FORMAL_CHARGES[int(z)] for z in frame.numbers)
+
+
+def write_formal_charge_valid_frames(input_path: Path, output_path: Path) -> tuple[int, int]:
+    """Keep only DFT target frames with charge metadata matching formal charge."""
+    frames = read(input_path, index=":")
+    if isinstance(frames, Atoms):
+        frames = [frames]
+    frames = list(frames)
+    valid = [frame for frame in frames if int(frame.info.get("charge", 0)) == formal_charge(frame)]
+    if not valid:
+        raise ValueError(f"No formal-charge-valid frames found in {input_path}")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    write(output_path, valid, format="extxyz")
+    return len(valid), len(frames) - len(valid)
+
+
 def split_extxyz(
     input_path: Path,
     train_path: Path,
@@ -70,6 +94,7 @@ def split_extxyz(
     test_path: Path | None,
     valid_fraction: float,
     test_fraction: float,
+    seed: int,
 ) -> dict[str, int]:
     frames = read(input_path, index=":")
     if isinstance(frames, Atoms):
@@ -77,6 +102,7 @@ def split_extxyz(
     frames = list(frames)
     if not frames:
         raise ValueError(f"No frames found in {input_path}")
+    random.Random(seed).shuffle(frames)
 
     n_total = len(frames)
     n_test = int(round(n_total * test_fraction)) if test_path else 0
@@ -251,12 +277,18 @@ def extract_omol_replay(
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--orca-dir", type=Path, default=DEFAULT_INPUT_DIR)
+    parser.add_argument(
+        "--source-target-all",
+        type=Path,
+        help="Existing extxyz source to filter into --target-all when raw ORCA outputs are unavailable.",
+    )
     parser.add_argument("--target-all", type=Path, default=DEFAULT_TARGET_ALL)
     parser.add_argument("--target-train", type=Path, default=DEFAULT_TARGET_TRAIN)
     parser.add_argument("--target-valid", type=Path, default=DEFAULT_TARGET_VALID)
     parser.add_argument("--target-test", type=Path, default=DEFAULT_TARGET_TEST)
     parser.add_argument("--valid-fraction", type=float, default=0.05)
     parser.add_argument("--test-fraction", type=float, default=0.05)
+    parser.add_argument("--seed", type=int, default=3, help="Random seed for reproducible target splits.")
     parser.add_argument("--atomization-energies", type=Path, default=DEFAULT_ATOMIZATION)
     parser.add_argument("--e0s-json", type=Path, default=DEFAULT_E0S)
     parser.add_argument("--omol-archive", type=Path, default=DEFAULT_OMOL_ARCHIVE)
@@ -276,6 +308,8 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    if args.source_target_all and not args.skip_orca:
+        raise ValueError("--source-target-all requires --skip-orca.")
 
     e0s = write_e0_json(args.atomization_energies, args.e0s_json)
     print(f"Wrote E0s for atomic numbers {sorted(e0s)} to {args.e0s_json}")
@@ -295,6 +329,10 @@ def main() -> None:
         )
         convert_outputs(orca_args)
 
+    source_target_all = args.source_target_all or args.target_all
+    kept, rejected = write_formal_charge_valid_frames(source_target_all, args.target_all)
+    print(f"Formal-charge validation: kept={kept} rejected={rejected}")
+
     counts = split_extxyz(
         args.target_all,
         args.target_train,
@@ -302,6 +340,7 @@ def main() -> None:
         args.target_test,
         args.valid_fraction,
         args.test_fraction,
+        args.seed,
     )
     print(
         "Split target data: "
