@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import sys
+import warnings
 from pathlib import Path
 
 from ase.data import atomic_numbers
@@ -15,6 +16,18 @@ from ase.data import atomic_numbers
 # archive.  PyTorch >= 2.6 defaults to weights_only=True and otherwise rejects
 # the archive before MACE starts.  Set this before importing MACE/e3nn.
 os.environ.setdefault("TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD", "1")
+
+# e3nn 0.4.4 is pinned by MACE and dynamically generates FX modules that
+# PyTorch 2.11 warns about while compiling them to TorchScript.  The generated
+# modules are valid; suppress only this known compatibility warning.
+warnings.filterwarnings(
+    "ignore",
+    message=(
+        "The TorchScript type system doesn't support instance-level annotations "
+        "on empty non-base types in `__init__`.*"
+    ),
+    category=UserWarning,
+)
 
 try:
     from torch.distributed.elastic.multiprocessing.errors import record
@@ -100,9 +113,7 @@ def build_train_argv(args: argparse.Namespace) -> list[str]:
     argv = [
         "run_train.py",
         f"--name={args.name}",
-        "--model=PolarMACE",
-        f"--foundation_model={args.foundation_model}",
-        "--multiheads_finetuning=False",
+        f"--model={'MACE' if args.delta_correction else 'PolarMACE'}",
         f"--train_file={train_file}",
         f"--valid_file={valid_file}",
         f"--atomic_numbers={args.atomic_numbers}",
@@ -118,8 +129,11 @@ def build_train_argv(args: argparse.Namespace) -> list[str]:
         f"--batch_size={args.batch_size}",
         f"--valid_batch_size={args.valid_batch_size}",
         f"--max_num_epochs={args.max_num_epochs}",
+        f"--patience={args.patience}",
+        f"--report_train_metrics={args.report_train_metrics}",
+        f"--report_train_metrics_interval={args.report_train_metrics_interval}",
         f"--lr={args.lr}",
-        f"--log_interval={args.status_every}",
+        f"--swa_lr={args.swa_lr}",
         f"--seed={args.seed}",
         f"--default_dtype={args.default_dtype}",
         f"--device={args.device}",
@@ -130,19 +144,23 @@ def build_train_argv(args: argparse.Namespace) -> list[str]:
         f"--results_dir={path_arg(paths['results'])}",
         f"--work_dir={path_arg(paths['work'])}",
     ]
+    argv.extend([
+        f"--foundation_model={args.foundation_model}",
+        "--multiheads_finetuning=False",
+    ])
+    if args.delta_correction:
+        argv.append("--delta_correction=True")
     if args.restart_latest:
         argv.append("--restart_latest")
     if args.ema:
         argv.extend(["--ema", f"--ema_decay={args.ema_decay}"])
-    # MACE's SWA ("Stage Two") also changes the loss weighting and lowers the
-    # learning rate for the final training phase.  Keep it mandatory so every
-    # fine-tuning run has the same convergence behavior.
-    argv.extend([
-        "--swa",
-        f"--start_swa={args.start_swa}",
-        f"--swa_energy_weight={args.swa_energy_weight}",
-        f"--swa_forces_weight={args.swa_forces_weight}",
-    ])
+    if not args.no_swa:
+        argv.extend([
+            "--swa",
+            f"--start_swa={args.start_swa}",
+            f"--swa_energy_weight={args.swa_energy_weight}",
+            f"--swa_forces_weight={args.swa_forces_weight}",
+        ])
     if args.dry_run:
         print(" ".join(argv))
         raise SystemExit(0)
@@ -151,15 +169,20 @@ def build_train_argv(args: argparse.Namespace) -> list[str]:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--name", default="polar1s_naive_orca_dft_e0")
+    parser.add_argument("--name", default="polar1s_delta_154")
     parser.add_argument("--foundation-model", default="polar-1-s")
-    parser.add_argument("--train-file", type=Path, default=DATA_DIR / "target_train.xyz")
-    parser.add_argument("--valid-file", type=Path, default=DATA_DIR / "target_valid.xyz")
-    parser.add_argument("--run-dir", type=Path, default=RUNS_DIR / "polar1s_naive_orca_dft_e0")
+    parser.add_argument("--train-file", type=Path, default=DATA_DIR / "target_train_154_delta.xyz")
+    parser.add_argument("--valid-file", type=Path, default=DATA_DIR / "target_valid_delta.xyz")
+    parser.add_argument("--run-dir", type=Path, default=RUNS_DIR / "polar1s_delta_154")
     parser.add_argument(
         "--e0s",
         default="foundation",
         help="'foundation' (default, embedded MACE-POLAR E0s), 'estimated', 'dft', or an E0 JSON path.",
+    )
+    parser.add_argument(
+        "--delta-correction", action="store_true", default=True,
+        help=("Freeze Polar's representation and train a zero-initialized correction readout on "
+              "DFT-minus-foundation labels. Its output must be added to the frozen foundation."),
     )
     parser.add_argument("--atomic-numbers", default="[1, 7, 8, 16]")
     # Preserve the established force-loss scale while making forces dominate
@@ -170,21 +193,50 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--valid-batch-size", type=int, default=1)
     parser.add_argument("--max-num-epochs", type=int, default=200)
-    parser.add_argument("--status-every", type=int, default=250)
+    parser.add_argument(
+        "--patience", type=int, default=20,
+        help="Stop after this many non-improving validation-loss epochs (default: 20).",
+    )
+    parser.add_argument(
+        "--status-every",
+        type=int,
+        default=250,
+        help="Accepted for backward compatibility; current MACE controls progress logging internally.",
+    )
     parser.add_argument("--seed", type=int, default=3)
     parser.add_argument("--default-dtype", default="float32", choices=["float32", "float64"])
     parser.add_argument("--device", default="cuda")
-    # Fine tuning begins from an already accurate foundation checkpoint.  The
-    # MACE base default (1e-2) is a pre-training-scale step and caused the
-    # validation error to jump after the first batch-size-one epoch.
-    parser.add_argument("--lr", type=float, default=1e-5)
+    # The default is a standalone residual model, not a full foundation update,
+    # so it needs a conventional train-from-scratch learning rate.
+    parser.add_argument(
+        "--lr", type=float, default=3e-4,
+        help="Adam learning rate for the small zero-initialized delta readout (default: 3e-4).",
+    )
+    parser.add_argument(
+        "--swa-lr",
+        type=float,
+        default=3e-4,
+        help="Stage Two learning rate (default: 3e-4, matching --lr).",
+    )
     parser.add_argument("--num-workers", type=int, default=4)
     parser.add_argument("--restart-latest", action="store_true")
-    parser.add_argument("--ema", action="store_true", default=True)
-    parser.add_argument("--ema-decay", type=float, default=0.99999)
+    parser.add_argument(
+        "--ema", action="store_true",
+        help="Enable EMA averaging (off by default for the small delta-learning run).",
+    )
+    parser.add_argument("--ema-decay", type=float, default=0.99)
     parser.add_argument("--start-swa", type=int, default=15)
     parser.add_argument("--swa-energy-weight", type=float, default=1.0)
     parser.add_argument("--swa-forces-weight", type=float, default=100_000.0)
+    parser.add_argument("--no-swa", action="store_true", default=True, help="Disable MACE Stage Two/SWA.")
+    parser.add_argument(
+        "--report-train-metrics", action="store_true", default=True,
+        help="Print full-train-set RMSE alongside validation RMSE periodically.",
+    )
+    parser.add_argument(
+        "--report-train-metrics-interval", type=int, default=5,
+        help="Epoch interval for full-train-set RMSE reporting (default: 5).",
+    )
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
 

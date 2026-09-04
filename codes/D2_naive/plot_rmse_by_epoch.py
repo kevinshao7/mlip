@@ -23,15 +23,16 @@ EPOCH_METRIC = re.compile(
 COLORS = {"Default": "#0072B2", "pt_head": "#D55E00"}
 
 
-def parse_session(log_path: Path, date: str) -> dict[str, list[tuple[int, float, float, float]]]:
-    """Return metrics from the final training session begun on ``date``."""
+def parse_session(log_path: Path, date: str | None) -> dict[str, list[tuple[int, float, float, float]]]:
+    """Return metrics from the latest session, or final session begun on ``date``."""
     lines = log_path.read_text(encoding="utf-8", errors="replace").splitlines()
     starts = [
         index for index, line in enumerate(lines)
-        if (match := SESSION_START.match(line)) and match["date"] == date
+        if (match := SESSION_START.match(line)) and (date is None or match["date"] == date)
     ]
     if not starts:
-        raise ValueError(f"No training session beginning on {date} in {log_path}")
+        description = "training session" if date is None else f"training session beginning on {date}"
+        raise ValueError(f"No {description} in {log_path}")
     start = starts[-1]
     end = next(
         (index for index in range(start + 1, len(lines)) if SESSION_START.match(lines[index])),
@@ -45,7 +46,8 @@ def parse_session(log_path: Path, date: str) -> dict[str, list[tuple[int, float,
                 (int(match["epoch"]), float(match["loss"]), float(match["energy"]), float(match["force"]))
             )
     if not metrics:
-        raise ValueError(f"No numeric epoch RMSE values found in the final {date} session")
+        description = "latest" if date is None else f"final {date}"
+        raise ValueError(f"No numeric epoch RMSE values found in the {description} session")
     return dict(metrics)
 
 
@@ -134,20 +136,28 @@ def write_plot(
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--log", type=Path, default=DEFAULT_LOG)
-    parser.add_argument("--date", default="2026-09-01", help="Session start date (YYYY-MM-DD).")
-    parser.add_argument("--output", type=Path, default=SCRIPT_DIR / "runs" / RUN_NAME / "results" / "rmse_by_epoch_2026-09-01.png")
-    parser.add_argument("--loss-output", type=Path, default=SCRIPT_DIR / "runs" / RUN_NAME / "results" / "loss_by_epoch_2026-09-01.png")
+    parser.add_argument("--date", help="Session start date (YYYY-MM-DD); defaults to the latest session.")
+    parser.add_argument("--energy-output", type=Path, default=SCRIPT_DIR / "runs" / RUN_NAME / "results" / "energy_error_by_epoch_latest.png")
+    parser.add_argument("--force-output", type=Path, default=SCRIPT_DIR / "runs" / RUN_NAME / "results" / "force_error_by_epoch_latest.png")
+    parser.add_argument("--loss-output", type=Path, default=SCRIPT_DIR / "runs" / RUN_NAME / "results" / "loss_by_epoch_latest.png")
     args = parser.parse_args()
     metrics = parse_session(args.log, args.date)
+    session_date = args.date
+    if session_date is None:
+        session_date = next(
+            match["date"] for line in reversed(args.log.read_text(encoding="utf-8", errors="replace").splitlines())
+            if (match := SESSION_START.match(line))
+        )
     energy = {head: [(epoch, value) for epoch, _, value, _ in series] for head, series in metrics.items()}
     force = {head: [(epoch, value) for epoch, _, _, value in series] for head, series in metrics.items()}
     loss = {head: [(epoch, value) for epoch, value, _, _ in series] for head, series in metrics.items()}
-    write_plot([( "Energy", "RMSE energy per atom (meV)", energy, True, 1),
-                ("Forces", "RMSE force (meV / Å)", force, True, 1)], args.output,
-               f"Naïve MACE fine-tuning RMSE by epoch — final session started {args.date}")
+    write_plot([("Energy error", "RMSE energy per atom (meV)", energy, True, 1)],
+               args.energy_output, f"Naïve MACE fine-tuning energy error by epoch — final session started {session_date}")
+    write_plot([("Force error", "RMSE force (meV / Å)", force, True, 1)],
+               args.force_output, f"Naïve MACE fine-tuning force error by epoch — final session started {session_date}")
     write_plot([(f"Loss: {head}", "Weighted loss", {head: loss[head]}, False, 4) for head in sorted(loss)],
-               args.loss_output, f"Naïve MACE fine-tuning weighted loss by epoch — final session started {args.date}")
-    print(f"Wrote {args.output} and {args.loss_output} with " + ", ".join(
+               args.loss_output, f"Naïve MACE fine-tuning weighted loss by epoch — final session started {session_date}")
+    print(f"Wrote {args.energy_output}, {args.force_output}, and {args.loss_output} with " + ", ".join(
         f"{head}={len(series)} epochs" for head, series in sorted(metrics.items())))
 
 

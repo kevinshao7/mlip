@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Compare PolarMACE foundation and naïve-fine-tuned predictions with ORCA DFT.
 
-The four PNG parity plots use one point per configuration for total system
-energy and one point per Cartesian force component for every atom.  The most
-erroneous observations are labelled in each plot and recorded in CSV files;
-all configurations containing a labelled point are also written to extxyz for
-structural inspection.
+The parity and signed-residual PNG plots use one point per configuration for
+total system energy and one point per Cartesian force component for every
+atom. The most erroneous parity observations are labelled in each plot and
+recorded in CSV files; all configurations containing a labelled point are also
+written to extxyz for structural inspection.
 """
 
 from __future__ import annotations
@@ -41,7 +41,10 @@ DEFAULT_SPLITS = {
     "valid": DATA_DIR / "target_valid.xyz",
     "test": DATA_DIR / "target_test.xyz",
 }
-DEFAULT_FINETUNED = SCRIPT_DIR / "runs" / RUN_NAME / "models" / f"{RUN_NAME}.model"
+# MACE exports the stage-one model as ``{RUN_NAME}.model`` and the selected
+# best-validation stage-two/SWA model separately.  Use the latter for the
+# final fine-tuned parity comparison.
+DEFAULT_FINETUNED = SCRIPT_DIR / "runs" / RUN_NAME / "models" / f"{RUN_NAME}_stagetwo.model"
 COMPONENT_NAMES = ("Fx", "Fy", "Fz")
 
 
@@ -136,6 +139,39 @@ def parity_plot(
     return selected
 
 
+def signed_error_plot(
+    reference: np.ndarray,
+    predicted: np.ndarray,
+    labels: list[str],
+    title: str,
+    axis_label: str,
+    output: Path,
+    outlier_count: int,
+) -> np.ndarray:
+    """Plot signed ``MLIP - DFT`` errors against DFT values and return outlier rows."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    signed_error = predicted - reference
+    selected = np.argsort(np.abs(signed_error))[-min(outlier_count, len(signed_error)):][::-1]
+    low, high = float(reference.min()), float(reference.max())
+    padding = max((high - low) * 0.04, 1.0e-8)
+    figure, axis = plt.subplots(figsize=(7.2, 5.2), constrained_layout=True)
+    axis.scatter(reference, signed_error, s=13, alpha=0.60, color="#0072B2", edgecolors="none")
+    axis.axhline(0.0, color="#222222", linewidth=1.2, zorder=0)
+    axis.scatter(reference[selected], signed_error[selected], s=36, color="#D55E00", zorder=3)
+    for row in selected:
+        axis.annotate(labels[row], (reference[row], signed_error[row]), xytext=(4, 4),
+                      textcoords="offset points", fontsize=7, color="#7A3100")
+    axis.set(xlim=(low - padding, high + padding), xlabel=f"DFT {axis_label}",
+             ylabel=f"Signed error (MLIP − DFT; {axis_label.split('(')[-1]}", title=title)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    figure.savefig(output, dpi=220)
+    plt.close(figure)
+    return selected
+
+
 def main() -> None:
     args = parse_args()
     if args.outliers < 1:
@@ -186,12 +222,13 @@ def main() -> None:
         if not (len(dft) == len(foundation) == len(tuned)):
             raise ValueError(f"Atom-count mismatch in configuration {index}")
 
-    dft_energy = np.array([frame.info["REF_energy"] for frame in dft_frames], dtype=float)
-    foundation_energy = np.array([frame.info["MACE_energy"] for frame in foundation_frames], dtype=float)
-    finetuned_energy = np.array([frame.info["MACE_energy"] for frame in finetuned_frames], dtype=float)
-    dft_force = np.concatenate([frame.arrays["REF_forces"].reshape(-1) for frame in dft_frames])
-    foundation_force = np.concatenate([frame.arrays["MACE_forces"].reshape(-1) for frame in foundation_frames])
-    finetuned_force = np.concatenate([frame.arrays["MACE_forces"].reshape(-1) for frame in finetuned_frames])
+    # ASE stores energies in eV and forces in eV / Å; plot and report meV.
+    dft_energy = 1000.0 * np.array([frame.info["REF_energy"] for frame in dft_frames], dtype=float)
+    foundation_energy = 1000.0 * np.array([frame.info["MACE_energy"] for frame in foundation_frames], dtype=float)
+    finetuned_energy = 1000.0 * np.array([frame.info["MACE_energy"] for frame in finetuned_frames], dtype=float)
+    dft_force = 1000.0 * np.concatenate([frame.arrays["REF_forces"].reshape(-1) for frame in dft_frames])
+    foundation_force = 1000.0 * np.concatenate([frame.arrays["MACE_forces"].reshape(-1) for frame in foundation_frames])
+    finetuned_force = 1000.0 * np.concatenate([frame.arrays["MACE_forces"].reshape(-1) for frame in finetuned_frames])
     energy_labels = [config_label(frame, index) for index, frame in enumerate(dft_frames)]
     force_rows = [
         (config_index, atom_index, component)
@@ -204,20 +241,36 @@ def main() -> None:
     split_name = args.split_name or configs.stem
     selected["foundation_energy"] = parity_plot(
         dft_energy, foundation_energy, energy_labels, np.abs(foundation_energy - dft_energy),
-        f"Foundation PolarMACE vs DFT ({split_name}): system energy", "system energy (eV)",
+        f"Foundation PolarMACE vs DFT ({split_name}): system energy", "system energy (meV)",
         args.output_dir / "foundation_energy_parity.png", args.outliers)
     selected["finetuned_energy"] = parity_plot(
         dft_energy, finetuned_energy, energy_labels, np.abs(finetuned_energy - dft_energy),
-        f"Naïve-fine-tuned PolarMACE vs DFT ({split_name}): system energy", "system energy (eV)",
+        f"Naïve-fine-tuned PolarMACE vs DFT ({split_name}): system energy", "system energy (meV)",
         args.output_dir / "finetuned_energy_parity.png", args.outliers)
     selected["foundation_force"] = parity_plot(
         dft_force, foundation_force, force_labels, np.abs(foundation_force - dft_force),
-        f"Foundation PolarMACE vs DFT ({split_name}): force components", "force component (eV / Å)",
+        f"Foundation PolarMACE vs DFT ({split_name}): force components", "force component (meV / Å)",
         args.output_dir / "foundation_force_parity.png", args.outliers)
     selected["finetuned_force"] = parity_plot(
         dft_force, finetuned_force, force_labels, np.abs(finetuned_force - dft_force),
-        f"Naïve-fine-tuned PolarMACE vs DFT ({split_name}): force components", "force component (eV / Å)",
+        f"Naïve-fine-tuned PolarMACE vs DFT ({split_name}): force components", "force component (meV / Å)",
         args.output_dir / "finetuned_force_parity.png", args.outliers)
+    signed_error_plot(
+        dft_energy, foundation_energy, energy_labels,
+        f"Foundation PolarMACE signed energy error ({split_name})", "system energy (meV)",
+        args.output_dir / "foundation_energy_signed_error.png", args.outliers)
+    signed_error_plot(
+        dft_energy, finetuned_energy, energy_labels,
+        f"Naïve-fine-tuned PolarMACE signed energy error ({split_name})", "system energy (meV)",
+        args.output_dir / "finetuned_energy_signed_error.png", args.outliers)
+    signed_error_plot(
+        dft_force, foundation_force, force_labels,
+        f"Foundation PolarMACE signed force error ({split_name})", "force component (meV / Å)",
+        args.output_dir / "foundation_force_signed_error.png", args.outliers)
+    signed_error_plot(
+        dft_force, finetuned_force, force_labels,
+        f"Naïve-fine-tuned PolarMACE signed force error ({split_name})", "force component (meV / Å)",
+        args.output_dir / "finetuned_force_signed_error.png", args.outliers)
 
     outlier_configurations: set[int] = set()
     rows: list[dict[str, object]] = []
@@ -255,13 +308,13 @@ def main() -> None:
     summary = {name: {"rmse": float(np.sqrt(np.mean((predicted - reference) ** 2))),
                       "mae": float(np.mean(np.abs(predicted - reference))), "n": len(reference)}
                for name, predicted, reference in (
-                   ("foundation_system_energy_eV", foundation_energy, dft_energy),
-                   ("finetuned_system_energy_eV", finetuned_energy, dft_energy),
-                   ("foundation_force_component_eV_per_A", foundation_force, dft_force),
-                   ("finetuned_force_component_eV_per_A", finetuned_force, dft_force),
+                   ("foundation_system_energy_meV", foundation_energy, dft_energy),
+                   ("finetuned_system_energy_meV", finetuned_energy, dft_energy),
+                   ("foundation_force_component_meV_per_A", foundation_force, dft_force),
+                   ("finetuned_force_component_meV_per_A", finetuned_force, dft_force),
                )}
     (args.output_dir / "parity_summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
-    print(f"Wrote four PNG parity plots, {csv_path}, and {len(structures)} labelled outlier structures to {args.output_dir}")
+    print(f"Wrote eight PNG parity/signed-error plots, {csv_path}, and {len(structures)} labelled outlier structures to {args.output_dir}")
 
 
 if __name__ == "__main__":
