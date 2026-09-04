@@ -89,12 +89,18 @@ def apportion(
         for key in group_sizes
     }
     remaining = total - sum(allocation.values())
-    for key in sorted(group_sizes, key=lambda key: (-(quotas[key] - int(quotas[key])), key)):
-        if not remaining:
+    priority = sorted(group_sizes, key=lambda key: (-(quotas[key] - int(quotas[key])), key))
+    while remaining:
+        assigned = 0
+        for key in priority:
+            if not remaining:
+                break
+            if allocation[key] < capacities[key]:
+                allocation[key] += 1
+                remaining -= 1
+                assigned += 1
+        if not assigned:
             break
-        if allocation[key] < capacities[key]:
-            allocation[key] += 1
-            remaining -= 1
     if remaining:
         raise RuntimeError("Could not allocate all requested split frames.")
     return allocation
@@ -122,11 +128,15 @@ def split_extxyz(input_path: Path, train_path: Path, valid_path: Path, test_path
     # Allocate a representative holdout sample while retaining at least one
     # member of every chemistry stratum in training. Then divide that holdout
     # sample into validation and test sets without overlap.
-    holdout = apportion(
-        group_sizes,
-        n_valid + n_test,
-        {key: max(0, size - 1) for key, size in group_sizes.items()},
-    )
+    holdout_total = n_valid + n_test
+    # Prefer to retain at least one example of every stratum in training. Some
+    # cluster datasets contain mostly singleton formulas, making that constraint
+    # incompatible with the requested holdout size; in that case allow singleton
+    # strata into the holdout instead of failing dataset preparation.
+    holdout_capacities = {key: max(0, size - 1) for key, size in group_sizes.items()}
+    if sum(holdout_capacities.values()) < holdout_total:
+        holdout_capacities = group_sizes.copy()
+    holdout = apportion(group_sizes, holdout_total, holdout_capacities)
     valid_counts = apportion(holdout, n_valid, holdout)
     rng = random.Random(seed)
     train_indices: list[int] = []
@@ -140,6 +150,28 @@ def split_extxyz(input_path: Path, train_path: Path, valid_path: Path, test_path
         valid_indices.extend(indices[:n_for_valid])
         test_indices.extend(indices[n_for_valid:n_for_valid + n_for_test])
         train_indices.extend(indices[n_for_valid + n_for_test:])
+
+    # Formula-level stratification can put no N-containing frame in a small
+    # holdout when most formulas occur only once. Guarantee elemental coverage
+    # for elements represented by at least three frames, using deterministic
+    # train/holdout swaps that preserve split sizes and disjointness.
+    for target_indices in (valid_indices, test_indices):
+        for atomic_number in sorted(set(int(z) for frame in frames for z in frame.numbers)):
+            containing = [index for index, frame in enumerate(frames) if atomic_number in frame.numbers]
+            if len(containing) < 3 or any(atomic_number in frames[index].numbers for index in target_indices):
+                continue
+            donors = [index for index in train_indices if atomic_number in frames[index].numbers]
+            if len(donors) < 2:
+                continue
+            outgoing = next(
+                (index for index in target_indices if atomic_number not in frames[index].numbers),
+                None,
+            )
+            if outgoing is None:
+                continue
+            incoming = donors[0]
+            train_indices[train_indices.index(incoming)] = outgoing
+            target_indices[target_indices.index(outgoing)] = incoming
 
     train = [frames[index] for index in train_indices]
     valid = [frames[index] for index in valid_indices]
