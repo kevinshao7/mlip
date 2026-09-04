@@ -339,6 +339,8 @@ def validate_rendered_slurm(slurm_text: str, group_stem: str, expected_stems: li
         'OUTPUT_PATH="$OUTPUT_DIR/${STEM}.out"',
         'TEMP_OUTPUT_PATH="$OUTPUT_DIR/${STEM}.out.tmp.$$"',
         'EXPECTED_CHARGE="$(awk \'tolower($1) == "*xyz" { print $2; exit }\' "$INPUT_PATH")"',
+        'RESTART_BASE="${INPUT_PATH%.inp}"',
+        'rm -f "${RESTART_BASE}.gbw" "${RESTART_BASE}.ges"',
         'if ! "$ORCA_COMMAND" "$INPUT_PATH" > "$TEMP_OUTPUT_PATH"; then',
         'mv -f "$TEMP_OUTPUT_PATH" "$OUTPUT_PATH"',
     ]
@@ -365,6 +367,8 @@ def validate_rendered_slurm(slurm_text: str, group_stem: str, expected_stems: li
             ("OUTPUT_PATH assignment", r'^\s*OUTPUT_PATH="\$OUTPUT_DIR/\$\{STEM\}\.out"$'),
             ("input-charge extraction", r'^\s*EXPECTED_CHARGE="\$\(awk '),
             ("OUTPUT_PATH completion check", r'^\s*if \[\[ -f "\$OUTPUT_PATH" \]\]'),
+            ("restart basename assignment", r'^\s*RESTART_BASE="\$\{INPUT_PATH%\.inp\}"$'),
+            ("stale restart cleanup", r'^\s*rm -f "\$\{RESTART_BASE\}\.gbw" "\$\{RESTART_BASE\}\.ges"$'),
             ("ORCA run command", r'^\s*if ! "\$ORCA_COMMAND" "\$INPUT_PATH" > "\$TEMP_OUTPUT_PATH"; then$'),
             ("verified output replacement", r'^\s*mv -f "\$TEMP_OUTPUT_PATH" "\$OUTPUT_PATH"$'),
         ],
