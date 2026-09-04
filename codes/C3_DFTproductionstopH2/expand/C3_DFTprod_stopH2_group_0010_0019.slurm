@@ -114,11 +114,10 @@ for STEM in "${STEMS[@]}"; do
     fi
 
     echo "Starting $STEM"
-    # ORCA automatically restarts from same-basename files beside the input.
-    # Regenerated inputs may have different geometries, so never reuse them implicitly.
+    # Never mix a regenerated input with restart or result sidecars from an older run.
     RESTART_BASE="${INPUT_PATH%.inp}"
-    rm -f "${RESTART_BASE}.gbw" "${RESTART_BASE}.ges"
-    rm -f "$TEMP_OUTPUT_PATH"
+    rm -f "${RESTART_BASE}.gbw" "${RESTART_BASE}.ges" "${RESTART_BASE}.engrad" "${RESTART_BASE}.property.txt" "${RESTART_BASE}.densities"
+    rm -f "$OUTPUT_DIR/${STEM}.out.tmp."*
     if ! "$ORCA_COMMAND" "$INPUT_PATH" > "$TEMP_OUTPUT_PATH"; then
         rm -f "$TEMP_OUTPUT_PATH"
         echo "ORCA failed for $STEM; preserving any existing $OUTPUT_PATH" >&2
