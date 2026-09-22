@@ -2,6 +2,21 @@
 
 This repository contains scripts and local dependencies for NH3/H2S-in-water simulation workflows using molecular dynamics, ORCA DFT, and MACE-POLAR.
 
+> [!IMPORTANT]
+> **JAX-MD CLI update:** Workflows that import the external `jax_md_cli`
+> package must use the **`dev` branch of `jax-md-cli`** for MACE-POLAR. The
+> development branch should now work with `model_type = "mace_polar"`. The
+> MACE-POLAR launchers fail immediately if the checkout is not on `dev`.
+
+Update and verify the external checkout before running one of these workflows:
+
+```bash
+cd /path/to/jaxmd-cli
+git switch dev
+git pull
+git branch --show-current   # must print: dev
+```
+
 ## Current Focus
 
 The active cluster-validation workflow is:
@@ -46,6 +61,9 @@ Expected local checkouts:
 mlip/mace/
 mlip/aseMolec/
 ```
+
+The JAX workflows additionally require an external `jax-md-cli` checkout on
+its `dev` branch, as noted above.
 
 The recent Windows Python used for local checks is:
 

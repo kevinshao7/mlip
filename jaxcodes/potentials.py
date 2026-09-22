@@ -14,6 +14,9 @@
 
 """Potential energy function loading and construction."""
 
+import importlib.util
+import subprocess
+from pathlib import Path
 from typing import Any, Callable, Optional, Tuple, List
 
 import chex
@@ -29,6 +32,45 @@ from .config import (
     NeighborListConfig,
     NNPotentialConfig,
 )
+
+
+def _require_jaxmd_cli_dev_branch() -> None:
+    """Fail clearly unless this external jax-md-cli checkout is on ``dev``."""
+    package_spec = importlib.util.find_spec("jax_md_cli")
+    if package_spec is None or package_spec.origin is None:
+        raise RuntimeError(
+            "FATAL: MACE-POLAR requires external jax-md-cli from its dev branch, "
+            "but Python cannot locate the jax_md_cli package."
+        )
+
+    module_path = Path(package_spec.origin).resolve()
+    checkout = next((parent for parent in module_path.parents if (parent / ".git").exists()), None)
+    if checkout is None:
+        raise RuntimeError(
+            "FATAL: MACE-POLAR requires the dev branch of external jax-md-cli, "
+            f"but no Git checkout could be identified from {module_path}. "
+            "Install/execute jax-md-cli from a dev-branch checkout."
+        )
+
+    try:
+        branch = subprocess.run(
+            ["git", "-C", str(checkout), "branch", "--show-current"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise RuntimeError(
+            f"FATAL: cannot verify the jax-md-cli branch in {checkout}; "
+            "MACE-POLAR execution is blocked."
+        ) from exc
+
+    if branch != "dev":
+        found = branch or "DETACHED HEAD"
+        raise RuntimeError(
+            "FATAL: MACE-POLAR requires jax-md-cli branch 'dev'; "
+            f"found {found!r} in {checkout}. Run `git switch dev && git pull` there."
+        )
 
 
 def replicate_params_to_mesh(params: Any, mesh: Mesh) -> Any:
@@ -788,12 +830,12 @@ def load_nn_potential(
 
     elif model_type == 'mace_polar':
         # PolarMACE with electrostatics (Fukui loop)
+        _require_jaxmd_cli_dev_branch()
         from aai_mace.mace_jax.save_load_utils import load_polar_mace_flax_from_orbax
         from aai_mace.mace_jax.electrostatics.fukui import (
             ElectrostaticGraph,
             get_jittable_electrostatic_graph_builder,
         )
-        from pathlib import Path
         from jax_md import space
 
         save_dir = Path(checkpoint_path).expanduser().resolve()

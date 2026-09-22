@@ -26,3 +26,4 @@ nvidia-smi
 cd /ptmp/kshao/jax/jaxmd-cli
 source .venv/bin/activate
 jaxmd-run /ptmp/kshao/jax/jaxmd-cli/codes/maceoff_npt.toml
+z
