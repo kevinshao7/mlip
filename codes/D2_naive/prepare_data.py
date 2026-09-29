@@ -204,7 +204,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--test-fraction", type=float, default=0.10)
     parser.add_argument("--seed", type=int, default=3, help="Random seed for reproducible stratified splits.")
     parser.add_argument("--atomization-energies", type=Path, default=DEFAULT_ATOMIZATION)
-    parser.add_argument("--e0s-json", type=Path, default=DEFAULT_E0S)
+    parser.add_argument("--e0s-json", type=Path, default=DEFAULT_E0S,
+                        help="Destination only when --write-dft-e0s is explicitly requested.")
+    parser.add_argument("--write-dft-e0s", action="store_true",
+                        help="Write a custom DFT E0 JSON for a separate, explicitly configured experiment.")
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--skip-orca", action="store_true")
     parser.add_argument("--allow-incomplete", action="store_true")
@@ -216,10 +219,11 @@ def main() -> None:
     args = parse_args()
     if args.source_target_all and not args.skip_orca:
         raise ValueError("--source-target-all requires --skip-orca.")
-    if not args.atomization_energies.is_file():
-        raise FileNotFoundError(f"Missing DFT atomic-reference CSV: {args.atomization_energies}")
-    e0s = write_e0_json(args.atomization_energies, args.e0s_json)
-    print(f"Wrote DFT E0s for atomic numbers {sorted(e0s)} to {args.e0s_json}")
+    if args.write_dft_e0s:
+        if not args.atomization_energies.is_file():
+            raise FileNotFoundError(f"Missing DFT atomic-reference CSV: {args.atomization_energies}")
+        e0s = write_e0_json(args.atomization_energies, args.e0s_json)
+        print(f"Wrote explicit DFT E0s for atomic numbers {sorted(e0s)} to {args.e0s_json}")
     if not args.skip_orca:
         convert_outputs(argparse.Namespace(inputs=[args.orca_dir], output=args.target_all, all_steps=False, charge=None, multiplicity=None, config_type="ORCA_DFT", allow_incomplete=args.allow_incomplete, strict=args.strict, vacuum=0.0, workers=args.workers))
     source_target_all = args.source_target_all or args.target_all

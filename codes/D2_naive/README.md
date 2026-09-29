@@ -39,10 +39,9 @@ C:\\Users\\shaoq\\AppData\\Local\\Programs\\Python\\Python312\\python.exe .\\mli
 This optional preparation step reads completed ORCA outputs from
 `outputsfull\\C_DFTproduction\\C_DFTproduction\\dft_outputs`, checking both
 `FINAL SINGLE POINT ENERGY` and `ORCA TERMINATED NORMALLY`.  It writes
-`data\\target_all.xyz`, plus deterministic, seeded 80/10/10
-train/validation/test splits stratified by source family and nitrogen presence,
-and
-`data\\target_dft_e0s.json`. This avoids a validation or test set that
+`data\\target_all.xyz` plus deterministic, seeded 80/10/10
+train/validation/test splits stratified by source family and nitrogen presence.
+This avoids a validation or test set that
 contains only one chemistry family.
 
 Energies and forces parsed by ASE are in eV and eV/Angstrom.  Each molecular
@@ -52,12 +51,12 @@ Before splitting, records whose stored `charge` disagrees with the project
 formal-charge convention (`H=+1`, `N=-3`, `O=-2`) are rejected. The original
 source is never overwritten: use `--source-target-all` with `--skip-orca` to
 filter an existing extxyz dataset into this directory.
-The data-preparation utility can write omegaB97 DFT isolated-atom energies for
-reproducible energy comparisons. Training does not use that custom table by
-default: it uses the `foundation` E0 mode, which retains the atomic-energy
-table embedded in the MACE-POLAR checkpoint. `estimated` instead refits E0s
-from foundation-model predictions on the target training data. Use `--e0s dft`
-only when the isolated-atom ORCA reference is explicitly required.
+Training uses `--E0s=foundation`: the atomic-energy table embedded in the
+`polar-1-s` MACE-POLAR checkpoint. This is the active and required default for
+the current D2 workflow, which uses the same DFT standard as that foundation
+model. Data preparation does not generate or select a custom E0 table unless
+`--write-dft-e0s` is explicitly requested for a separate experiment. Do not
+use `estimated`, `dft`, or an E0 JSON path in a standard D2 run.
 
 By default, failed or incomplete ORCA outputs are reported and omitted.  Pass
 `--strict` to reject a partial dataset.
