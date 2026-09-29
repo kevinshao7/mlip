@@ -20,7 +20,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--gpu", default="0", help="Physical GPU ID to use (default: 0).")
+    parser.add_argument("--gpu", default="1", help="Physical GPU ID to use (active experiment default: 1).")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
         "train_args",

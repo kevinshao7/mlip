@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
-"""Create DFT-minus-Polar residual labels for a separate delta model.
+"""Create archived water-only DFT-minus-Polar residual labels.
 
 The output labels are ``REF_energy = E_DFT - E_foundation`` and
 ``REF_forces = F_DFT - F_foundation``.  The original DFT and foundation labels
 are retained as ``DFT_*`` and ``FOUNDATION_*`` fields, respectively.
 
-By default this preserves the existing 32-structure training and 8-structure
-validation splits.  ``--full-input`` additionally prepares residual labels
-for a larger pool and can derive a training file by excluding a held-out
-validation file.  A correction model trained on these files must be *added*
-to the frozen foundation model at inference; it is not a drop-in target for
-foundation-initialized fine tuning.
+The archived 32-structure training input remains the default, while a raw
+historical validation input must be supplied explicitly. ``--full-input``
+additionally prepares residual labels for a larger pool and can derive a
+training file by excluding a held-out validation file. A correction model
+trained on these files must be *added* to the frozen foundation model at
+inference; it is not a drop-in target for foundation-initialized fine tuning.
+
+This utility is retained only to reproduce the pre-nitrogen delta experiment;
+its outputs are not valid inputs for the active D2 target-only workflow.
 """
 
 from __future__ import annotations
@@ -27,6 +30,7 @@ from ase.io import read, write
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 DATA_DIR = SCRIPT_DIR / "data"
+DELTA_ARCHIVE_DIR = DATA_DIR / "archive" / "water_only_delta_experiments_2026-09-29"
 DEFAULT_FOUNDATION = Path("/home/kevinsh/mlip/outputsfull/.cache/mace/MACEPOLAR1Smodel")
 
 
@@ -102,10 +106,11 @@ def exclude_frames(full_delta_path: Path, excluded_input_path: Path, output_path
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--train-input", type=Path, default=DATA_DIR / "target_train_32.xyz")
-    parser.add_argument("--valid-input", type=Path, default=DATA_DIR / "target_valid.xyz")
-    parser.add_argument("--train-output", type=Path, default=DATA_DIR / "target_train_32_delta.xyz")
-    parser.add_argument("--valid-output", type=Path, default=DATA_DIR / "target_valid_delta.xyz")
+    parser.add_argument("--train-input", type=Path, default=DELTA_ARCHIVE_DIR / "target_train_32.xyz")
+    parser.add_argument("--valid-input", type=Path, required=True,
+                        help="Historical raw DFT validation input; no default avoids mixing this experiment with the active split.")
+    parser.add_argument("--train-output", type=Path, default=DELTA_ARCHIVE_DIR / "target_train_32_delta.xyz")
+    parser.add_argument("--valid-output", type=Path, default=DELTA_ARCHIVE_DIR / "target_valid_delta.xyz")
     parser.add_argument("--foundation-model", type=Path, default=DEFAULT_FOUNDATION)
     parser.add_argument("--device", choices=("cpu", "cuda"), default="cuda")
     parser.add_argument("--full-input", type=Path,

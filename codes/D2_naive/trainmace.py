@@ -4,9 +4,15 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime
+import hashlib
 import json
 import os
+import re
+import shlex
+import subprocess
 import sys
+import time
 import warnings
 from pathlib import Path
 
@@ -95,11 +101,115 @@ def resolve_e0s(e0s_arg: str) -> str:
     return require_file(Path(e0s_arg), "Missing E0 JSON")
 
 
-def build_train_argv(args: argparse.Namespace) -> list[str]:
+def unique_run_context(args: argparse.Namespace) -> tuple[str, Path]:
+    """Return an immutable, timestamped directory for one training attempt."""
+    safe_name = re.sub(r"[^A-Za-z0-9_.-]+", "-", args.name).strip(".-")
+    if not safe_name:
+        raise ValueError("--name must contain at least one letter or number")
+    timestamp = datetime.now().astimezone().strftime("%Y%m%dT%H%M%S_%f%z")
+    run_name = f"{safe_name}_{timestamp}"
+    run_dir = args.runs_root.resolve() / run_name
+    if run_dir.exists():  # Microseconds make this exceptional, but never overwrite a run.
+        raise FileExistsError(f"Refusing to reuse an existing run directory: {run_dir}")
+    return run_name, run_dir
+
+
+def append_experiment_log(args: argparse.Namespace, run_name: str, run_dir: Path, argv: list[str]) -> None:
+    """Append one launch record to the workflow's single experiment log."""
+    destination = SCRIPT_DIR / "hyperparameters.txt"
+    lines = [
+        "",
+        "=" * 88,
+        f"RUN START {datetime.now().astimezone().isoformat()}",
+        f"created_at={datetime.now().astimezone().isoformat()}",
+        f"run_name={run_name}",
+        f"run_directory={run_dir}",
+        f"training_log={run_dir / 'logs' / f'{run_name}_run-3.log'}",
+        f"checkpoint_model={run_dir / 'checkpoints' / f'{run_name}_run-3.model'}",
+        f"compiled_model_if_available={run_dir / 'models' / f'{run_name}_compiled.model'}",
+        "POLICY: Change exactly one scientific/training factor per iteration.",
+        "POLICY: Set changed_parameter and change_note before every non-baseline run.",
+        f"changed_parameter={args.changed_parameter}",
+        f"change_note={args.change_note}",
+        "",
+        "Resolved wrapper hyperparameters:",
+    ]
+    for key, value in sorted(vars(args).items()):
+        if not key.startswith("_"):
+            lines.append(f"{key}={value}")
+    lines.extend([
+        "", "Resolved MACE command:", shlex.join(argv), "",
+        "Analysis notes (append below; add a dated entry after every analysis or decision):",
+        "- evidence: ",
+        "- diagnosis / uncertainty: ",
+        "- next one-factor test: ",
+        "- why this test is informative: ",
+        "- changed factor relative to this run: ",
+        "",
+    ])
+    with destination.open("a", encoding="utf-8") as handle:
+        handle.write("\n".join(lines))
+
+
+def sha256(path: Path) -> str:
+    """Return a content digest so a run is tied to its exact input files."""
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def git_revision() -> str | None:
+    """Best-effort Git revision; training must also work from exported sources."""
+    try:
+        return subprocess.check_output(
+            ["git", "-C", str(MLIP_DIR), "rev-parse", "HEAD"], text=True, stderr=subprocess.DEVNULL
+        ).strip()
+    except (OSError, subprocess.CalledProcessError):
+        return None
+
+
+def write_run_metadata(args: argparse.Namespace, run_name: str, run_dir: Path, argv: list[str]) -> None:
+    """Write immutable machine-readable provenance before optimization begins."""
+    metadata = {
+        "created_at": datetime.now().astimezone().isoformat(),
+        "run_name": run_name,
+        "run_directory": str(run_dir),
+        "git_revision": git_revision(),
+        "python_executable": sys.executable,
+        "cuda_visible_devices": os.environ.get("CUDA_VISIBLE_DEVICES"),
+        "xdg_cache_home": os.environ.get("XDG_CACHE_HOME"),
+        "arguments": {key: str(value) for key, value in vars(args).items() if not key.startswith("_")},
+        "mace_command": argv,
+        "input_sha256": {
+            "train_file": sha256(args.train_file),
+            "valid_file": sha256(args.valid_file),
+        },
+    }
+    (run_dir / "run_metadata.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
+
+
+def append_run_outcome(run_name: str, run_dir: Path, started: float, outcome: str, error: BaseException | None = None) -> None:
+    """Record terminal status even when MACE raises before producing a model."""
+    destination = SCRIPT_DIR / "hyperparameters.txt"
+    lines = [
+        f"RUN END {datetime.now().astimezone().isoformat()}",
+        f"run_name={run_name}",
+        f"run_directory={run_dir}",
+        f"outcome={outcome}",
+        f"elapsed_seconds={time.monotonic() - started:.1f}",
+    ]
+    if error is not None:
+        lines.extend([f"error_type={type(error).__name__}", f"error_message={error}"])
+    with destination.open("a", encoding="utf-8") as handle:
+        handle.write("\n" + "\n".join(lines) + "\n")
+
+
+def build_train_argv(args: argparse.Namespace, run_name: str, run_dir: Path) -> list[str]:
     train_file = require_file(args.train_file, "Missing target training extxyz")
     valid_file = require_file(args.valid_file, "Missing target validation extxyz")
     e0s = resolve_e0s(args.e0s)
-    run_dir = args.run_dir.resolve()
     paths = {
         "model": run_dir / "models",
         "checkpoints": run_dir / "checkpoints",
@@ -107,13 +217,10 @@ def build_train_argv(args: argparse.Namespace) -> list[str]:
         "results": run_dir / "results",
         "work": run_dir / "work",
     }
-    for path in paths.values():
-        path.mkdir(parents=True, exist_ok=True)
-
     argv = [
         "run_train.py",
-        f"--name={args.name}",
-        f"--model={'MACE' if args.delta_correction else 'PolarMACE'}",
+        f"--name={run_name}",
+        "--model=PolarMACE",
         f"--train_file={train_file}",
         f"--valid_file={valid_file}",
         f"--atomic_numbers={args.atomic_numbers}",
@@ -129,9 +236,6 @@ def build_train_argv(args: argparse.Namespace) -> list[str]:
         f"--batch_size={args.batch_size}",
         f"--valid_batch_size={args.valid_batch_size}",
         f"--max_num_epochs={args.max_num_epochs}",
-        f"--patience={args.patience}",
-        f"--report_train_metrics={args.report_train_metrics}",
-        f"--report_train_metrics_interval={args.report_train_metrics_interval}",
         f"--lr={args.lr}",
         f"--swa_lr={args.swa_lr}",
         f"--seed={args.seed}",
@@ -144,45 +248,33 @@ def build_train_argv(args: argparse.Namespace) -> list[str]:
         f"--results_dir={path_arg(paths['results'])}",
         f"--work_dir={path_arg(paths['work'])}",
     ]
-    argv.extend([
-        f"--foundation_model={args.foundation_model}",
-        "--multiheads_finetuning=False",
-    ])
-    if args.delta_correction:
-        argv.append("--delta_correction=True")
+    argv.extend([f"--foundation_model={args.foundation_model}", "--multiheads_finetuning=False"])
     if args.restart_latest:
         argv.append("--restart_latest")
     if args.ema:
         argv.extend(["--ema", f"--ema_decay={args.ema_decay}"])
-    if not args.no_swa:
+    if args.swa:
         argv.extend([
             "--swa",
             f"--start_swa={args.start_swa}",
             f"--swa_energy_weight={args.swa_energy_weight}",
             f"--swa_forces_weight={args.swa_forces_weight}",
         ])
-    if args.dry_run:
-        print(" ".join(argv))
-        raise SystemExit(0)
     return argv
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--name", default="polar1s_delta_154")
+    parser.add_argument("--name", default="polar1s_naive_orca_dft_e0")
     parser.add_argument("--foundation-model", default="polar-1-s")
-    parser.add_argument("--train-file", type=Path, default=DATA_DIR / "target_train_154_delta.xyz")
-    parser.add_argument("--valid-file", type=Path, default=DATA_DIR / "target_valid_delta.xyz")
-    parser.add_argument("--run-dir", type=Path, default=RUNS_DIR / "polar1s_delta_154")
+    parser.add_argument("--train-file", type=Path, default=DATA_DIR / "target_train.xyz")
+    parser.add_argument("--valid-file", type=Path, default=DATA_DIR / "target_valid.xyz")
+    parser.add_argument("--runs-root", type=Path, default=RUNS_DIR,
+                        help="Parent directory; each launch creates a unique timestamped child directory.")
     parser.add_argument(
         "--e0s",
         default="foundation",
         help="'foundation' (default, embedded MACE-POLAR E0s), 'estimated', 'dft', or an E0 JSON path.",
-    )
-    parser.add_argument(
-        "--delta-correction", action="store_true", default=True,
-        help=("Freeze Polar's representation and train a zero-initialized correction readout on "
-              "DFT-minus-foundation labels. Its output must be added to the frozen foundation."),
     )
     parser.add_argument("--atomic-numbers", default="[1, 7, 8, 16]")
     # Preserve the established force-loss scale while making forces dominate
@@ -192,11 +284,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--forces-weight", type=float, default=100.0)
     parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--valid-batch-size", type=int, default=1)
-    parser.add_argument("--max-num-epochs", type=int, default=200)
-    parser.add_argument(
-        "--patience", type=int, default=20,
-        help="Stop after this many non-improving validation-loss epochs (default: 20).",
-    )
+    parser.add_argument("--max-num-epochs", type=int, default=100,
+                        help="Active one-factor experiment length (default: 100).")
     parser.add_argument(
         "--status-every",
         type=int,
@@ -206,37 +295,31 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=3)
     parser.add_argument("--default-dtype", default="float32", choices=["float32", "float64"])
     parser.add_argument("--device", default="cuda")
-    # The default is a standalone residual model, not a full foundation update,
-    # so it needs a conventional train-from-scratch learning rate.
-    parser.add_argument(
-        "--lr", type=float, default=3e-4,
-        help="Adam learning rate for the small zero-initialized delta readout (default: 3e-4).",
-    )
+    parser.add_argument("--lr", type=float, default=1e-4,
+                        help="Adam learning rate from the validated 2026-09-04 baseline.")
     parser.add_argument(
         "--swa-lr",
         type=float,
         default=3e-4,
-        help="Stage Two learning rate (default: 3e-4, matching --lr).",
+        help="Active one-factor Stage Two LR test (default: 3e-4).",
     )
     parser.add_argument("--num-workers", type=int, default=4)
     parser.add_argument("--restart-latest", action="store_true")
-    parser.add_argument(
-        "--ema", action="store_true",
-        help="Enable EMA averaging (off by default for the small delta-learning run).",
-    )
-    parser.add_argument("--ema-decay", type=float, default=0.99)
+    parser.add_argument("--ema", action="store_true", default=True, help="Enable EMA (baseline default).")
+    parser.add_argument("--no-ema", action="store_false", dest="ema", help="Disable baseline EMA.")
+    parser.add_argument("--ema-decay", type=float, default=0.99999)
     parser.add_argument("--start-swa", type=int, default=15)
     parser.add_argument("--swa-energy-weight", type=float, default=1.0)
     parser.add_argument("--swa-forces-weight", type=float, default=100_000.0)
-    parser.add_argument("--no-swa", action="store_true", default=True, help="Disable MACE Stage Two/SWA.")
-    parser.add_argument(
-        "--report-train-metrics", action="store_true", default=True,
-        help="Print full-train-set RMSE alongside validation RMSE periodically.",
-    )
-    parser.add_argument(
-        "--report-train-metrics-interval", type=int, default=5,
-        help="Epoch interval for full-train-set RMSE reporting (default: 5).",
-    )
+    parser.add_argument("--swa", action="store_true", default=True, help="Enable baseline MACE Stage Two/SWA.")
+    parser.add_argument("--no-swa", action="store_false", dest="swa", help="Disable baseline MACE Stage Two/SWA.")
+    parser.add_argument("--changed-parameter", default="swa_learning_rate",
+                        help="The one scientific/training factor changed from the preceding run.")
+    parser.add_argument("--change-note", default=(
+        "Set only Stage-Two LR to intermediate 3e-4 after 1e-4 underfit "
+        "forces and 1e-3 caused energy drift."
+    ),
+                        help="Short rationale and expected effect for the single change.")
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
 
@@ -248,9 +331,24 @@ def main() -> None:
         raise FileNotFoundError(f"Local MACE checkout is missing: {MACE_REPO}")
     os.environ.setdefault("XDG_CACHE_HOME", str(CACHE_DIR.resolve()))
     sys.path.insert(0, str(MACE_REPO.resolve()))
-    sys.argv = build_train_argv(args)
+    run_name, run_dir = unique_run_context(args)
+    sys.argv = build_train_argv(args, run_name, run_dir)
+    if args.dry_run:
+        print(shlex.join(sys.argv))
+        return
+    run_dir.mkdir(parents=True, exist_ok=False)
+    for directory in ("models", "checkpoints", "logs", "results", "work"):
+        (run_dir / directory).mkdir()
+    append_experiment_log(args, run_name, run_dir, sys.argv)
+    write_run_metadata(args, run_name, run_dir, sys.argv)
     from mace.cli.run_train import main as run_train_main
-    run_train_main()
+    started = time.monotonic()
+    try:
+        run_train_main()
+    except BaseException as error:
+        append_run_outcome(run_name, run_dir, started, "failed", error)
+        raise
+    append_run_outcome(run_name, run_dir, started, "completed")
 
 
 if __name__ == "__main__":

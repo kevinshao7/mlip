@@ -1,10 +1,32 @@
 # PolarMACE Naive Fine Tuning
 
 This directory is a target-only, **naive** fine-tuning workflow for the
-`polar-1-s` PolarMACE foundation model.  It intentionally has no replay data
-and does not enable MACE multihead fine tuning.  The foundation weights are
+`polar-1-s` PolarMACE foundation model. It intentionally has no replay data
+and does not enable MACE multihead fine tuning. The foundation weights are
 used to initialize one `Default` head, which is then optimized against the
 ORCA DFT target data only.
+
+The authoritative data source is `data/target_all.xyz`. It includes the newly
+obtained nitrogen-containing DFT structures. The current deterministic split
+derived from that file is `181` training, `23` validation, and `23` test
+structures. It is seeded and stratified by source family and nitrogen presence,
+so validation and test contain representative nitrogen-bearing C3 frames; use
+`target_train.xyz` and `target_valid.xyz` for training rather than an older
+oxygen-only or delta-label split. The superseded 205/11/11 formula-level split
+is preserved under `data/archive/` for prior-run reproducibility.
+
+`../WORKFLOW_MAP.md` distinguishes this current target-only workflow from the
+older oxygen-only multihead and delta experiments. Before preparing a new
+experiment, run the explicit read-only audit:
+
+```bash
+python analyze_dataset_distribution.py
+```
+
+It writes `data/dataset_distribution/dataset_distribution_summary.json` and
+`dataset_distribution_by_split.csv`, including per-split elemental/frame
+balance, charge and spin distributions, formal-charge validation, duplicate
+geometry checks, and cross-split leakage checks.
 
 ## Data preparation
 
@@ -17,8 +39,9 @@ C:\\Users\\shaoq\\AppData\\Local\\Programs\\Python\\Python312\\python.exe .\\mli
 This optional preparation step reads completed ORCA outputs from
 `outputsfull\\C_DFTproduction\\C_DFTproduction\\dft_outputs`, checking both
 `FINAL SINGLE POINT ENERGY` and `ORCA TERMINATED NORMALLY`.  It writes
-`data\\target_all.xyz`, plus deterministic, seeded train/validation/test
-splits stratified by molecular formula, charge, and spin, and
+`data\\target_all.xyz`, plus deterministic, seeded 80/10/10
+train/validation/test splits stratified by source family and nitrogen presence,
+and
 `data\\target_dft_e0s.json`. This avoids a validation or test set that
 contains only one chemistry family.
 
@@ -46,25 +69,59 @@ To reproduce a split, rerun `prepare_data.py` with the same `--seed` (default
 
 ## Training
 
-Run production training on one GPU (the default physical GPU ID is `0`):
+Run production training on one GPU (the current default physical GPU ID is `1`):
 
 ```powershell
-C:\\Users\\shaoq\\AppData\\Local\\Programs\\Python\\Python312\\python.exe .\\mlip\\codes\\D2_naive\\launch_single_gpu.py --gpu 0
+C:\\Users\\shaoq\\AppData\\Local\\Programs\\Python\\Python312\\python.exe .\\mlip\\codes\\D2_naive\\launch_single_gpu.py --gpu 1
 ```
 
 The launcher accepts exactly one physical GPU ID, sets `CUDA_VISIBLE_DEVICES`,
 and invokes `trainmace.py` directly. Distributed training is not supported in
 this workflow. Training and validation batch sizes are both `1`.
 
-The defaults use `energy_weight=0.001` and `forces_weight=100`, retaining a
-100,000:1 force:energy ratio without globally rescaling the prior force-loss
-scale. The initial fine-tuning learning rate is `0.0001`; this is deliberately
-lower than MACE's general training default because the foundation checkpoint is
-already accurate and batch size is one. MACE SWA (Stage Two) is always enabled:
-it starts at epoch 15 with energy and force weights of 1 and 100,000,
-respectively, and uses MACE's default Stage Two learning rate of 0.001. Change
-the start or weights with `--start-swa`, `--swa-energy-weight`, and
-`--swa-forces-weight` after the launcher's `--` separator.
+The restored validated baseline uses `energy_weight=0.001`,
+`forces_weight=100`, Adam `lr=0.0001`, EMA with decay `0.99999`, and MACE
+Stage Two/SWA from epoch 15 with energy and force weights of 1 and 100,000,
+respectively, at `swa_lr=0.001`.
+
+The currently prepared next experiment changes only the Stage-Two learning
+rate to the intermediate `swa_lr=0.0003` and runs for 100 epochs. It is the
+active default, so start it with no extra training arguments:
+
+```bash
+python launch_single_gpu.py
+```
+
+## Experiment procedure — one change at a time
+
+Every real `trainmace.py` invocation creates a fresh datetime-named directory
+under `runs/`; no previous result is overwritten. Before MACE starts, it
+appends the resolved wrapper settings, exact MACE command, run path, training
+log path, checkpoint-model path, and compiled-model path to the one continuous
+`hyperparameters.txt` file in this directory. It also writes
+`runs/<run>/run_metadata.json` with the input-file SHA-256 hashes, Git revision,
+Python executable, GPU visibility, cache path, resolved arguments, and MACE
+command. A terminal `RUN END` record is automatically appended for both
+successful and failed Python-level training attempts.
+
+Follow this procedure for every iteration:
+
+1. Begin from the validated baseline.
+2. Change **one and only one** scientific or optimization factor.
+3. State that factor with `--changed-parameter` and the expected effect with
+   `--change-note`.
+4. Compare its validation result only with the immediate parent baseline before
+   proposing another modification.
+
+For example, a learning-rate-only trial is:
+
+```powershell
+C:\\Users\\shaoq\\AppData\\Local\\Programs\\Python\\Python312\\python.exe .\\mlip\\codes\\D2_naive\\launch_single_gpu.py --gpu 0 -- --lr 0.00005 --changed-parameter learning_rate --change-note "Halve Adam LR to test update stability."
+```
+
+Never combine changes to data, split, model architecture, foundation model,
+optimizer, learning rate, loss weights, precision, or scheduler in one run.
+Use `--dry-run` to inspect the command without creating a run directory.
 
 Inspect the resolved MACE command without training:
 
@@ -72,10 +129,10 @@ Inspect the resolved MACE command without training:
 C:\\Users\\shaoq\\AppData\\Local\\Programs\\Python\\Python312\\python.exe .\\mlip\\codes\\D2_naive\\launch_single_gpu.py --dry-run -- --max-num-epochs 1
 ```
 
-Outputs are isolated under `runs\\polar1s_naive_orca_dft_e0`.  Downloads cache
-under `outputsfull\\.cache` through `XDG_CACHE_HOME`, rather than the user home
-directory. Default settings preserve the target loss, foundation model,
-precision, and batch sizes, while setting
+Outputs are isolated in unique datetime-named directories under `runs\\`.
+Downloads cache under `outputsfull\\.cache` through `XDG_CACHE_HOME`, rather
+than the user home directory. Default settings preserve the target loss,
+foundation model, precision, and batch sizes, while setting
 `--multiheads_finetuning=False` and omitting all replay options.
 
 ## Evaluation

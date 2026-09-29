@@ -1,0 +1,267 @@
+# D2 naive fine-tuning — continuous experiment log
+#
+# This is the only hyperparameter/experiment log for this workflow. Do not
+# replace prior entries. Append every launch, diagnosis, code/default change,
+# and planned next test here. Each launch record must identify its run folder,
+# training log, checkpoint model, compiled model (if available), command, and
+# resolved hyperparameters.
+
+2026-09-29T00:00:00-04:00 — Dataset-audit tooling added
+observation=The active D2 target_all.xyz contains 227 formal-charge-verified H/N/O DFT frames, whereas the parallel D_MHFT target data is an older 162-frame oxygen-only dataset. The former is the candidate authoritative dataset; the latter must not be selected for the nitrogen-bearing target workflow.
+diagnosis_or_uncertainty=The existing seeded formula/charge/spin stratification is reproducible, but rare formula strata leave only one nitrogen-bearing frame in each 11-frame validation/test split. This requires a chemistry-balance review before regenerating splits.
+code_change=Added analyze_dataset_distribution.py, a read-only audit that reports element/frame balance, formulas, charge/spin/source distributions, formal-charge mismatches, exact geometry duplicates, cross-split leakage, and partition completeness.
+proposed_next_test=Run the audit on the current D2 all/train/valid/test files, then decide the desired validation/test chemistry representation and whether a fixed source-group holdout is needed.
+why_most_informative=It separates demonstrable split defects from choices about the intended scientific generalization before any DFT data or historical workflow is removed.
+changed_factor=dataset audit instrumentation only; no training or dataset content changed.
+
+2026-09-29T00:00:00-04:00 — Training provenance logging strengthened
+observation=The launcher already created unique run directories and recorded a pre-launch command, but the continuous log did not automatically distinguish completed from failed attempts or bind a run to immutable input-file contents and source revision.
+diagnosis_or_uncertainty=Without terminal status and data hashes, a later analysis can mistake an interrupted run for a completed one or cannot prove which exact split files it consumed.
+code_change=trainmace.py now writes run_metadata.json before optimization with train/validation SHA-256 hashes, Git revision when available, interpreter, CUDA visibility, cache path, resolved arguments, and command. It appends RUN END with elapsed time and completed/failed status on normal Python-level completion or exception.
+proposed_next_test=No scientific training test selected; this is operational provenance only.
+why_most_informative=It makes every future training attempt auditable without changing model, data, loss, optimizer, or scheduler behavior.
+changed_factor=training-run audit logging only.
+
+2026-09-29T00:00:00-04:00 — 80/10/10 split regenerated and delta artifacts archived
+evidence=prepare_data.py --skip-orca --source-target-all data/target_all.xyz --seed 3 retained all 227 formal-charge-valid frames and wrote 181 train, 23 validation, and 23 test frames. analyze_dataset_distribution.py reports N-bearing frames=36/5/4, C3-source frames=52/7/6, zero duplicate geometries, zero cross-split overlaps, and zero frames missing from the partition.
+diagnosis=The active split now represents the N-bearing C3 family in both holdouts, unlike the preserved 205/11/11 split. Charge distributions remain reported explicitly because rare individual charge states cannot all be represented in 23-frame holdouts.
+data_change=Archived the exact former 205/11/11 files with SHA-256 manifest under data/archive/split_seed3_formula_charge_spin_90_5_5_2026-09-29. Moved only the identified water-only delta artifacts to data/archive/water_only_delta_experiments_2026-09-29; no raw DFT data or historical old/archive directories were removed.
+next_one_factor_test=Establish a new full-training baseline using the active 80/10/10 split before altering optimizer, model, loss, learning rate, precision, replay, or scheduling.
+why_most_informative=The split policy is the sole scientific change relative to earlier D2 runs; a baseline isolates its effect.
+changed_factor=dataset split policy only.
+
+========================================================================================
+RUN START 2026-09-04T09:24:17-04:00 — smoke test (failed before training)
+run_directory=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T092417_819103-0400
+training_log=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T092417_819103-0400/logs/polar1s_naive_orca_dft_e0_20260904T092417_819103-0400_run-3.log
+checkpoint_model=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T092417_819103-0400/checkpoints/polar1s_naive_orca_dft_e0_20260904T092417_819103-0400_run-3.model
+changed_parameter=smoke_test
+result=Failed before training because official MACE develop does not accept legacy --log_interval.
+resolution=Removed only the obsolete --log_interval forwarding option.
+
+========================================================================================
+RUN START 2026-09-04T09:24:34-04:00 — smoke test (official MACE develop)
+run_directory=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T092434_336024-0400
+training_log=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T092434_336024-0400/logs/polar1s_naive_orca_dft_e0_20260904T092434_336024-0400_run-3.log
+checkpoint_model=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T092434_336024-0400/checkpoints/polar1s_naive_orca_dft_e0_20260904T092434_336024-0400_run-3.model
+compiled_model_if_available=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T092434_336024-0400/models/polar1s_naive_orca_dft_e0_20260904T092434_336024-0400_compiled.model
+train_file=/home/kevinsh/mlip/codes/D2_naive/data/target_train.xyz
+valid_file=/home/kevinsh/mlip/codes/D2_naive/data/target_valid.xyz
+data_split=205 train / 11 validation, derived from N-containing target_all.xyz
+model=PolarMACE; foundation_model=polar-1-s; E0s=foundation
+optimizer=Adam; lr=0.0001; EMA=True; ema_decay=0.99999
+energy_weight=0.001; forces_weight=100.0; SWA=True; start_swa=15
+swa_energy_weight=1.0; swa_forces_weight=100000.0; swa_lr=0.001
+batch_size=1; valid_batch_size=1; seed=3; dtype=float32; device=cpu
+max_num_epochs=0
+initial_validation=RMSE_E_per_atom 27.08 meV; RMSE_F 250.67 meV/A
+
+2026-09-04T09:25:00-04:00 — Analysis and planned next experiment
+evidence=The smoke run loaded 205 train / 11 validation configurations from the current N-containing target_all-derived split. The historic 11.89 meV/A result used an oxygen-only 146/8 split and is not directly comparable.
+diagnosis=The frozen foundation has substantial error on the expanded chemistry. Optimization changes are not interpretable until a full baseline is trained on this exact split.
+next_one_factor_test=Increase training duration from the 0-epoch smoke test to the standard 200-epoch baseline run on GPU 0.
+why=This establishes the direct full-training baseline before changing the learning rate, loss, optimizer, model, or split.
+changed_factor=training duration; CPU-to-GPU is an operational change required for production execution.
+
+========================================================================================
+2026-09-04T09:52:00-04:00 — Analysis of latest full baseline and planned child run
+parent_run=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T093646_611434-0400
+parent_training_log=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T093646_611434-0400/logs/polar1s_naive_orca_dft_e0_20260904T093646_611434-0400_run-3.log
+evidence=Validation force RMSE fell from 250.67 meV/A initially to 181.80 meV/A at epoch 14. Stage Two began at epoch 15, changing the loss weights and increasing learning rate from 1e-4 to swa_lr=1e-3. Force RMSE then reached its minimum observed value, 149.47 meV/A, at epoch 74 and fluctuated around 150–153 meV/A thereafter. The run log ends at epoch 76 without a Training complete entry.
+evidence_energy=Validation energy RMSE rose from 47.65 meV/atom at epoch 14 to 58.97 at epoch 15 and 109.50 at epoch 76. This is contemporaneous with the Stage-Two transition.
+diagnosis=The 10-fold Stage-Two learning-rate increase is the most direct suspected cause of energy drift and the force plateau. The expanded N-containing chemistry remains difficult, but this schedule discontinuity is the first isolated factor to test.
+next_one_factor_test=Reduce only swa_lr from 0.001 to 0.0001; retain Stage Two, all loss weights, data files, model, Adam, EMA, seed, and all other settings. Train for 100 epochs on GPU 1.
+why=This tests the observed instability at the exact schedule transition without confounding it with a model, loss, data, or optimizer change. A 100-epoch run covers 85 Stage-Two epochs, more than the parent reached.
+changed_parameter=swa_learning_rate
+child_command=/home/kevinsh/env/bin/python launch_single_gpu.py --gpu 1 -- --max-num-epochs 100 --swa-lr 0.0001 --changed-parameter swa_learning_rate --change-note "Lower only Stage-Two LR from 1e-3 to 1e-4 to reduce post-epoch-15 energy drift and force plateau."
+
+2026-09-04T09:53:00-04:00 — Code and experiment log synchronized
+code_change=trainmace.py defaults now make the prepared child experiment directly runnable without extra arguments: max_num_epochs=100, swa_lr=0.0001, changed_parameter=swa_learning_rate, and the matching change_note. launch_single_gpu.py default GPU is now 1.
+documentation_change=README.md and both AGENTS.md files now require code/default and hyperparameters.txt updates in the same task, and require prepared experiments to run via python launch_single_gpu.py without extra flags.
+why=The latest-run diagnosis identified the Stage-Two learning-rate jump as the sole scientific change to test. Making it the default prevents an undocumented command-line override from diverging from the continuous experiment log.
+
+========================================================================================
+2026-09-04T10:15:00-04:00 — Analysis of swa_lr=1e-4 child and course correction
+child_run=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T095542_785890-0400
+child_training_log=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T095542_785890-0400/logs/polar1s_naive_orca_dft_e0_20260904T095542_785890-0400_run-3.log
+evidence=At matched epoch 31, the 1e-4 child has validation RMSE_F=177.67 meV/A and RMSE_E_per_atom=50.61 meV, while the 1e-3 parent has RMSE_F=155.81 meV/A and RMSE_E_per_atom=93.95 meV. Through epoch 33, the child force RMSE remains 176–178 meV/A, substantially worse than the parent force trajectory, while its energy remains controlled near 50.7 meV/atom.
+diagnosis=Reducing swa_lr to 1e-4 removed the high-LR energy drift but made Stage Two underfit the force correction. The two prior values bracket the desired tradeoff: 1e-3 learns forces faster but destabilizes energy; 1e-4 stabilizes energy but learns forces too slowly.
+next_one_factor_test=Set only swa_lr to the geometric intermediate 3e-4. Retain the same model, data, loss weights, EMA, Stage-Two start, seed, GPU 1, and 100-epoch duration.
+why=An intermediate learning rate is the direct one-dimensional course correction supported by the two bracketing trajectories. It tests whether force progress can recover without the full energy drift seen at 1e-3.
+changed_parameter=swa_learning_rate
+code_change=trainmace.py active default changed from swa_lr=1e-4 to swa_lr=3e-4; README.md synchronized. The user can run the prepared test with no arguments.
+
+2026-09-04T10:00:00-04:00 — Plot artifacts generated
+source_log=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T093646_611434-0400/logs/polar1s_naive_orca_dft_e0_20260904T093646_611434-0400_run-3.log
+epochs_plotted=103 validation epochs
+loss_plot=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T093646_611434-0400/results/loss_by_epoch.png
+energy_plot=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T093646_611434-0400/results/energy_error_by_epoch.png
+force_plot=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T093646_611434-0400/results/force_error_by_epoch.png
+
+========================================================================================
+RUN START 2026-09-04T09:36:46.611768-04:00
+created_at=2026-09-04T09:36:46.611774-04:00
+run_name=polar1s_naive_orca_dft_e0_20260904T093646_611434-0400
+run_directory=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T093646_611434-0400
+training_log=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T093646_611434-0400/logs/polar1s_naive_orca_dft_e0_20260904T093646_611434-0400_run-3.log
+checkpoint_model=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T093646_611434-0400/checkpoints/polar1s_naive_orca_dft_e0_20260904T093646_611434-0400_run-3.model
+compiled_model_if_available=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T093646_611434-0400/models/polar1s_naive_orca_dft_e0_20260904T093646_611434-0400_compiled.model
+POLICY: Change exactly one scientific/training factor per iteration.
+POLICY: Set changed_parameter and change_note before every non-baseline run.
+changed_parameter=none (baseline reproduction)
+change_note=Reproduce validated baseline with current target_all-derived split.
+
+Resolved wrapper hyperparameters:
+atomic_numbers=[1, 7, 8, 16]
+batch_size=1
+change_note=Reproduce validated baseline with current target_all-derived split.
+changed_parameter=none (baseline reproduction)
+default_dtype=float32
+device=cuda
+dry_run=False
+e0s=foundation
+ema=True
+ema_decay=0.99999
+energy_weight=0.001
+forces_weight=100.0
+foundation_model=polar-1-s
+lr=0.0001
+max_num_epochs=200
+name=polar1s_naive_orca_dft_e0
+num_workers=4
+restart_latest=False
+runs_root=/home/kevinsh/mlip/codes/D2_naive/runs
+seed=3
+start_swa=15
+status_every=250
+swa=True
+swa_energy_weight=1.0
+swa_forces_weight=100000.0
+swa_lr=0.001
+train_file=/home/kevinsh/mlip/codes/D2_naive/data/target_train.xyz
+valid_batch_size=1
+valid_file=/home/kevinsh/mlip/codes/D2_naive/data/target_valid.xyz
+
+Resolved MACE command:
+run_train.py --name=polar1s_naive_orca_dft_e0_20260904T093646_611434-0400 --model=PolarMACE --train_file=/home/kevinsh/mlip/codes/D2_naive/data/target_train.xyz --valid_file=/home/kevinsh/mlip/codes/D2_naive/data/target_valid.xyz '--atomic_numbers=[1, 7, 8, 16]' --energy_key=REF_energy --forces_key=REF_forces --total_charge_key=charge --total_spin_key=spin --E0s=foundation --energy_weight=0.001 --forces_weight=100.0 --stress_weight=0.0 --loss=weighted --batch_size=1 --valid_batch_size=1 --max_num_epochs=200 --lr=0.0001 --swa_lr=0.001 --seed=3 --default_dtype=float32 --device=cuda --num_workers=4 --model_dir=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T093646_611434-0400/models --checkpoints_dir=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T093646_611434-0400/checkpoints --log_dir=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T093646_611434-0400/logs --results_dir=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T093646_611434-0400/results --work_dir=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T093646_611434-0400/work --foundation_model=polar-1-s --multiheads_finetuning=False --ema --ema_decay=0.99999 --swa --start_swa=15 --swa_energy_weight=1.0 --swa_forces_weight=100000.0
+
+Analysis notes (append below; add a dated entry after every analysis or decision):
+- evidence:
+- diagnosis / uncertainty:
+- next one-factor test:
+- why this test is informative:
+- changed factor relative to this run:
+
+2026-09-22 analysis: latest completed fine-tuning run is polar1s_naive_orca_dft_e0_20260904T101538_510780-0400 (100 epochs; swa_learning_rate=3e-4). Parsed its training log and wrote plots at runs/polar1s_naive_orca_dft_e0_20260904T101538_510780-0400/results/loss_by_epoch.png, runs/polar1s_naive_orca_dft_e0_20260904T101538_510780-0400/results/energy_error_by_epoch.png, and runs/polar1s_naive_orca_dft_e0_20260904T101538_510780-0400/results/force_error_by_epoch.png. Evidence: loss is 4.5504 at epoch 0, reaches its stage-one minimum 3.6546 at epoch 3, and is 3131.7134 at epoch 99; the discontinuity reflects the logged switch to the different, heavily weighted SWA objective. Energy RMSE per atom increases from 24.27 to 65.70 meV; force RMSE decreases from 200.72 to its minimum 163.70 meV/A at epoch 93 (164.36 meV/A at epoch 99). Diagnosis / uncertainty: the epoch metrics trade energy accuracy for force accuracy after SWA begins; these are the training-loop epoch metrics, while final validation metrics for the selected stage-two checkpoint are 65.3 meV/atom and 163.7 meV/A. Next one-factor test: not selected in this plotting-only analysis. Changed factor relative to this run: none.
+
+2026-09-22 parity analysis: evaluated the selected stage-two fine-tuned checkpoint (runs/polar1s_naive_orca_dft_e0_20260904T101538_510780-0400/models/polar1s_naive_orca_dft_e0_20260904T101538_510780-0400_stagetwo.model) and its Polar-1-S foundation checkpoint (/home/kevinsh/.cache/mace/MACEPOLAR1Smodel) on the held-out DFT test split (data/target_test.xyz; 11 configurations and 897 Cartesian force components). Wrote parity and signed-error figures, predictions, metrics, and labelled outliers under runs/polar1s_naive_orca_dft_e0_20260904T101538_510780-0400/results/parity/test. Evidence: foundation versus fine-tuned RMSE is 14302.7 versus 14191.6 meV for total system energy and 434.0 versus 377.4 meV/A for force components; MAE is 5588.6 versus 5536.0 meV and 139.1 versus 122.9 meV/A. Diagnosis / uncertainty: fine-tuning modestly improves test total-energy error and materially improves force-component error on this 11-configuration split. Next one-factor test: not selected in this plotting-only analysis. Changed factor relative to this run: none.
+
+2026-09-22 parity analysis: generated the same foundation-versus-fine-tuned parity suites for data/target_train.xyz (205 configurations; 18,342 force components) and data/target_valid.xyz (11 configurations; 843 force components) under runs/polar1s_naive_orca_dft_e0_20260904T101538_510780-0400/results/parity/train and .../parity/validation. Evidence: train force-component RMSE is 518.0 (foundation) versus 425.3 meV/A (fine-tuned); validation is 480.4 versus 464.5 meV/A. Direct reevaluation of both exported stage-two model files on target_valid.xyz reproduced 464.5 meV/A, which conflicts with the run log's final 163.7 meV/A validation value. Diagnosis / uncertainty: the parity figures correctly reflect direct eval_configs predictions from the saved selected model, while the training-time reported validation metric is not reproducible from that export; do not compare that log metric directly with parity values until the evaluator/export discrepancy is resolved. Next one-factor test: not selected in this plotting-only analysis. Changed factor relative to this run: none.
+
+========================================================================================
+RUN START 2026-09-04T09:55:42.786283-04:00
+created_at=2026-09-04T09:55:42.786291-04:00
+run_name=polar1s_naive_orca_dft_e0_20260904T095542_785890-0400
+run_directory=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T095542_785890-0400
+training_log=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T095542_785890-0400/logs/polar1s_naive_orca_dft_e0_20260904T095542_785890-0400_run-3.log
+checkpoint_model=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T095542_785890-0400/checkpoints/polar1s_naive_orca_dft_e0_20260904T095542_785890-0400_run-3.model
+compiled_model_if_available=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T095542_785890-0400/models/polar1s_naive_orca_dft_e0_20260904T095542_785890-0400_compiled.model
+POLICY: Change exactly one scientific/training factor per iteration.
+POLICY: Set changed_parameter and change_note before every non-baseline run.
+changed_parameter=swa_learning_rate
+change_note=Lower only Stage-Two LR from 1e-3 to 1e-4 to reduce post-epoch-15 energy drift and force plateau.
+
+Resolved wrapper hyperparameters:
+atomic_numbers=[1, 7, 8, 16]
+batch_size=1
+change_note=Lower only Stage-Two LR from 1e-3 to 1e-4 to reduce post-epoch-15 energy drift and force plateau.
+changed_parameter=swa_learning_rate
+default_dtype=float32
+device=cuda
+dry_run=False
+e0s=foundation
+ema=True
+ema_decay=0.99999
+energy_weight=0.001
+forces_weight=100.0
+foundation_model=polar-1-s
+lr=0.0001
+max_num_epochs=100
+name=polar1s_naive_orca_dft_e0
+num_workers=4
+restart_latest=False
+runs_root=/home/kevinsh/mlip/codes/D2_naive/runs
+seed=3
+start_swa=15
+status_every=250
+swa=True
+swa_energy_weight=1.0
+swa_forces_weight=100000.0
+swa_lr=0.0001
+train_file=/home/kevinsh/mlip/codes/D2_naive/data/target_train.xyz
+valid_batch_size=1
+valid_file=/home/kevinsh/mlip/codes/D2_naive/data/target_valid.xyz
+
+Resolved MACE command:
+run_train.py --name=polar1s_naive_orca_dft_e0_20260904T095542_785890-0400 --model=PolarMACE --train_file=/home/kevinsh/mlip/codes/D2_naive/data/target_train.xyz --valid_file=/home/kevinsh/mlip/codes/D2_naive/data/target_valid.xyz '--atomic_numbers=[1, 7, 8, 16]' --energy_key=REF_energy --forces_key=REF_forces --total_charge_key=charge --total_spin_key=spin --E0s=foundation --energy_weight=0.001 --forces_weight=100.0 --stress_weight=0.0 --loss=weighted --batch_size=1 --valid_batch_size=1 --max_num_epochs=100 --lr=0.0001 --swa_lr=0.0001 --seed=3 --default_dtype=float32 --device=cuda --num_workers=4 --model_dir=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T095542_785890-0400/models --checkpoints_dir=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T095542_785890-0400/checkpoints --log_dir=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T095542_785890-0400/logs --results_dir=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T095542_785890-0400/results --work_dir=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T095542_785890-0400/work --foundation_model=polar-1-s --multiheads_finetuning=False --ema --ema_decay=0.99999 --swa --start_swa=15 --swa_energy_weight=1.0 --swa_forces_weight=100000.0
+
+Analysis notes (append below; add a dated entry after every analysis or decision):
+- evidence:
+- diagnosis / uncertainty:
+- next one-factor test:
+- why this test is informative:
+- changed factor relative to this run:
+
+========================================================================================
+RUN START 2026-09-04T10:15:38.511365-04:00
+created_at=2026-09-04T10:15:38.511384-04:00
+run_name=polar1s_naive_orca_dft_e0_20260904T101538_510780-0400
+run_directory=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T101538_510780-0400
+training_log=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T101538_510780-0400/logs/polar1s_naive_orca_dft_e0_20260904T101538_510780-0400_run-3.log
+checkpoint_model=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T101538_510780-0400/checkpoints/polar1s_naive_orca_dft_e0_20260904T101538_510780-0400_run-3.model
+compiled_model_if_available=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T101538_510780-0400/models/polar1s_naive_orca_dft_e0_20260904T101538_510780-0400_compiled.model
+POLICY: Change exactly one scientific/training factor per iteration.
+POLICY: Set changed_parameter and change_note before every non-baseline run.
+changed_parameter=swa_learning_rate
+change_note=Set only Stage-Two LR to intermediate 3e-4 after 1e-4 underfit forces and 1e-3 caused energy drift.
+
+Resolved wrapper hyperparameters:
+atomic_numbers=[1, 7, 8, 16]
+batch_size=1
+change_note=Set only Stage-Two LR to intermediate 3e-4 after 1e-4 underfit forces and 1e-3 caused energy drift.
+changed_parameter=swa_learning_rate
+default_dtype=float32
+device=cuda
+dry_run=False
+e0s=foundation
+ema=True
+ema_decay=0.99999
+energy_weight=0.001
+forces_weight=100.0
+foundation_model=polar-1-s
+lr=0.0001
+max_num_epochs=100
+name=polar1s_naive_orca_dft_e0
+num_workers=4
+restart_latest=False
+runs_root=/home/kevinsh/mlip/codes/D2_naive/runs
+seed=3
+start_swa=15
+status_every=250
+swa=True
+swa_energy_weight=1.0
+swa_forces_weight=100000.0
+swa_lr=0.0003
+train_file=/home/kevinsh/mlip/codes/D2_naive/data/target_train.xyz
+valid_batch_size=1
+valid_file=/home/kevinsh/mlip/codes/D2_naive/data/target_valid.xyz
+
+Resolved MACE command:
+run_train.py --name=polar1s_naive_orca_dft_e0_20260904T101538_510780-0400 --model=PolarMACE --train_file=/home/kevinsh/mlip/codes/D2_naive/data/target_train.xyz --valid_file=/home/kevinsh/mlip/codes/D2_naive/data/target_valid.xyz '--atomic_numbers=[1, 7, 8, 16]' --energy_key=REF_energy --forces_key=REF_forces --total_charge_key=charge --total_spin_key=spin --E0s=foundation --energy_weight=0.001 --forces_weight=100.0 --stress_weight=0.0 --loss=weighted --batch_size=1 --valid_batch_size=1 --max_num_epochs=100 --lr=0.0001 --swa_lr=0.0003 --seed=3 --default_dtype=float32 --device=cuda --num_workers=4 --model_dir=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T101538_510780-0400/models --checkpoints_dir=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T101538_510780-0400/checkpoints --log_dir=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T101538_510780-0400/logs --results_dir=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T101538_510780-0400/results --work_dir=/home/kevinsh/mlip/codes/D2_naive/runs/polar1s_naive_orca_dft_e0_20260904T101538_510780-0400/work --foundation_model=polar-1-s --multiheads_finetuning=False --ema --ema_decay=0.99999 --swa --start_swa=15 --swa_energy_weight=1.0 --swa_forces_weight=100000.0
+
+Analysis notes (append below; add a dated entry after every analysis or decision):
+- evidence:
+- diagnosis / uncertainty:
+- next one-factor test:
+- why this test is informative:
+- changed factor relative to this run:

@@ -113,3 +113,66 @@ python -m py_compile path/to/script.py
 ```
 
 For workflow scripts, prefer a small smoke test that confirms inputs load and outputs are written to the expected directory. Report any dependency, network, or model-cache blockers directly.
+
+## Fine-Tuning Experiment Protocol
+
+For every MACE fine-tuning iteration, use the workflow's launcher rather than
+calling `run_train.py` directly. Each launch must create a new directory with
+a unique datetime in its name and must append to the single workflow-level
+`hyperparameters.txt` before optimization begins. Never reuse or overwrite a
+prior run directory.
+
+Treat that single file as the living lab notebook. Agents must append a dated
+entry to the workflow-level `hyperparameters.txt` whenever they inspect,
+diagnose, compare, or decide what to do next with a run. Do not replace its
+launch records.
+Each appended entry must state:
+
+- the observation and exact evidence (metrics, epoch, log path, or plot);
+- the current diagnosis or uncertainty;
+- the proposed next test;
+- why that test is the most informative next step; and
+- the one parameter/factor it changes relative to this run.
+
+Write an entry after an interrupted or failed run too. Before starting a child
+run, append the planned one-factor change and rationale to the single log,
+then record the corresponding `--changed-parameter` and `--change-note` in
+the child launch. This preserves the causal chain between experiments.
+
+**Keep code and experiment records synchronized.** Whenever an agent changes
+fine-tuning code, defaults, data selection, or documentation, it must in the
+same task append a dated explanation to the workflow's single
+`hyperparameters.txt`. Conversely, a diagnosis or next-test decision made
+in an experiment record must be reflected in the relevant workflow code or
+README when it changes the default procedure. Never leave a code change or a
+scientific decision recorded in only one place.
+
+When preparing the next approved experiment, update the workflow defaults in
+code as well as the experiment log. The user must be able to start that exact
+prepared experiment with only `python launch_single_gpu.py` from the workflow
+directory—no additional flags, keyword arguments, or remembered overrides.
+Record the same active setting and rationale in `hyperparameters.txt` in the
+same task. Do not tell the user to add flags for a change that the agent has
+already prepared.
+
+Each launch record must include exact locations for the run directory, training
+log, checkpoint model, and compiled model (if compilation succeeds). Tell the
+user the single workflow-level log path. A user can launch the current baseline
+simply with `python launch_single_gpu.py` from its workflow directory; the
+launcher appends the run record automatically.
+
+Run experiments in this order:
+
+1. Start from the documented validated baseline.
+2. Change **exactly one** scientific or training factor.
+3. Set `--changed-parameter` to that one factor and explain the rationale in
+   `--change-note`.
+4. Append the diagnosis and next-test rationale to the parent's
+   `hyperparameters.txt`.
+5. Compare the new validation metrics with its direct parent run before making
+   another change.
+
+Do not combine data-split, model, optimizer, learning-rate, loss-weight,
+foundation-checkpoint, precision, or scheduler changes in a single trial.
+Record a failed trial as faithfully as a successful one; it is part of the
+experimental evidence.

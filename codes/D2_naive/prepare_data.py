@@ -65,20 +65,27 @@ def write_formal_charge_valid_frames(input_path: Path, output_path: Path) -> tup
     return len(valid), len(frames) - len(valid)
 
 
-def frame_stratum(frame: Atoms) -> tuple[str, int, int]:
-    """Return the chemistry label used to balance the dataset splits."""
-    return (
-        frame.get_chemical_formula(),
-        int(frame.info.get("charge", 0)),
-        int(frame.info.get("spin", 1)),
-    )
+def frame_stratum(frame: Atoms) -> tuple[str, str]:
+    """Return a split stratum that remains useful for sparse cluster chemistry.
+
+    Exact formula/charge/spin stratification made nearly every nitrogen-bearing
+    cluster a singleton. The current data has three robust source/chemistry
+    families: N-bearing C3 clusters, N-free C3 clusters, and original C_DFT
+    water clusters. These can be represented in every split.
+    """
+    source = str(frame.info.get("source_dataset", ""))
+    if not source:
+        source_file = str(frame.info.get("source_file", ""))
+        source = "C_DFTproduction" if source_file.startswith("C_DFTprod_") else "unspecified"
+    chemistry = "nitrogen_bearing" if 7 in frame.numbers else "nitrogen_free"
+    return chemistry, source
 
 
 def apportion(
-    group_sizes: dict[tuple[str, int, int], int],
+    group_sizes: dict[tuple[object, ...], int],
     total: int,
-    capacities: dict[tuple[str, int, int], int],
-) -> dict[tuple[str, int, int], int]:
+    capacities: dict[tuple[object, ...], int],
+) -> dict[tuple[object, ...], int]:
     """Allocate an exact total across strata using largest-remainder rounding."""
     population = sum(group_sizes.values())
     if total > sum(capacities.values()):
@@ -120,17 +127,17 @@ def split_extxyz(input_path: Path, train_path: Path, valid_path: Path, test_path
     n_test = max(1, int(round(n_total * test_fraction))) if n_total >= 3 and test_fraction else 0
     if n_valid + n_test >= n_total:
         raise ValueError(f"Split fractions leave no training data: total={n_total}, valid={n_valid}, test={n_test}")
-    groups: dict[tuple[str, int, int], list[int]] = defaultdict(list)
+    groups: dict[tuple[str, str], list[int]] = defaultdict(list)
     for index, frame in enumerate(frames):
         groups[frame_stratum(frame)].append(index)
     group_sizes = {key: len(indices) for key, indices in groups.items()}
 
     # Allocate a representative holdout sample while retaining at least one
-    # member of every chemistry stratum in training. Then divide that holdout
+    # member of every source/chemistry family in training. Then divide that holdout
     # sample into validation and test sets without overlap.
     holdout_total = n_valid + n_test
     # Prefer to retain at least one example of every stratum in training. Some
-    # cluster datasets contain mostly singleton formulas, making that constraint
+    # cluster datasets can contain mostly singleton formulas, making that constraint
     # incompatible with the requested holdout size; in that case allow singleton
     # strata into the holdout instead of failing dataset preparation.
     holdout_capacities = {key: max(0, size - 1) for key, size in group_sizes.items()}
@@ -151,10 +158,8 @@ def split_extxyz(input_path: Path, train_path: Path, valid_path: Path, test_path
         test_indices.extend(indices[n_for_valid:n_for_valid + n_for_test])
         train_indices.extend(indices[n_for_valid + n_for_test:])
 
-    # Formula-level stratification can put no N-containing frame in a small
-    # holdout when most formulas occur only once. Guarantee elemental coverage
-    # for elements represented by at least three frames, using deterministic
-    # train/holdout swaps that preserve split sizes and disjointness.
+    # Keep this guard for arbitrary future inputs. The family stratification
+    # above already represents nitrogen in the current 80/10/10 target split.
     for target_indices in (valid_indices, test_indices):
         for atomic_number in sorted(set(int(z) for frame in frames for z in frame.numbers)):
             containing = [index for index, frame in enumerate(frames) if atomic_number in frame.numbers]
@@ -195,8 +200,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--target-train", type=Path, default=DEFAULT_TARGET_TRAIN)
     parser.add_argument("--target-valid", type=Path, default=DEFAULT_TARGET_VALID)
     parser.add_argument("--target-test", type=Path, default=DEFAULT_TARGET_TEST)
-    parser.add_argument("--valid-fraction", type=float, default=0.05)
-    parser.add_argument("--test-fraction", type=float, default=0.05)
+    parser.add_argument("--valid-fraction", type=float, default=0.10)
+    parser.add_argument("--test-fraction", type=float, default=0.10)
     parser.add_argument("--seed", type=int, default=3, help="Random seed for reproducible stratified splits.")
     parser.add_argument("--atomization-energies", type=Path, default=DEFAULT_ATOMIZATION)
     parser.add_argument("--e0s-json", type=Path, default=DEFAULT_E0S)
