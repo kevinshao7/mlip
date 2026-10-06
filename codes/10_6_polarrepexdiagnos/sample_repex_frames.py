@@ -18,7 +18,7 @@ from scipy.io import netcdf_file
 SCRIPT_DIR = Path(__file__).resolve().parent
 MLIP_DIR = SCRIPT_DIR.parents[1]
 DEFAULT_INPUT = MLIP_DIR / "outputsfull" / "9_29_repexfull"
-DEFAULT_OUTPUT = MLIP_DIR / "outputsfull" / "10_6_polarrepexdiagnos" / "representative_100.xyz"
+DEFAULT_OUTPUT = SCRIPT_DIR / "representative_300.xyz"
 REPLICA_RE = re.compile(r"^replica_(\d+)_lambda_([0-9.]+)_el_([0-9.]+)$")
 
 
@@ -33,7 +33,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input-dir", type=Path, default=DEFAULT_INPUT)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
-    parser.add_argument("--n-frames", type=int, default=100)
+    parser.add_argument("--n-frames", type=int, default=300)
     parser.add_argument(
         "--equilibration-fraction", type=fraction, default=0.20,
         help="Leading fraction omitted independently in every replica (default: 0.20).",

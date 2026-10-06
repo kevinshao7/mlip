@@ -14,7 +14,7 @@ from typing import Any
 SCRIPT_DIR = Path(__file__).resolve().parent
 MLIP_DIR = SCRIPT_DIR.parents[1]
 MACE_REPO = MLIP_DIR / "mace"
-DEFAULT_INPUT = MLIP_DIR / "outputsfull" / "10_6_polarrepexdiagnos" / "representative_100.xyz"
+DEFAULT_INPUT = SCRIPT_DIR / "representative_300.xyz"
 DEFAULT_OUTPUT = MLIP_DIR / "outputsfull" / "10_6_polarrepexdiagnos" / "parity"
 DEFAULT_CACHE = MLIP_DIR / "outputsfull" / ".cache"
 os.environ.setdefault("XDG_CACHE_HOME", str(DEFAULT_CACHE))
