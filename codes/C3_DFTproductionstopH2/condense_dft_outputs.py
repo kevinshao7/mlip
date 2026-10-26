@@ -26,13 +26,15 @@ FORMAL_CHARGES = {"H": 1, "N": -3, "O": -2, "S": -2}
 HARTREE_TO_EV = 27.211386245988
 HARTREE_PER_BOHR_TO_EV_PER_ANGSTROM = HARTREE_TO_EV / 0.529177210903
 FLOAT = r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[Ee][+-]?\d+)?"
-XYZ_RE = re.compile(r"^\s*\*xyz\s+([+-]?\d+)\s+(\d+)\s*$", re.I | re.M)
+# ORCA accepts both ``*xyz`` and the more common ``* xyz`` spelling.  The
+# campaign writes the latter, so the audit parser must accept both.
+XYZ_RE = re.compile(r"^\s*\*\s*xyz\s+([+-]?\d+)\s+(\d+)\s*$", re.I | re.M)
 ATOM_RE = re.compile(rf"^\s*([A-Za-z]+)\s+({FLOAT})\s+({FLOAT})\s+({FLOAT})\s*$")
 OUTPUT_CHARGE_RE = re.compile(r"Total\s+Charge\s+Charge\s+\.+\s+([+-]?\d+)", re.I)
 # ORCA echoes the input deck near the beginning of every output.  This is the
 # authoritative record of what was actually calculated; the current .inp may
 # have been regenerated since the output was produced.
-OUTPUT_XYZ_RE = re.compile(r"^\s*\|\s*\d+>\s*\*xyz\s+([+-]?\d+)\s+(\d+)\s*$", re.I | re.M)
+OUTPUT_XYZ_RE = re.compile(r"^\s*\|\s*\d+>\s*\*\s*xyz\s+([+-]?\d+)\s+(\d+)\s*$", re.I | re.M)
 ENERGY_RE = re.compile(rf"FINAL SINGLE POINT ENERGY\s+({FLOAT})")
 GRADIENT_RE = re.compile(rf"^\s*\d+\s+([A-Za-z]+)\s*:\s*({FLOAT})\s+({FLOAT})\s+({FLOAT})\s*$")
 

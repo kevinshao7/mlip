@@ -6,7 +6,10 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import sys
+import time
+from datetime import datetime
 from pathlib import Path
 
 from ase.data import atomic_numbers
@@ -26,6 +29,8 @@ DFT_E0S_JSON = DATA_DIR / "target_dft_e0s.json"
 # This is the E0 set used by the completed polar1s_mhft_orca run.  Keep it
 # unchanged so that run remains reproducible under the explicit "averaged" name.
 AVERAGED_E0S_JSON = DATA_DIR / "target_e0s.json"
+sys.path.insert(0, str(MLIP_DIR / "codes"))
+import finetune_megadataset as megadataset
 
 
 def path_arg(path: Path) -> str:
@@ -237,10 +242,25 @@ def main() -> None:
     os.environ.setdefault("XDG_CACHE_HOME", str(CACHE_DIR.resolve()))
     sys.path.insert(0, str(MACE_REPO.resolve()))
     sys.argv = build_train_argv(args)
+    run_dir = args.run_dir.resolve()
+    try:
+        revision = subprocess.check_output(["git", "-C", str(MLIP_DIR), "rev-parse", "HEAD"], text=True, stderr=subprocess.DEVNULL).strip()
+    except (OSError, subprocess.CalledProcessError):
+        revision = None
+    metadata = {"created_at": datetime.now().astimezone().isoformat(), "run_name": args.name,
+                "run_directory": str(run_dir), "git_revision": revision,
+                "arguments": {key: str(value) for key, value in vars(args).items()}, "mace_command": sys.argv}
+    metadata_path = run_dir / "run_metadata.json"
+    metadata_path.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
 
     from mace.cli.run_train import main as run_train_main
-
-    run_train_main()
+    started = time.monotonic()
+    try:
+        run_train_main()
+    except BaseException as error:
+        megadataset.record_metadata_file(metadata_path, method="multihead_replay", wrapper="D_MHFT/trainmace.py", status="failed", ended_at=datetime.now().astimezone().isoformat(), duration_seconds=time.monotonic()-started, error=str(error))
+        raise
+    megadataset.record_metadata_file(metadata_path, method="multihead_replay", wrapper="D_MHFT/trainmace.py", status="completed", ended_at=datetime.now().astimezone().isoformat(), duration_seconds=time.monotonic()-started)
 
 
 if __name__ == "__main__":

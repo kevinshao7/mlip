@@ -52,6 +52,8 @@ C2_ATOMIZATION_E0S = (
     SCRIPT_DIR.parent / "C2_atomizationDFT"
 ).parent / "7_7b_clustervalidation" / "atomizationenergies.txt"
 DFT_E0S_JSON = DATA_DIR / "target_dft_e0s.json"
+sys.path.insert(0, str(MLIP_DIR / "codes"))
+import finetune_megadataset as megadataset
 
 
 def path_arg(path: Path) -> str:
@@ -204,6 +206,16 @@ def append_run_outcome(run_name: str, run_dir: Path, started: float, outcome: st
         lines.extend([f"error_type={type(error).__name__}", f"error_message={error}"])
     with destination.open("a", encoding="utf-8") as handle:
         handle.write("\n" + "\n".join(lines) + "\n")
+    # This shared, Git-tracked registry is the machine-readable authority for
+    # comparisons across naive, replay, and campaign fine-tuning methods.
+    try:
+        megadataset.record_metadata_file(
+            run_dir / "run_metadata.json", method="target_only_naive", wrapper="D2_naive/trainmace.py",
+            status=outcome, ended_at=datetime.now().astimezone().isoformat(),
+            duration_seconds=round(time.monotonic() - started, 3), error=str(error) if error else None,
+        )
+    except Exception as registry_error:
+        print(f"WARNING: fine-tuning megadataset record failed: {registry_error}", file=sys.stderr)
 
 
 def build_train_argv(args: argparse.Namespace, run_name: str, run_dir: Path) -> list[str]:

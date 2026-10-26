@@ -1,5 +1,10 @@
 # PolarMACE Naive Fine Tuning
 
+Every terminal launch appends one provenance/metrics row to the Git-tracked
+[`../finetuning_megadataset.jsonl`](../finetuning_megadataset.jsonl). It records
+data hashes and sizes, hyperparameters, method, timing, and initial/final MACE
+loss/RMSE; see [`../FINETUNING_MEGADATASET.md`](../FINETUNING_MEGADATASET.md).
+
 This directory is a target-only, **naive** fine-tuning workflow for the
 `polar-1-s` PolarMACE foundation model. It intentionally has no replay data
 and does not enable MACE multihead fine tuning. The foundation weights are

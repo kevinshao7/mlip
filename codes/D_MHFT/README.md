@@ -1,5 +1,10 @@
 # PolarMACE Multihead Fine Tuning
 
+Every terminal launch appends one provenance/metrics row to the Git-tracked
+[`../finetuning_megadataset.jsonl`](../finetuning_megadataset.jsonl). It records
+data hashes and sizes, hyperparameters, method, timing, and initial/final MACE
+loss/RMSE; see [`../FINETUNING_MEGADATASET.md`](../FINETUNING_MEGADATASET.md).
+
 This folder prepares ORCA DFT outputs and runs multihead fine tuning of
 `polar-1-s` from the local `mlip/mace` checkout.
 

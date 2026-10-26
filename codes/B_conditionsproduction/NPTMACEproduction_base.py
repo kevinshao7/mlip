@@ -259,7 +259,11 @@ def stagedMD(init_conf, temp_final, pressure_gpa, calc, fname, checkpoint_fname,
     t1 = time.time()
 
     pbar.close()
-    dyn.atoms.write(checkpoint_fname)
+    # ``dyn`` was the name used by an older, non-chunked integrator.  The
+    # chunked workflow updates ``init_conf`` in place, so write that final
+    # configuration.  This must happen after production has already been
+    # flushed, but before the thermodynamic history is serialized.
+    init_conf.write(checkpoint_fname)
 
     data = np.column_stack([
         times,
