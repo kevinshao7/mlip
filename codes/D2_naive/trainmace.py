@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import fcntl
 from datetime import datetime
 import hashlib
 import json
@@ -17,6 +18,7 @@ import warnings
 from pathlib import Path
 
 from ase.data import atomic_numbers
+from ase.io import iread
 
 # e3nn 0.4.x stores trusted, package-shipped Wigner constants as a Torch
 # archive.  PyTorch >= 2.6 defaults to weights_only=True and otherwise rejects
@@ -48,6 +50,7 @@ MACE_REPO = MLIP_DIR / "mace"
 CACHE_DIR = MLIP_DIR / "outputsfull" / ".cache"
 DATA_DIR = SCRIPT_DIR / "data"
 RUNS_DIR = SCRIPT_DIR / "runs"
+FORMAL_CHARGES = {"H": 1, "N": -3, "O": -2, "S": -2}
 C2_ATOMIZATION_E0S = (
     SCRIPT_DIR.parent / "C2_atomizationDFT"
 ).parent / "7_7b_clustervalidation" / "atomizationenergies.txt"
@@ -64,6 +67,44 @@ def require_file(path: Path, message: str) -> str:
     if not path.is_file():
         raise FileNotFoundError(f"{message}: {path}")
     return path_arg(path)
+
+
+def validate_formal_charge_and_spin(path: Path, label: str) -> int:
+    """Reject any frame whose total charge or singlet spin is inconsistent."""
+    require_file(path, f"Missing {label} extxyz")
+    count = 0
+    for index, atoms in enumerate(iread(path, index=":")):
+        symbols = atoms.get_chemical_symbols()
+        unknown = sorted(set(symbols) - FORMAL_CHARGES.keys())
+        if unknown:
+            raise ValueError(
+                f"{label} frame {index}: no formal-charge rule for {','.join(unknown)}"
+            )
+        expected_charge = sum(FORMAL_CHARGES[symbol] for symbol in symbols)
+        if "charge" not in atoms.info:
+            raise ValueError(f"{label} frame {index}: missing extxyz charge metadata")
+        actual_charge = int(atoms.info["charge"])
+        if actual_charge != expected_charge:
+            raise ValueError(
+                f"{label} frame {index}: extxyz charge {actual_charge} != "
+                f"recomputed formal charge {expected_charge}"
+            )
+        if "spin" not in atoms.info:
+            raise ValueError(f"{label} frame {index}: missing extxyz spin metadata")
+        spin = int(atoms.info["spin"])
+        if spin != 1:
+            raise ValueError(f"{label} frame {index}: spin multiplicity {spin} != 1")
+        electron_count = int(sum(atoms.numbers) - expected_charge)
+        if electron_count % 2:
+            raise ValueError(
+                f"{label} frame {index}: odd electron count {electron_count} "
+                "is incompatible with multiplicity 1"
+            )
+        count += 1
+    if count == 0:
+        raise ValueError(f"{label} extxyz contains no structures: {path}")
+    print(f"Validated formal charge and spin multiplicity 1 for {count} {label} structures")
+    return count
 
 
 def write_dft_e0_json(source: Path, destination: Path) -> str:
@@ -150,7 +191,10 @@ def append_experiment_log(args: argparse.Namespace, run_name: str, run_dir: Path
         "",
     ])
     with destination.open("a", encoding="utf-8") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX)
         handle.write("\n".join(lines))
+        handle.flush()
+        fcntl.flock(handle, fcntl.LOCK_UN)
 
 
 def sha256(path: Path) -> str:
@@ -205,7 +249,10 @@ def append_run_outcome(run_name: str, run_dir: Path, started: float, outcome: st
     if error is not None:
         lines.extend([f"error_type={type(error).__name__}", f"error_message={error}"])
     with destination.open("a", encoding="utf-8") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX)
         handle.write("\n" + "\n".join(lines) + "\n")
+        handle.flush()
+        fcntl.flock(handle, fcntl.LOCK_UN)
     # This shared, Git-tracked registry is the machine-readable authority for
     # comparisons across naive, replay, and campaign fine-tuning methods.
     try:
@@ -341,6 +388,8 @@ def main() -> None:
     args = parse_args()
     if not MACE_REPO.is_dir():
         raise FileNotFoundError(f"Local MACE checkout is missing: {MACE_REPO}")
+    validate_formal_charge_and_spin(args.train_file, "training")
+    validate_formal_charge_and_spin(args.valid_file, "validation")
     os.environ.setdefault("XDG_CACHE_HOME", str(CACHE_DIR.resolve()))
     sys.path.insert(0, str(MACE_REPO.resolve()))
     run_name, run_dir = unique_run_context(args)

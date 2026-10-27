@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import re
 import shutil
 import time
@@ -63,27 +64,43 @@ def rows() -> list[dict]:
     for pressure in map(float, campaign.config()["pressures_gpa"]):
         cycle = campaign.cycle(pressure)
         md = cycle / "md"; analysis = cycle / "analysis"; dfts = sorted((cycle / "dft").glob("acquisition*"))
-        requested = accepted = partial = 0; parity_candidates = []
+        requested = accepted = completed_uncollected = partial = 0; parity_candidates = []
         for dft in dfts:
             requested_one, accepted_one = count_rows(dft / "collection.csv")
             if not requested_one and (dft / "manifest.csv").exists():
                 with (dft / "manifest.csv").open(encoding="utf-8") as stream:
                     requested_one = sum(1 for _ in csv.DictReader(stream))
             requested += requested_one; accepted += accepted_one
-            partial += len(list((dft / "outputs").glob("*.partial"))) if (dft / "outputs").exists() else 0
+            if (dft / "outputs").exists():
+                completed_one = len(list((dft / "outputs").glob("*.out")))
+                completed_uncollected += max(completed_one - accepted_one, 0)
+                partial += len(list((dft / "outputs").glob("*.partial")))
             if (dft / "parity_summary.json").exists(): parity_candidates.append(dft / "parity_summary.json")
         parity = load(max(parity_candidates, key=lambda p: p.stat().st_mtime), {}) if parity_candidates else {}
         summary = load(analysis / "summary.json", {})
+        training = cycle / "training"
+        # finetune_status.json is written by campaign.py finetune and contains
+        # real metadata (finetune_id, state, counts).  A bare launch_command.sh
+        # without a status file means the batch was prepared but never started
+        # (e.g. orphaned scripts from a superseded campaign branch); treat it as
+        # "prepared" for the stage-map dot only, not as a live batch to display.
+        finetune_status = load(training / "finetune_status.json", {})
+        if not finetune_status and (training / "batch_complete.json").exists():
+            finetune_status = {"state": "completed"}
+        finetune_prepared = (training / "launch_command.sh").exists()
         result.append({
             "pressure": pressure, "tag": campaign.tag(pressure),
-            "md": bool(list(md.glob("production_*.xyz"))),
+            "md": bool(list(md.glob("**/production_*.xyz"))),
             "analysis": (analysis / "summary.json").exists(),
-            "clusters": (cycle / "clusters" / "acquisition" / "clusters.extxyz").exists(),
+            "clusters": bool(list((cycle / "clusters").glob("acquisition*/clusters.extxyz"))),
             "prepared": bool(dfts),
             "dft_done": any((dft / "dft_failure_report.json").exists() for dft in dfts),
-            "requested": requested, "accepted": accepted, "partial": partial,
+            "requested": requested, "accepted": accepted,
+            "completed_uncollected": completed_uncollected, "partial": partial,
             "mae": parity.get("energy_mae_mev_per_atom"),
             "mean_pressure": summary.get("mean_pressure_GPa"),
+            "finetune": bool(finetune_status) or finetune_prepared,
+            "finetune_status": finetune_status,
         })
     return result
 
@@ -128,6 +145,56 @@ def batch_metrics(history: list[dict]) -> list[dict]:
     return batches
 
 
+def live_batch_metrics(data: list[dict]) -> dict | None:
+    """Return metrics from a prepared/running batch before lineage finalization."""
+    candidates = [row["finetune_status"] for row in data
+                  if row["finetune_status"].get("state") in {"prepared", "running", "failed", "interrupted"}]
+    if not candidates:
+        return None
+    status = max(candidates, key=lambda item: item.get("updated_utc", ""))
+    child_statuses = status.get("children", [])
+    if child_statuses:
+        child_metrics = []
+        runs = (ROOT / "../D2_naive/runs").resolve()
+        for child in child_statuses:
+            child_id = child.get("finetune_id")
+            run_dirs = sorted(runs.glob(f"{child_id}_*"), key=lambda path: path.stat().st_mtime) if child_id else []
+            logs = sorted((run_dirs[-1] / "logs").glob("*.log")) if run_dirs else []
+            text = logs[-1].read_text(errors="replace") if logs else ""
+            series = []
+            for line in text.splitlines():
+                hit = METRIC_RE.search(line)
+                if hit:
+                    series.append({"epoch": -1 if hit.group("epoch") is None else int(hit.group("epoch")),
+                                   "loss": float(hit.group("loss")), "energy": float(hit.group("energy")),
+                                   "force": float(hit.group("force"))})
+            child_metrics.append({"status": child, "series": series,
+                                  "log": str(logs[-1]) if logs else ""})
+        first_series = next((item["series"] for item in child_metrics if item["series"]), [])
+        return {"status": status, "series": first_series, "endpoint": {}, "children": child_metrics}
+    finetune_id = status.get("finetune_id")
+    if not finetune_id:
+        return {"status": status, "series": [], "endpoint": {}}
+    runs = (ROOT / "../D2_naive/runs").resolve()
+    run_dirs = sorted(runs.glob(f"{finetune_id}_*"), key=lambda path: path.stat().st_mtime)
+    logs = sorted((run_dirs[-1] / "logs").glob("*.log")) if run_dirs else []
+    text = logs[-1].read_text(errors="replace") if logs else ""
+    series = []
+    for line in text.splitlines():
+        hit = METRIC_RE.search(line)
+        if hit:
+            series.append({"epoch": -1 if hit.group("epoch") is None else int(hit.group("epoch")),
+                           "loss": float(hit.group("loss")), "energy": float(hit.group("energy")),
+                           "force": float(hit.group("force"))})
+    endpoint = {}
+    for hit in TABLE_ROW_RE.finditer(text):
+        endpoint[hit.group("split").lower()] = {
+            "energy": float(hit.group("energy")), "force": float(hit.group("force"))
+        }
+    return {"status": status, "series": series, "endpoint": endpoint,
+            "log": str(logs[-1]) if logs else ""}
+
+
 def publish_active_named_run(output: Path) -> None:
     """Publish a clearly tracked top-level view of the active named run.
 
@@ -144,7 +211,7 @@ def publish_active_named_run(output: Path) -> None:
         archive.mkdir(parents=True, exist_ok=True)
         stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         shutil.copy2(PUBLIC_TARGET, archive / f"campaign_dashboard_{previous.get('run_id', 'unnamed')}_{stamp}.png")
-    temporary = PUBLIC_TARGET.with_suffix(".active.partial.png")
+    temporary = PUBLIC_TARGET.with_name(f".{PUBLIC_TARGET.stem}.{os.getpid()}.active.partial.png")
     shutil.copy2(output, temporary)
     temporary.replace(PUBLIC_TARGET)
     ACTIVE_POINTER.write_text(json.dumps({"updated_utc": datetime.now(timezone.utc).isoformat(),
@@ -166,20 +233,29 @@ def render(output: Path = TARGET) -> None:
     labels = [f"{row['pressure']:.2f}" for row in data]; y = np.arange(len(data))
     stages = [("MD", "md", "#2878b5"), ("analysis", "analysis", "#59a14f"),
               ("allowed clusters", "clusters", "#edc948"), ("DFT prepared", "prepared", "#f28e2b"),
-              ("DFT queue complete", "dft_done", "#e15759")]
+              ("DFT queue complete", "dft_done", "#e15759"), ("fine tuning", "finetune", "#af7aa1")]
     for xpos, (label, key, color) in enumerate(stages):
         present = [row[key] for row in data]
         ax_stage.scatter(np.full(sum(present), xpos), y[np.array(present, dtype=bool)], s=105,
                          c=color, marker="s", label=label, edgecolors="white", linewidths=.7)
+        if key == "finetune":
+            for ypos, row in enumerate(data):
+                if row[key]:
+                    state = row["finetune_status"].get("state", "unknown")
+                    ax_stage.annotate(state, (xpos, ypos), xytext=(5, 0), textcoords="offset points",
+                                      va="center", fontsize=7)
     ax_stage.set(yticks=y, yticklabels=[f"{p} GPa" for p in labels], xlim=(-.6, len(stages)-.4),
                  xticks=range(len(stages)), xticklabels=[x[0] for x in stages], title="Pressure-cycle stage map")
     ax_stage.tick_params(axis="x", rotation=25); ax_stage.grid(axis="y", alpha=.25); ax_stage.legend(fontsize=8, loc="lower right")
 
     requested = np.array([row["requested"] for row in data]); accepted = np.array([row["accepted"] for row in data])
-    partial = np.array([row["partial"] for row in data]); pending = np.maximum(requested - accepted - partial, 0)
+    completed = np.array([row["completed_uncollected"] for row in data])
+    partial = np.array([row["partial"] for row in data])
+    pending = np.maximum(requested - accepted - completed - partial, 0)
     ax_dft.bar(y, accepted, color="#59a14f", label="validated")
-    ax_dft.bar(y, partial, bottom=accepted, color="#e15759", label="SCF skipped")
-    ax_dft.bar(y, pending, bottom=accepted+partial, color="#bab0ac", label="not yet classified")
+    ax_dft.bar(y, completed, bottom=accepted, color="#4e79a7", label="ORCA complete; awaiting collection")
+    ax_dft.bar(y, partial, bottom=accepted+completed, color="#e15759", label="running/failed partial")
+    ax_dft.bar(y, pending, bottom=accepted+completed+partial, color="#bab0ac", label="not started")
     ax_dft.set(xticks=y, xticklabels=labels, xlabel="target pressure / GPa", ylabel="clusters", title="DFT acquisition status")
     ax_dft.legend(fontsize=8); ax_dft.grid(axis="y", alpha=.25)
 
@@ -198,13 +274,58 @@ def render(output: Path = TARGET) -> None:
     history = [item for item in lineage.get("history", [])
                if str(item.get("branch_id", "legacy")) == active_branch]
     metric_batches = batch_metrics(history)
-    if metric_batches:
-        latest = metric_batches[-1]
-        epochs = [row["epoch"] for row in latest["series"]]
-        ax_loss.plot(epochs, [row["loss"] for row in latest["series"]], "o-", ms=3, color="#f28e2b")
+    live = live_batch_metrics(data)
+    displayed = live if live and live["series"] else (metric_batches[-1] if metric_batches else None)
+    if displayed:
+        if displayed is live and live.get("children"):
+            for child, color in zip(live["children"], ("#4e79a7", "#f28e2b")):
+                series = child["series"]
+                if not series:
+                    continue
+                label = (f"GPU {child['status'].get('gpu', '?')}  "
+                         f"lr={child['status'].get('lr', '?')}")
+                ax_loss.plot([row["epoch"] for row in series], [row["loss"] for row in series],
+                             "o-", ms=3, color=color, label=label)
+            ax_loss.legend(fontsize=8)
+        else:
+            epochs = [row["epoch"] for row in displayed["series"]]
+            ax_loss.plot(epochs, [row["loss"] for row in displayed["series"]], "o-", ms=3, color="#f28e2b")
+        if displayed is live:
+            status = live["status"]
+            title = (f"Live two-child fine-tuning loss: {status.get('finetune_id', 'unknown')} "
+                     f"[{status.get('state', 'unknown')}]") if live.get("children") else (
+                         f"Live fine-tuning loss: {status.get('finetune_id', 'unknown')} "
+                         f"[{status.get('state', 'unknown')}]")
+        else:
+            title = f"Latest fine-tuning batch loss: {displayed['item'].get('finetune_id', 'unknown')}"
         ax_loss.set(xlabel="epoch (−1 = initial)", ylabel="weighted validation loss",
-                    title=f"Latest fine-tuning batch loss: {latest['item'].get('finetune_id', 'unknown')}")
+                    title=title)
         ax_loss.grid(alpha=.25)
+        if live:
+            status = live["status"]
+            child_text = ""
+            if status.get("children"):
+                child_text = "\n" + "\n".join(
+                    f"GPU {child.get('gpu', '?')}: lr={child.get('lr', '?')}"
+                    for child in status["children"]
+                )
+            ax_loss.text(.02, .98,
+                         f"next/current: {status.get('state', 'unknown')}\n"
+                         f"{status.get('finetune_id', 'unknown')}\n"
+                         f"train={status.get('train_count', '?')}  valid={status.get('validation_count', '?')}"
+                         f"{child_text}",
+                         ha="left", va="top", transform=ax_loss.transAxes, fontsize=8,
+                         bbox={"facecolor":"white", "edgecolor":"#af7aa1", "alpha":.9})
+    elif live:
+        status = live["status"]
+        ax_loss.text(.5, .5, f"{status.get('state', 'unknown').upper()}\n{status.get('finetune_id', 'unknown')}\n"
+                     f"train={status.get('train_count', '?')}  valid={status.get('validation_count', '?')}",
+                     ha="center", va="center", transform=ax_loss.transAxes)
+        ax_loss.set_title("Current fine-tuning batch")
+    else:
+        ax_loss.text(.5, .5, "No completed MACE metric log", ha="center", va="center", transform=ax_loss.transAxes)
+        ax_loss.set_title("Fine-tuning loss")
+    if metric_batches:
         endpoints = [batch["endpoint"] for batch in metric_batches]
         batch_ids = np.arange(1, len(endpoints)+1)
         # Explicit train/validation separation makes divergence (overfitting
@@ -222,9 +343,8 @@ def render(output: Path = TARGET) -> None:
         ax_error.set(xlabel="completed fine-tuning batch", ylabel="RMSE / meV", title="Saved-model endpoint RMSE (train vs validation)")
         ax_error.grid(alpha=.25); ax_error.legend(fontsize=8)
     else:
-        for axis, title in ((ax_loss, "Fine-tuning loss"), (ax_error, "Fine-tuning errors")):
-            axis.text(.5, .5, "No completed MACE metric log", ha="center", va="center", transform=axis.transAxes)
-            axis.set_title(title)
+        ax_error.text(.5, .5, "No completed MACE metric log", ha="center", va="center", transform=ax_error.transAxes)
+        ax_error.set_title("Fine-tuning errors")
     if history:
         dates = [datetime.fromisoformat(x["utc"]) for x in history]
         pressures = [x.get("pressure_gpa", np.nan) for x in history]
@@ -233,19 +353,28 @@ def render(output: Path = TARGET) -> None:
         ax_model.set_ylabel("acquisition pressure / GPa")
     else:
         ax_model.text(.5, .5, "No completed fine-tuning batch", ha="center", va="center", transform=ax_model.transAxes)
+    if live:
+        status = live["status"]
+        timestamp = status.get("started_utc") or status.get("updated_utc")
+        pressure = status.get("pressure_gpa")
+        if timestamp and pressure is not None:
+            live_date = datetime.fromisoformat(timestamp)
+            ax_model.plot([live_date], [float(pressure)], marker="*", ms=13, color="#f28e2b")
+            ax_model.annotate(f"B{status.get('batch_number', '?')} {status.get('state', 'unknown')}",
+                              (live_date, float(pressure)), xytext=(5, 5), textcoords="offset points", fontsize=8)
     ax_model.set_title("Fine-tuning lineage (each point = immutable 20-epoch batch)")
     ax_model.grid(alpha=.25)
     for label in ax_model.get_xticklabels():
         label.set_rotation(20)
         label.set_ha("right")
     current = Path(lineage.get("current_model", "polar-1-s")).name
-    run_label = campaign.RUN_ID or "unnamed legacy run"
+    run_label = campaign.RUN_ID or "base campaign"
     fig.suptitle(f"Semi-active-learning campaign dashboard [{run_label}] — updated {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}\nactive branch: {active_branch} | current model: {current}\npriority: {operator_note()}", fontsize=13)
     output.parent.mkdir(parents=True, exist_ok=True)
-    temporary = output.with_suffix(".partial.png")
+    temporary = output.with_name(f".{output.stem}.{os.getpid()}.partial.png")
     fig.savefig(temporary, dpi=170, bbox_inches="tight")
     temporary.replace(output); plt.close(fig)
-    METADATA.write_text(json.dumps({"updated_utc": datetime.now(timezone.utc).isoformat(), "dashboard": str(output), "current_model": lineage.get("current_model"), "active_branch": active_branch, "fine_tune_trigger_mev_per_atom": threshold, "operator_priority_note": operator_note()}, indent=2)+"\n", encoding="utf-8")
+    METADATA.write_text(json.dumps({"updated_utc": datetime.now(timezone.utc).isoformat(), "dashboard": str(output), "current_model": lineage.get("current_model"), "active_branch": active_branch, "fine_tune_trigger_mev_per_atom": threshold, "operator_priority_note": operator_note(), "fine_tuning": {row["tag"]: row["finetune_status"] for row in data if row["finetune"]}}, indent=2)+"\n", encoding="utf-8")
     publish_active_named_run(output)
     print(f"Updated {output}", flush=True)
 

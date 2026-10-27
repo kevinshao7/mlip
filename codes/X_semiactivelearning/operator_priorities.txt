@@ -2,15 +2,16 @@
 # every poll (normally every 5 s); comments and free text are ignored.
 # Use key = value. Set active_pressure_gpa = all to remove the pressure hold.
 
-# Current scientific priority: resume P17 DFT acquisition, parity, and
-# short-batch fine tuning; the already-prepared P31 MD remains untouched.
-active_pressure_gpa = 17.7827941004
+# Current scientific priority: collect validated P31 DFT snapshots and run
+# one 20-epoch fine-tuning batch for each new immutable snapshot.
+active_pressure_gpa = 31.0
 hold_pressures_above_active = true
-active_acquisition_kind = auto
-continuous_acquisition = true
+active_acquisition_kind = acquisition
+continuous_acquisition = false
 continue_finetune = true
-finetune_on_new_dft_only = false
+finetune_on_new_dft_only = true
 
-# Context for provenance/dashboard readers: P31 preparation is preserved, but
-# continue improving the P17 campaign model until the operator advances again.
-note = Resume P17 autonomous DFT acquisition, parity checks, and 20-epoch fine-tune batches; P31 remains prepared only and controller remains forbidden from launching MD.
+# Context for provenance/dashboard readers: P31 fine tuning begins from the
+# promoted best P17 checkpoint (batch 46); the manual DFT runner remains owner
+# of the live CPU queue, so do not start a second autonomous watcher yet.
+note = Fine tune on each newly collected, charge-consistent P31 DFT snapshot from promoted P17 batch 46; keep the existing manual P31 ORCA queue as the sole DFT runner.

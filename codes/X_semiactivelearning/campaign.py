@@ -10,6 +10,7 @@ import argparse
 import csv
 import hashlib
 import json
+import math
 import os
 import random
 import re
@@ -17,6 +18,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -371,7 +373,7 @@ def command_status(_: argparse.Namespace) -> None:
     rows = []
     for pressure in config()["pressures_gpa"]:
         cdir = cycle(pressure)
-        rows.append({"pressure_gpa": pressure, "md_prepared": (cdir / "md" / "manifest.json").is_file(), "md_completed": bool(list((cdir / "md").glob("production_*.xyz"))), "analysis": (cdir / "analysis" / "summary.json").is_file(), "approved": (cdir / "approval_acquisition.json").is_file(), "acquisition_dft": (cdir / "dft" / "acquisition" / "processed.extxyz").is_file()})
+        rows.append({"pressure_gpa": pressure, "md_prepared": (cdir / "md" / "manifest.json").is_file(), "md_completed": bool(list((cdir / "md").glob("**/production_*.xyz"))), "analysis": (cdir / "analysis" / "summary.json").is_file(), "approved": (cdir / "approval_acquisition.json").is_file(), "acquisition_dft": (cdir / "dft" / "acquisition" / "processed.extxyz").is_file()})
     print(json.dumps({"current_model": lineage["current_model"], "active_branch": active_branch(lineage),
                       "active_branch_batches": len(branch_history(lineage)), "cycles": rows,
                       "provenance_log": str(OUT / "provenance.jsonl"),
@@ -418,9 +420,25 @@ def replace_assignment(text: str, name: str, value: str) -> str:
 def command_md(args: argparse.Namespace) -> None:
     cfg, cdir = config(), cycle(args.pressure)
     md = cdir / "md"
+    launch_root = ROOT / "md_launches" / (RUN_ID or "default") / tag(args.pressure)
+    if launch_root.exists() and any(launch_root.iterdir()):
+        launch_history = ROOT / "md_launches" / "_history" / (RUN_ID or "default") / tag(args.pressure)
+        launch_history.mkdir(parents=True, exist_ok=True)
+        archived_launch = launch_history / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+        shutil.copytree(launch_root, archived_launch)
+        # Preserve the active directory inode: an operator may already have a
+        # shell in it, and moving the directory would silently strand that
+        # shell inside the archived, stale launch code.
+        for child in launch_root.iterdir():
+            if child.is_dir() and not child.is_symlink():
+                shutil.rmtree(child)
+            else:
+                child.unlink()
+        print(f"[history] copied prior MD launch code to {archived_launch}", flush=True)
     if md.exists() and any(md.iterdir()):
         archive_stage(md, args.pressure, "md")
     md.mkdir(parents=True, exist_ok=True)
+    launch_root.mkdir(parents=True, exist_ok=True)
     source = relpath(cfg["md"]["base_script"])
     rho, temp = read_profile(args.pressure)
     parent = current_parent()
@@ -447,6 +465,21 @@ def command_md(args: argparse.Namespace) -> None:
     text = replace_assignment(text, "ammonia_water_ratio", repr(cfg["composition"]["ammonia_water_ratio"]))
     text, n = re.subn(r"^simbox\.add_solvent\(.*$", "simbox.add_solvent([water, amm], ratio=[1, 1], zdim=boxsize, density=densitygcm3)", text, count=1, flags=re.M)
     if n != 1: raise RuntimeError("Could not patch R1 mixture into MD base script")
+    target_molecules = int(cfg["md"]["target_molecules"])
+    if target_molecules % 2:
+        raise ValueError("The R1 mixture requires an even target_molecules count")
+    water_molecules = ammonia_molecules = target_molecules // 2
+    expected_atoms = 3 * water_molecules + 4 * ammonia_molecules
+    expected_formula = f"H{2 * water_molecules + 3 * ammonia_molecules}N{ammonia_molecules}O{water_molecules}"
+    text, n = re.subn(
+        r"^init_conf\s*=atoms\s*$",
+        "init_conf = atoms\n"
+        f"EXPECTED_ATOMS = {expected_atoms}\n"
+        "if len(init_conf) != EXPECTED_ATOMS:\n"
+        "    raise RuntimeError(f\"Expected {EXPECTED_ATOMS} atoms for the configured R1 system, got {len(init_conf)}\")",
+        text, count=1, flags=re.M,
+    )
+    if n != 1: raise RuntimeError("Could not add the generated-system atom-count invariant")
     text = re.sub(r'model="polar-1-s"', f"model={parent!r}", text, count=1)
     # Save exactly the requested production-hold frames, rather than creating
     # high-volume ramp trajectories that cannot enter the cluster workflow.
@@ -454,23 +487,90 @@ def command_md(args: argparse.Namespace) -> None:
     if n != 1: raise RuntimeError("Could not set production-only first save step")
     text, n = re.subn(r"if total_steps >= next_save_step:", "if stage == \"production_hold\" and total_steps >= next_save_step:", text, count=1)
     if n != 1: raise RuntimeError("Could not restrict trajectory saving to production hold")
-    generated = md / "run_md.py"; generated.write_text(text, encoding="utf-8")
-    launcher = md / "run_md.sh"
-    launcher.write_text("#!/usr/bin/env bash\nset -euo pipefail\n" + f"export CUDA_VISIBLE_DEVICES={cfg['md']['gpu']}\nexec {shlex.quote(sys.executable)} run_md.py\n", encoding="utf-8")
-    launcher.chmod(0o755)
-    manifest = {"pressure_gpa": args.pressure, "density_g_cm3": rho, "temperature_K": temp, "parent_model": parent, "seed_policy": "one random seed", "runtime_target_hours": cfg["md"]["walltime_target_hours"], "pressure_ramp_ps": cfg["md"]["pressure_ramp_ps"], "temperature_ramp_ps": cfg["md"]["temperature_ramp_ps"], "production_duration_ps": cfg["md"]["production_duration_ps"], "total_steps": total_steps, "production_steps": production_steps, "save_interval_steps": save_interval, "target_production_frames": cfg["md"]["target_production_frames"], "generated": now()}
+    gpu_values = [value.strip() for value in (args.gpus or str(cfg["md"]["gpu"])).split(",")]
+    if not gpu_values or any(not re.fullmatch(r"\d+", value) for value in gpu_values):
+        raise ValueError("--gpus must be a comma-separated list of non-negative CUDA device indices")
+    if len(set(gpu_values)) != len(gpu_values):
+        raise ValueError("--gpus must not contain duplicate CUDA device indices")
+    if args.seeds:
+        seed_values = [value.strip() for value in args.seeds.split(",")]
+        if len(seed_values) != len(gpu_values) or any(not re.fullmatch(r"\d+", value) for value in seed_values):
+            raise ValueError("--seeds must provide one comma-separated non-negative integer per GPU")
+        seeds = [int(value) for value in seed_values]
+        if any(seed >= 1_000_000_000 for seed in seeds) or len(set(seeds)) != len(seeds):
+            raise ValueError("Replica seeds must be distinct integers below 1000000000")
+    else:
+        seeds = random.SystemRandom().sample(range(1_000_000_000), len(gpu_values))
+    replicas = []
+    generated_files = []
+    launchers = []
+    activation_script = Path(sys.executable).parent / "activate"
+    if not activation_script.is_file():
+        raise FileNotFoundError(f"Python environment activation script is missing: {activation_script}")
+    for replica_index, (gpu, seed) in enumerate(zip(gpu_values, seeds)):
+        replica_name = f"replica_gpu{gpu}" if len(gpu_values) > 1 else "."
+        result_dir = md if replica_name == "." else md / replica_name
+        code_dir = launch_root if replica_name == "." else launch_root / replica_name
+        result_dir.mkdir(parents=True, exist_ok=True)
+        code_dir.mkdir(parents=True, exist_ok=True)
+        replica_text = replace_assignment(text, "MD_RESULTS_DIR", repr(str(result_dir)))
+        replica_text, count = re.subn(
+            r"^RUN_SEED\s*=.*$", f"RUN_SEED = {seed}", replica_text, count=1, flags=re.M
+        )
+        if count != 1:
+            raise RuntimeError("Could not set an explicit reproducible MD replica seed")
+        generated = code_dir / "run_md.py"
+        generated.write_text(replica_text, encoding="utf-8")
+        launcher = launch_root / (f"run_md_gpu{gpu}.sh" if len(gpu_values) > 1 else "run_md.sh")
+        relative_replica = os.path.relpath(code_dir, launch_root)
+        launcher.write_text(
+            "#!/usr/bin/env bash\nset -euo pipefail\n"
+            + f"source {shlex.quote(str(activation_script))}\n"
+            "cd -- \"$(dirname -- \"$0\")\"\n"
+            "case \"$(pwd -P)\" in */md_launches/_history/*) echo 'Refusing to run archived MD launch code; use the active md_launches/<run>/<pressure> directory.' >&2; exit 2;; esac\n"
+            + (f"cd -- {shlex.quote(relative_replica)}\n" if relative_replica != "." else "")
+            + f"export CUDA_VISIBLE_DEVICES={gpu}\n"
+            + "export MLIP_MACE_DEVICE=cuda\n"
+            + "exec python run_md.py\n",
+            encoding="utf-8",
+        )
+        launcher.chmod(0o755)
+        replicas.append({"replica_index": replica_index, "gpu": gpu, "seed": seed,
+                         "results_directory": str(result_dir), "code_directory": str(code_dir),
+                         "launcher": str(launcher)})
+        generated_files.append(generated)
+        launchers.append(launcher)
+    launcher = launchers[0]
+    if len(launchers) > 1:
+        launcher = launch_root / "run_md_parallel.sh"
+        commands = "\n".join(f"./{path.name} & pids+=($!)" for path in launchers)
+        launcher.write_text(
+            "#!/usr/bin/env bash\nset -euo pipefail\n"
+            "cd -- \"$(dirname -- \"$0\")\"\n"
+            "case \"$(pwd -P)\" in */md_launches/_history/*) echo 'Refusing to run archived MD launch code; use the active md_launches/<run>/<pressure> directory.' >&2; exit 2;; esac\n"
+            "pids=()\n"
+            "trap 'kill \"${pids[@]}\" 2>/dev/null || true' INT TERM\n"
+            f"{commands}\n"
+            "status=0\n"
+            "for pid in \"${pids[@]}\"; do wait \"$pid\" || status=$?; done\n"
+            "trap - INT TERM\n"
+            "exit \"$status\"\n",
+            encoding="utf-8",
+        )
+        launcher.chmod(0o755)
+        launchers.append(launcher)
+    manifest = {"pressure_gpa": args.pressure, "density_g_cm3": rho, "temperature_K": temp, "parent_model": parent, "python_environment_activate": str(activation_script), "seed_policy": "explicit independent seed per replica", "replica_count": len(replicas), "replicas": replicas, "target_molecules": target_molecules, "expected_molecule_counts": {"H2O": water_molecules, "NH3": ammonia_molecules}, "expected_atoms_per_replica": expected_atoms, "expected_formula_per_replica": expected_formula, "runtime_target_hours": cfg["md"]["walltime_target_hours"], "runtime_target_hours_per_replica": cfg["md"]["walltime_target_hours"], "runtime_estimate_basis": "Scaled from the 350-atom P17 108000-step run, which completed in 6 h 36 min", "pressure_ramp_ps": cfg["md"]["pressure_ramp_ps"], "temperature_ramp_ps": cfg["md"]["temperature_ramp_ps"], "production_duration_ps": cfg["md"]["production_duration_ps"], "total_steps": total_steps, "production_steps": production_steps, "save_interval_steps": save_interval, "target_production_frames": cfg["md"]["target_production_frames"], "target_production_frames_per_replica": cfg["md"]["target_production_frames"], "generated": now()}
     write_json(md / "manifest.json", manifest)
-    event("md_prepared", args.pressure, [source, config_path()], [generated, launcher, md / "manifest.json"], parent_model=parent)
-    print(f"Prepared {generated}. Run: {launcher}")
+    event("md_prepared", args.pressure, [source, config_path()], [*generated_files, *launchers, md / "manifest.json"], parent_model=parent, replicas=replicas)
+    print(f"Prepared {len(replicas)} MD replica(s). Run: {launcher}")
     if args.run:
-        subprocess.run([str(launcher)], cwd=md, check=True)
-        trajectories = sorted(md.glob("production_*.xyz"))
-        event("md_completed", args.pressure, [generated], trajectories, parent_model=parent)
+        subprocess.run([str(launcher)], cwd=launch_root, check=True)
+        trajectories = sorted(md.glob("**/production_*.xyz"))
+        event("md_completed", args.pressure, generated_files, trajectories, parent_model=parent, replicas=replicas)
 
 
 def load_species_module():
-    sys.path.insert(0, str((ROOT / "../B_conditionsproduction").resolve()))
-    import plot_final_species_distribution as species
+    import workflow_species as species
     return species
 
 
@@ -520,14 +620,47 @@ def pressure_gpa_from_comment(comment: str) -> float:
     return -(values[0] + values[4] + values[8]) / 3 * 160.21766208
 
 
+def analyze_frame_worker(payload):
+    """Classify one trajectory frame in a worker process."""
+    import numpy as np
+    frame_index, frame, production_start_frame, production_frame_stride, frame_time_ps = payload
+    if frame_index < production_start_frame:
+        return None
+    thermo = {
+        "frame": frame_index,
+        "production_time_ps": (frame_index - production_start_frame) * frame_time_ps,
+        "pressure_GPa": pressure_gpa_from_comment(frame.comment),
+        "volume_A3": float(np.linalg.det(frame.cell)),
+    }
+    if (frame_index - production_start_frame) % production_frame_stride:
+        return thermo, None
+    species = load_species_module()
+    components = fast_molecular_components(frame, species)
+    formulas = [species.component_formula(frame, component) for component in components]
+    return thermo, formulas
+
+
 def command_analyze(args: argparse.Namespace) -> None:
     from collections import Counter
+    from concurrent.futures import ProcessPoolExecutor
+    # Each frame is one process-level task. Keep NumPy/BLAS single-threaded so
+    # 20 workers occupy 20 CPU cores instead of oversubscribing the host.
+    for variable in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
+        os.environ[variable] = "1"
     import numpy as np
     if args.production_frame_stride < 1:
         raise ValueError("--production-frame-stride must be positive")
+    workers = args.workers if args.workers is not None else int(config()["analysis"]["workers"])
+    if workers < 1:
+        raise ValueError("--workers must be positive")
     species = load_species_module(); cdir = cycle(args.pressure); md = cdir / "md"
-    trajectories = [args.trajectory.resolve()] if args.trajectory else sorted(md.glob("production_*.xyz"))
-    if len(trajectories) != 1 or not trajectories[0].is_file(): raise FileNotFoundError(f"Expected exactly one readable trajectory, got {trajectories}")
+    trajectories = [path.resolve() for path in args.trajectory] if args.trajectory else sorted(md.glob("**/production_*.xyz"))
+    if not trajectories or any(not path.is_file() for path in trajectories):
+        raise FileNotFoundError(f"Expected one or more readable trajectories, got {trajectories}")
+    identifiers = []
+    for index, path in enumerate(trajectories):
+        candidate = path.parent.name
+        identifiers.append(candidate if candidate not in identifiers else f"{candidate}_{index}")
     frame_time_ps = args.frame_time_ps
     if frame_time_ps is None:
         md_cfg=config()["md"]
@@ -538,47 +671,82 @@ def command_analyze(args: argparse.Namespace) -> None:
         archive_stage(out, args.pressure, "analysis")
     out.mkdir(parents=True, exist_ok=True)
     allowed = set(config()["analysis"]["base_species"]); rows=[]; events=[]; thermo_rows=[]; total_components=0
-    for frame_index, frame in species.iter_xyz_frames(trajectories[0]):
-        if frame_index < args.production_start_frame:
-            continue
-        thermo_rows.append({"frame": frame_index, "production_time_ps": (frame_index - args.production_start_frame) * frame_time_ps, "pressure_GPa": pressure_gpa_from_comment(frame.comment), "volume_A3": float(np.linalg.det(frame.cell))})
-        if (frame_index - args.production_start_frame) % args.production_frame_stride:
-            continue
-        components = fast_molecular_components(frame, species)
-        total_components += len(components)
-        formulas = [species.component_formula(frame, x) for x in components]
-        counts = Counter(formulas); rows.append({"frame": frame_index, **counts})
-        for index, formula in enumerate(formulas):
-            if formula not in allowed:
-                events.append({"frame": frame_index, "component": index, "formula": formula})
-    columns = sorted({k for row in rows for k in row if k != "frame"})
+    per_trajectory = {}
+    sample_index = 0
+    print(f"[analysis] using {workers} CPU worker processes", flush=True)
+    with ProcessPoolExecutor(max_workers=workers) as executor:
+        for trajectory_id, trajectory in zip(identifiers, trajectories, strict=True):
+            trajectory_rows = trajectory_events = trajectory_components = 0
+            print(f"[analysis] scanning {trajectory_id}: {trajectory}", flush=True)
+            payloads = ((frame_index, frame, args.production_start_frame,
+                         args.production_frame_stride, frame_time_ps)
+                        for frame_index, frame in species.iter_xyz_frames(trajectory))
+            for result in executor.map(analyze_frame_worker, payloads, chunksize=4):
+                if result is None:
+                    continue
+                thermo, formulas = result
+                frame_index = int(thermo["frame"])
+                thermo_rows.append({"trajectory_id": trajectory_id, **thermo})
+                if formulas is None:
+                    continue
+                total_components += len(formulas); trajectory_components += len(formulas)
+                counts = Counter(formulas)
+                rows.append({"sample": sample_index, "trajectory_id": trajectory_id,
+                             "frame": frame_index,
+                             "production_time_ps": thermo["production_time_ps"], **counts})
+                sample_index += 1; trajectory_rows += 1
+                for component_index, formula in enumerate(formulas):
+                    if formula not in allowed:
+                        events.append({"trajectory_id": trajectory_id, "trajectory": str(trajectory),
+                                       "frame": frame_index, "component": component_index,
+                                       "formula": formula})
+                        trajectory_events += 1
+                if frame_index and frame_index % 100 == 0:
+                    print(f"[analysis] {trajectory_id}: frame {frame_index}, events {trajectory_events}", flush=True)
+            per_trajectory[trajectory_id] = {"trajectory": str(trajectory), "frames": trajectory_rows,
+                                             "non_base_events": trajectory_events,
+                                             "complete_components_sampled": trajectory_components}
+    columns = sorted({k for row in rows for k in row
+                      if k not in {"sample", "trajectory_id", "frame", "production_time_ps"}})
     with (out / "species_time_series.csv").open("w", newline="", encoding="utf-8") as f:
-        writer=csv.DictWriter(f, fieldnames=["frame", *columns]); writer.writeheader(); writer.writerows(rows)
+        writer=csv.DictWriter(f, fieldnames=["sample", "trajectory_id", "frame", "production_time_ps", *columns]); writer.writeheader(); writer.writerows(rows)
     with (out / "events.csv").open("w", newline="", encoding="utf-8") as f:
-        writer=csv.DictWriter(f, fieldnames=["frame", "component", "formula"]); writer.writeheader(); writer.writerows(events)
+        writer=csv.DictWriter(f, fieldnames=["trajectory_id", "trajectory", "frame", "component", "formula"]); writer.writeheader(); writer.writerows(events)
     with (out / "pressure_volume_time_series.csv").open("w", newline="", encoding="utf-8") as f:
-        writer=csv.DictWriter(f, fieldnames=["frame", "production_time_ps", "pressure_GPa", "volume_A3"]); writer.writeheader(); writer.writerows(thermo_rows)
+        writer=csv.DictWriter(f, fieldnames=["trajectory_id", "frame", "production_time_ps", "pressure_GPa", "volume_A3"]); writer.writeheader(); writer.writerows(thermo_rows)
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    figure, axis = plt.subplots(figsize=(12, 6))
-    for formula in columns:
-        axis.plot([row["frame"] for row in rows], [row.get(formula, 0) for row in rows], label=formula, linewidth=1)
-    axis.set_yscale("symlog", linthresh=1); axis.set_xlabel("saved MD frame"); axis.set_ylabel("complete molecular-component count")
-    axis.set_title(f"Species evolution, {args.pressure:g} GPa, R1; non-base events are DFT candidates")
-    axis.legend(fontsize="small", ncol=2); figure.tight_layout(); figure.savefig(out / "species_time_series.png", dpi=180); plt.close(figure)
+    figure, axes = plt.subplots(len(identifiers), 1, figsize=(12, 4.5 * len(identifiers)),
+                               sharex=True, sharey=True, squeeze=False)
+    for axis, trajectory_id in zip(axes[:, 0], identifiers, strict=True):
+        selected = [row for row in rows if row["trajectory_id"] == trajectory_id]
+        for formula in columns:
+            axis.plot([row["production_time_ps"] for row in selected],
+                      [row.get(formula, 0) for row in selected], label=formula, linewidth=1)
+        axis.set_yscale("symlog", linthresh=1)
+        axis.set_ylabel("molecule count")
+        axis.set_title(f"{trajectory_id}: complete molecular-component distribution")
+        axis.legend(fontsize="small", ncol=3)
+    axes[-1, 0].set_xlabel("production time / ps")
+    figure.suptitle(f"Molecule distribution over time, {args.pressure:g} GPa, R1")
+    figure.tight_layout(); figure.savefig(out / "species_time_series.png", dpi=180); plt.close(figure)
     figure, axes = plt.subplots(2, 1, figsize=(11, 7), sharex=True)
-    times=np.asarray([row["production_time_ps"] for row in thermo_rows]); pressures=np.asarray([row["pressure_GPa"] for row in thermo_rows]); volumes=np.asarray([row["volume_A3"] for row in thermo_rows])
-    axes[0].plot(times, pressures, linewidth=.8, color="#2563eb"); axes[0].axhline(args.pressure, color="black", linestyle="--", label=f"target {args.pressure:g} GPa"); axes[0].set(ylabel="hydrostatic pressure / GPa", title="Production-regime equilibration diagnostic"); axes[0].legend()
-    axes[1].plot(times, volumes, linewidth=.8, color="#dc2626"); axes[1].set(xlabel="production time / ps", ylabel="cell volume / Å³")
+    for trajectory_id in identifiers:
+        selected = [row for row in thermo_rows if row["trajectory_id"] == trajectory_id]
+        axes[0].plot([row["production_time_ps"] for row in selected], [row["pressure_GPa"] for row in selected], linewidth=.8, label=trajectory_id)
+        axes[1].plot([row["production_time_ps"] for row in selected], [row["volume_A3"] for row in selected], linewidth=.8, label=trajectory_id)
+    axes[0].axhline(args.pressure, color="black", linestyle="--", label=f"target {args.pressure:g} GPa"); axes[0].set(ylabel="hydrostatic pressure / GPa", title="Production-regime equilibration diagnostic"); axes[0].legend()
+    axes[1].set(xlabel="production time / ps", ylabel="cell volume / Å³"); axes[1].legend()
     figure.tight_layout(); figure.savefig(out / "pressure_volume_time_series.png", dpi=180); plt.close(figure)
     illegal_fraction = len(events) / total_components if total_components else 0.0
     max_fraction=config()["analysis"]["max_illegal_component_fraction"]
     eligible=bool(events) and illegal_fraction < max_fraction
+    pressures=np.asarray([row["pressure_GPa"] for row in thermo_rows]); volumes=np.asarray([row["volume_A3"] for row in thermo_rows])
     pressure_finite=pressures[np.isfinite(pressures)]
-    summary={"trajectory": str(trajectories[0]), "production_start_frame_0based": args.production_start_frame, "production_frame_stride": args.production_frame_stride, "thermo_frames": len(thermo_rows), "frame_time_ps": frame_time_ps, "mean_pressure_GPa": float(np.mean(pressure_finite)) if pressure_finite.size else None, "pressure_std_GPa": float(np.std(pressure_finite)) if pressure_finite.size else None, "volume_start_A3": float(volumes[0]) if volumes.size else None, "volume_end_A3": float(volumes[-1]) if volumes.size else None, "frames": len(rows), "base_species": sorted(allowed), "non_base_events": len(events), "complete_components_sampled": total_components, "illegal_component_fraction": illegal_fraction, "max_illegal_component_fraction": max_fraction, "cluster_eligible": eligible, "non_base_formulas": sorted({x['formula'] for x in events}), "human_review_required": bool(events) and not eligible}
+    summary={"trajectory": str(trajectories[0]), "trajectories": {key: str(value) for key, value in zip(identifiers, trajectories, strict=True)}, "replica_summaries": per_trajectory, "analysis_workers": workers, "production_start_frame_0based": args.production_start_frame, "production_frame_stride": args.production_frame_stride, "thermo_frames": len(thermo_rows), "frame_time_ps": frame_time_ps, "mean_pressure_GPa": float(np.mean(pressure_finite)) if pressure_finite.size else None, "pressure_std_GPa": float(np.std(pressure_finite)) if pressure_finite.size else None, "volume_start_A3": float(volumes[0]) if volumes.size else None, "volume_end_A3": float(volumes[-1]) if volumes.size else None, "frames": len(rows), "base_species": sorted(allowed), "non_base_events": len(events), "complete_components_sampled": total_components, "illegal_component_fraction": illegal_fraction, "max_illegal_component_fraction": max_fraction, "cluster_eligible": eligible, "non_base_formulas": sorted({x['formula'] for x in events}), "human_review_required": bool(events) and not eligible}
     write_json(out / "summary.json", summary)
-    event("analysis_completed", args.pressure, [trajectories[0]], [out / "species_time_series.csv", out / "species_time_series.png", out / "pressure_volume_time_series.csv", out / "pressure_volume_time_series.png", out / "events.csv", out / "summary.json"], non_base_events=len(events), illegal_component_fraction=illegal_fraction, cluster_eligible=eligible)
+    event("analysis_completed", args.pressure, trajectories, [out / "species_time_series.csv", out / "species_time_series.png", out / "pressure_volume_time_series.csv", out / "pressure_volume_time_series.png", out / "events.csv", out / "summary.json"], non_base_events=len(events), illegal_component_fraction=illegal_fraction, cluster_eligible=eligible, trajectory_count=len(trajectories))
     print(json.dumps(summary, indent=2))
 
 
@@ -591,106 +759,317 @@ def command_approve(args: argparse.Namespace) -> None:
     print(f"Acquisition approved: {path}")
 
 
-def command_clusters(args: argparse.Namespace) -> None:
-    import numpy as np
+def build_cluster_worker(payload):
+    """Build one allowed-only DFT cluster by direct centre-molecule specification.
+
+    The centre molecule is given explicitly in ``row["center_component"]``.  All
+    PBC calculations are anchored to the centre molecule's own first atom, so the
+    resulting cluster — centre + five nearest allowed complete molecular neighbours
+    — is fully deterministic for a given (frame, centre_component) pair regardless
+    of how the cluster was selected.
+    """
     from ase import Atoms
     from ase.geometry import find_mic
+
+    chosen_index, row, frame, trajectory, allowed_values, molecule_count, visualize = payload
+    species = load_species_module()
+    allowed = set(allowed_values)
+    components = fast_molecular_components(frame, species)
+
+    centre_index = int(row["center_component"])
+    if not 0 <= centre_index < len(components):
+        raise ValueError(f"Center component {centre_index} is absent at frame {row['frame']}")
+    centre_formula = species.component_formula(frame, components[centre_index])
+    if centre_formula not in allowed:
+        raise ValueError(
+            f"Center component {centre_index} ({centre_formula}) is not an allowed species "
+            f"at frame {row['frame']}"
+        )
+
+    # Anchor ALL position calculations to the centre molecule's own first atom.
+    # This guarantees that neighbour-distance ordering is identical for any two
+    # workers that receive the same (frame, centre_component), eliminating the
+    # PBC-wrapping artefact that previously caused different event anchors to
+    # select different neighbour sets for the same centre.
+    anchor = frame.positions[components[centre_index][0]]
+    allowed_centres = {}
+    allowed_formulas = {}
+    for component_index, component in enumerate(components):
+        formula = species.component_formula(frame, component)
+        if formula not in allowed:
+            continue
+        vectors, _ = find_mic(frame.positions[component] - anchor, cell=frame.cell, pbc=True)
+        allowed_centres[component_index] = vectors.mean(axis=0)
+        allowed_formulas[component_index] = formula
+
+    selected_centre = centre_index
+    if len(allowed_centres) < molecule_count:
+        raise ValueError(
+            f"Frame {row['frame']} has {len(allowed_centres)} allowed complete molecules; "
+            f"need {molecule_count}"
+        )
+
+    neighbour_distances = []
+    for component_index in allowed_centres:
+        if component_index == selected_centre:
+            continue
+        _vector, distance = find_mic(
+            allowed_centres[component_index] - allowed_centres[selected_centre],
+            cell=frame.cell, pbc=True,
+        )
+        neighbour_distances.append((float(distance), component_index))
+    selected = [selected_centre, *[
+        component_index for _distance, component_index
+        in sorted(neighbour_distances)[:molecule_count - 1]
+    ]]
+    selected_formulas = [allowed_formulas[component_index] for component_index in selected]
+    if len(selected) != molecule_count or any(formula not in allowed for formula in selected_formulas):
+        raise AssertionError("DFT cluster is not exactly the requested allowed-molecule set")
+
+    atom_indices = [atom for component_index in selected for atom in components[component_index]]
+    positions, _ = find_mic(frame.positions[atom_indices] - anchor, cell=frame.cell, pbc=True)
+    atoms = Atoms([frame.symbols[index] for index in atom_indices], positions=positions, pbc=False)
+    charge = formal_charge(atoms.get_chemical_symbols())
+    electron_count = int(sum(atoms.numbers) - charge)
+    if electron_count % 2:
+        raise ValueError(
+            f"Allowed-only cluster at frame {row['frame']} has {electron_count} electrons; "
+            "the required singlet multiplicity is impossible"
+        )
+    trajectory_id = row.get("trajectory_id", "legacy")
+    atoms.info.update({
+        "source_pressure_gpa": float(row["source_pressure_gpa"]),
+        "source_trajectory_id": trajectory_id,
+        "source_trajectory": str(trajectory),
+        "source_frame": int(row["frame"]),
+        "central_allowed_component": selected_centre,
+        "central_allowed_formula": selected_formulas[0],
+        "central_atom_count": len(components[selected_centre]),
+        "cluster_kind": row["cluster_kind"],
+        "molecules": len(selected),
+        "allowed_molecules_only": True,
+        "charge": charge,
+        "multiplicity": 1,
+        "spin": 1,
+        "formal_charge_verified": True,
+    })
+
+    dft_visualization = None
+    preview_formulas = []
+    if visualize:
+        nearest_three = [ci for _, ci in sorted(neighbour_distances)[:3]]
+        visual_atom_indices = [
+            atom for ci in [selected_centre, *nearest_three] for atom in components[ci]
+        ]
+        visual_positions, _ = find_mic(
+            frame.positions[visual_atom_indices] - anchor, cell=frame.cell, pbc=True
+        )
+        preview_formulas = [
+            species.component_formula(frame, components[ci]) for ci in nearest_three
+        ]
+        dft_visualization = {
+            "trajectory_id": trajectory_id, "frame": int(row["frame"]),
+            "centre_formula": centre_formula, "molecules": len(selected),
+            "symbols": [frame.symbols[index] for index in atom_indices], "positions": positions,
+            "component_offsets": [
+                sum(len(components[index]) for index in selected[:offset])
+                for offset in range(len(selected))
+            ],
+            "component_sizes": [len(components[index]) for index in selected],
+            "component_formulas": selected_formulas,
+        }
+    metadata = {key: value for key, value in row.items()
+                if key not in {"source_pressure_gpa", "cluster_kind"}}
+    metadata.update({"n_molecules": len(selected), "n_atoms": len(atoms),
+                     "allowed_molecules_only": True,
+                     "selected_formulas": ";".join(selected_formulas)})
+    return chosen_index, atoms, metadata, None, dft_visualization, preview_formulas
+
+
+def command_clusters(args: argparse.Namespace) -> None:
+    from concurrent.futures import ProcessPoolExecutor
+    for variable in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
+        os.environ[variable] = "1"
+    import numpy as np
     from ase.io import write
     cdir = cycle(args.pressure); analysis = cdir / "analysis"
     acquisition = args.kind.startswith("acquisition")
     if acquisition and not (cdir / "approval_acquisition.json").is_file():
         raise PermissionError("Acquisition clusters require a recorded human approval: campaign.py approve")
-    selected_count = config()["clusters"]["acquisition_count" if acquisition else "diagnostic_count"]
+    selected_count = args.count if args.count is not None else config()["clusters"]["acquisition_count" if acquisition else "diagnostic_count"]
+    if selected_count < 1:
+        raise ValueError("--count must be positive")
+    workers = args.workers if args.workers is not None else int(config()["analysis"]["workers"])
+    if workers < 1:
+        raise ValueError("--workers must be positive")
     summary = json.loads((analysis / "summary.json").read_text(encoding="utf-8"))
-    if not summary.get("cluster_eligible", False):
-        raise ValueError("Cluster selection requires non-base components with an illegal-component fraction below 5%; inspect analysis/summary.json")
-    events = list(csv.DictReader((analysis / "events.csv").open(encoding="utf-8")))
-    if not events: raise ValueError("No non-base molecular events: no clusters should be selected")
-    # Subsequent acquisition rounds exclude event components selected in every
-    # preceding acquisition round.  This gives genuinely new configurations
-    # from the same immutable production trajectory without overwriting DFT.
+    total_frames = summary.get("frames", 0)
+    if total_frames < 1:
+        raise ValueError("analysis/summary.json reports no frames; re-run analysis before selecting clusters")
+    trajectories = {key: Path(value) for key, value in
+                    summary.get("trajectories", {"legacy": summary["trajectory"]}).items()}
+
+    # Clusters are now selected by uniform frame sampling rather than by chasing
+    # illegal-event locations.  This removes event-location bias from the training
+    # set and produces typical equilibrium configurations that converge better in
+    # ORCA.  Uniqueness is enforced on (trajectory_id, frame, center_component)
+    # so the same molecular neighbourhood is never DFT-labelled twice.
+    used: set = set()
     if acquisition and args.kind != "acquisition":
-        used = set()
         for previous in cdir.glob("clusters/acquisition*/selection.csv"):
             with previous.open(encoding="utf-8") as stream:
-                used.update((row["frame"], row["component"]) for row in csv.DictReader(stream))
-        events = [row for row in events if (row["frame"], row["component"]) not in used]
-        if not events: raise ValueError("No unselected acquisition events remain for a new DFT round")
-        print(f"[{args.kind}] excluded {len(used)} event components selected by earlier acquisition rounds.", flush=True)
-    # Evenly sample the remaining chronological event list.
-    indices = np.linspace(0, len(events) - 1, min(selected_count, len(events)), dtype=int)
-    chosen = [events[i] for i in sorted(set(indices.tolist()))]
-    species = load_species_module(); trajectory = Path(summary["trajectory"])
-    print(f"[{args.kind}] {len(events)} eligible non-base event(s); selecting {len(chosen)} cluster centre(s).", flush=True)
-    print(f"[{args.kind}] Reading source trajectory: {trajectory}", flush=True)
-    needed = {int(row["frame"]) for row in chosen}; frames = {}
-    for i, frame in species.iter_xyz_frames(trajectory):
-        if i in needed: frames[i] = frame
-        if i and i % 100 == 0:
-            print(f"[{args.kind}] scanned source frame {i}; located {len(frames)}/{len(needed)} selected frame(s).", flush=True)
-    clusters = []; metadata = []; visualizations = []; dft_visualizations = []
-    for row in chosen:
-        frame = frames[int(row["frame"])]
-        components, _ = species.molecular_components(frame, 1.45, 1.30, 0.50, 1.20)
-        event_component = components[int(row["component"])]
-        # A component can straddle a periodic boundary. Anchor all positions on
-        # one central atom before computing centres or writing the DFT cluster.
-        anchor = frame.positions[event_component[0]]
-        central_vectors, _ = find_mic(frame.positions[event_component] - anchor, cell=frame.cell, pbc=True)
-        central_center = central_vectors.mean(axis=0)
-        distances = []; allowed_centres = {}
-        allowed = set(summary["base_species"])
-        for idx, component in enumerate(components):
-            formula = species.component_formula(frame, component)
-            if formula not in allowed:
+                for row in csv.DictReader(stream):
+                    traj_id = row.get("trajectory_id", "legacy")
+                    centre_key = row.get("center_component", "")
+                    if centre_key:
+                        used.add((traj_id, row["frame"], centre_key))
+        print(f"[{args.kind}] excluding {len(used)} (frame, centre) pairs from prior acquisition rounds.", flush=True)
+
+    # Distribute cluster budget across replicas proportionally to frame counts.
+    replica_summaries = summary.get("replica_summaries", {})
+    replica_frames: dict = {}
+    for traj_id in trajectories:
+        replica_frames[traj_id] = int(
+            replica_summaries.get(traj_id, {}).get("frames", total_frames // len(trajectories))
+        )
+    if not any(replica_frames.values()):
+        for traj_id in trajectories:
+            replica_frames[traj_id] = total_frames // len(trajectories)
+    total_replica_frames = sum(replica_frames.values()) or 1
+    allocated: dict = {}
+    remaining = selected_count
+    for k, traj_id in enumerate(replica_frames):
+        if k == len(replica_frames) - 1:
+            allocated[traj_id] = remaining
+        else:
+            n = max(1, round(selected_count * replica_frames[traj_id] / total_replica_frames))
+            allocated[traj_id] = n
+            remaining -= n
+
+    # Sample frames for temporal spread.  Multiple centres can be extracted from
+    # each frame (up to the number of allowed molecules in that frame, typically
+    # ~100 for R1), so the cluster budget is not limited to one per frame.
+    # Sample min(tf, n_alloc) distinct frames so that when n_alloc <= tf we get
+    # one centre per frame on average with maximum temporal spread; when
+    # n_alloc > tf we use all frames and take multiple centres per frame.
+    needed_frames: dict = {}
+    candidates_per_traj: dict = {}
+    for traj_id, n_alloc in allocated.items():
+        tf = replica_frames[traj_id]
+        n_sample = min(tf, n_alloc)
+        idxs = sorted(set(np.linspace(0, tf - 1, n_sample, dtype=int).tolist()))
+        needed_frames.setdefault(traj_id, set()).update(idxs)
+        candidates_per_traj[traj_id] = idxs
+
+    species = load_species_module()
+    allowed_set = set(summary["base_species"])
+    molecule_count = int(config()["clusters"]["allowed_molecules"])
+    frames: dict = {}
+    for traj_id, traj_path in trajectories.items():
+        traj_needed = needed_frames.get(traj_id, set())
+        if not traj_needed:
+            continue
+        print(f"[{args.kind}] Reading {traj_id}: {traj_path}", flush=True)
+        located = 0
+        for i, frame_obj in species.iter_xyz_frames(traj_path):
+            if i in traj_needed:
+                frames[(traj_id, i)] = frame_obj; located += 1
+            if i and i % 100 == 0:
+                print(f"[{args.kind}] {traj_id}: scanned frame {i}; located {located}/{len(traj_needed)}.", flush=True)
+            if located == len(traj_needed):
+                break
+        print(f"[{args.kind}] {traj_id}: loaded {located} frames.", flush=True)
+
+    # Select centre molecules from candidate frames deterministically.
+    # Multiple centres may be taken from the same frame — each using its own
+    # centre molecule's first atom as the PBC anchor, so neighbour distances
+    # are independent and correct for every cluster.  No illegal species may
+    # appear as a centre or neighbour (enforced in build_cluster_worker).
+    # A hash-based offset into the sorted allowed-component list ensures that
+    # successive rounds naturally pick different centres from the same frame.
+    chosen: list = []
+    used_this_round: set = set()
+    for traj_id, candidate_frames in candidates_per_traj.items():
+        n_alloc = allocated[traj_id]
+        count_for_traj = 0
+        for frame_idx in candidate_frames:
+            if count_for_traj >= n_alloc or len(chosen) >= selected_count:
+                break
+            frame_obj = frames.get((traj_id, frame_idx))
+            if frame_obj is None:
                 continue
-            component_vectors, _ = find_mic(frame.positions[component] - anchor, cell=frame.cell, pbc=True)
-            vector, distance = find_mic(component_vectors.mean(axis=0) - central_center, cell=frame.cell, pbc=True)
-            distances.append((float(distance), idx))
-            allowed_centres[idx] = component_vectors.mean(axis=0)
-        allowed_sorted = [idx for _distance, idx in sorted(distances)]
-        molecule_count = config()["clusters"]["allowed_molecules"]
-        if len(allowed_sorted) < molecule_count:
-            raise ValueError(f"Frame {row['frame']} has only {len(allowed_sorted)} allowed complete molecules near event; need {molecule_count}")
-        # The event is only a diagnosis marker.  Its nearest allowed molecule
-        # becomes the DFT-cluster centre; select that centre plus its five
-        # nearest allowed molecular neighbours (six complete molecules).
-        selected_centre = allowed_sorted[0]
-        neighbour_distances = []
-        for idx in allowed_sorted[1:]:
-            _vector, distance = find_mic(allowed_centres[idx] - allowed_centres[selected_centre], cell=frame.cell, pbc=True)
-            neighbour_distances.append((float(distance), idx))
-        selected = [selected_centre, *[idx for _distance, idx in sorted(neighbour_distances)[:molecule_count - 1]]]
-        atoms_idx = [atom for component in selected for atom in components[component]]
-        vectors, _ = find_mic(frame.positions[atoms_idx] - anchor, cell=frame.cell, pbc=True)
-        positions = vectors
-        atoms = Atoms([frame.symbols[i] for i in atoms_idx], positions=positions, pbc=False)
-        selected_formulas = [species.component_formula(frame, components[c]) for c in selected]
-        if any(formula not in allowed for formula in selected_formulas):
-            raise AssertionError("Illegal component reached a DFT/training cluster")
-        atoms.info.update({"source_pressure_gpa": args.pressure, "source_frame": int(row["frame"]), "event_component": int(row["component"]), "event_formula": row["formula"], "event_included_in_dft": False, "central_allowed_component": selected_centre, "central_allowed_formula": selected_formulas[0], "central_atom_count": len(components[selected_centre]), "cluster_kind": args.kind, "molecules": len(selected), "allowed_molecules_only": True})
-        visual_components = [int(row["component"]), *allowed_sorted[:3]]
-        visual_atom_indices = [atom for component in visual_components for atom in components[component]]
-        visual_vectors, _ = find_mic(frame.positions[visual_atom_indices] - anchor, cell=frame.cell, pbc=True)
-        visualizations.append({
-            "frame": int(row["frame"]), "central_formula": row["formula"],
-            "symbols": [frame.symbols[i] for i in visual_atom_indices], "positions": visual_vectors,
-            "component_offsets": [sum(len(components[c]) for c in visual_components[:i]) for i in range(4)],
-            "component_sizes": [len(components[c]) for c in visual_components],
-            "component_formulas": [species.component_formula(frame, components[c]) for c in visual_components],
-        })
-        dft_visualizations.append({
-            "frame": int(row["frame"]), "event_formula": row["formula"],
-            "molecules": len(selected),
-            "symbols": [frame.symbols[i] for i in atoms_idx], "positions": positions,
-            "component_offsets": [sum(len(components[c]) for c in selected[:i]) for i in range(len(selected))],
-            "component_sizes": [len(components[c]) for c in selected],
-            "component_formulas": selected_formulas,
-        })
-        preview_formulas = [species.component_formula(frame, components[c]) for c in visual_components[1:]]
-        print(f"[{args.kind}] cluster {len(clusters)+1}/{len(chosen)}: frame={row['frame']} event={row['formula']} "
-              f"dft_molecules={len(selected)}_allowed_only centre={selected_formulas[0]} neighbours={len(selected)-1} event_excluded=True preview_nearest3={','.join(preview_formulas)} atoms={len(atoms)}", flush=True)
-        clusters.append(atoms); metadata.append({**row, "n_molecules": len(selected), "n_atoms": len(atoms)})
+            comps = fast_molecular_components(frame_obj, species)
+            allowed_comps = sorted([
+                ci for ci, comp in enumerate(comps)
+                if species.component_formula(frame_obj, comp) in allowed_set
+            ])
+            if len(allowed_comps) < molecule_count:
+                continue
+            h = int(hashlib.sha256(f"{traj_id}:{frame_idx}".encode()).hexdigest()[:16], 16)
+            for attempt in range(len(allowed_comps)):
+                if count_for_traj >= n_alloc or len(chosen) >= selected_count:
+                    break
+                centre_comp = allowed_comps[(h + attempt) % len(allowed_comps)]
+                key = (traj_id, str(frame_idx), str(centre_comp))
+                if key not in used and key not in used_this_round:
+                    centre_formula = species.component_formula(frame_obj, comps[centre_comp])
+                    chosen.append({
+                        "trajectory_id": traj_id,
+                        "frame": str(frame_idx),
+                        "center_component": str(centre_comp),
+                        "center_formula": centre_formula,
+                        "source_pressure_gpa": args.pressure,
+                        "cluster_kind": args.kind,
+                    })
+                    used_this_round.add(key)
+                    count_for_traj += 1
+
+    if args.count is not None and len(chosen) != selected_count:
+        raise ValueError(
+            f"Requested exactly {selected_count} clusters, but only {len(chosen)} unique "
+            f"(frame, centre) pairs are available from {total_frames} trajectory frames "
+            f"(~{total_frames * molecule_count} theoretical maximum across all frames)"
+        )
+    chosen = chosen[:selected_count]
+    print(f"[{args.kind}] {total_frames} trajectory frames; selected {len(chosen)} unique cluster centres.", flush=True)
+
+    visualization_limit = len(chosen) if args.visualization_limit is None else args.visualization_limit
+    if visualization_limit < 0:
+        raise ValueError("--visualization-limit must be non-negative")
+    visualized_indices = set(np.linspace(0, len(chosen) - 1,
+                                         min(visualization_limit, len(chosen)), dtype=int).tolist())
+    tasks = []
+    for chosen_index, row in enumerate(chosen):
+        traj_id = row["trajectory_id"]
+        tasks.append((chosen_index, row, frames[(traj_id, int(row["frame"]))],
+                      trajectories[traj_id], tuple(summary["base_species"]), molecule_count,
+                      chosen_index in visualized_indices))
+    print(f"[{args.kind}] building {len(tasks)} clusters with {workers} CPU worker processes", flush=True)
+    with ProcessPoolExecutor(max_workers=workers) as executor:
+        results = list(executor.map(build_cluster_worker, tasks, chunksize=1))
+    results.sort(key=lambda result: result[0])
+    clusters = []; metadata = []; dft_visualizations = []
+    for completed, (_chosen_index, atoms, row, _event_viz,
+                    dft_visualization, preview_formulas) in enumerate(results, start=1):
+        if dft_visualization is not None:
+            dft_visualizations.append(dft_visualization)
+        print(f"[{args.kind}] cluster {completed}/{len(results)}: "
+              f"trajectory={row.get('trajectory_id', 'legacy')} frame={row['frame']} "
+              f"centre={row.get('center_formula','')} dft_molecules={row['n_molecules']}_allowed_only "
+              f"preview_nearest3={','.join(preview_formulas)} "
+              f"atoms={row['n_atoms']}", flush=True)
+        clusters.append(atoms)
+        metadata.append(row)
+    if len(clusters) != selected_count:
+        raise AssertionError(f"Built {len(clusters)} clusters; required exactly {selected_count}")
+    allowed = set(summary["base_species"])
+    for index, (atoms, row) in enumerate(zip(clusters, metadata, strict=True)):
+        formulas = row["selected_formulas"].split(";")
+        if (len(formulas) != molecule_count or any(formula not in allowed for formula in formulas)
+                or atoms.info.get("allowed_molecules_only") is not True
+                or int(atoms.info.get("charge")) != formal_charge(atoms.get_chemical_symbols())
+                or int(atoms.info.get("multiplicity")) != 1):
+            raise AssertionError(f"Allowed-only validation failed for cluster {index}")
     out = cdir / "clusters" / args.kind
     if out.exists() and any(out.iterdir()):
         archive_stage(out, args.pressure, f"clusters_{args.kind}")
@@ -698,10 +1077,19 @@ def command_clusters(args: argparse.Namespace) -> None:
     xyz = out / "clusters.extxyz"; write(xyz, clusters, format="extxyz")
     with (out / "selection.csv").open("w", newline="", encoding="utf-8") as f:
         writer=csv.DictWriter(f, fieldnames=metadata[0].keys()); writer.writeheader(); writer.writerows(metadata)
-    gallery = write_cluster_gallery(clusters, out)
-    videos = write_event_videos(visualizations, out / "event_videos")
+    validation = out / "cluster_validation.json"
+    write_json(validation, {
+        "validated_utc": now(), "requested_clusters": selected_count,
+        "generated_clusters": len(clusters), "worker_processes": workers,
+        "required_complete_molecules_per_cluster": molecule_count,
+        "allowed_species": sorted(allowed), "illegal_event_included": False,
+        "all_clusters_allowed_only": True, "formal_charge_rule": FORMAL_CHARGES,
+        "formal_charge_verified": True, "spin_multiplicity": 1,
+    })
+    audit_clusters = [clusters[index] for index in sorted(visualized_indices)]
+    gallery = write_cluster_gallery(audit_clusters, out)
     dft_videos = write_dft_cluster_videos(dft_visualizations, out / "dft_cluster_videos")
-    event("clusters_selected", args.pressure, [trajectory, analysis / "events.csv"], [xyz, out / "selection.csv", gallery, *videos, *dft_videos], kind=args.kind, count=len(clusters), policy=f"illegal event excluded; one central allowed molecule plus {config()['clusters']['allowed_molecules'] - 1} nearest allowed complete molecular neighbors only")
+    event("clusters_selected", args.pressure, list(trajectories.values()), [xyz, out / "selection.csv", validation, gallery, *dft_videos], kind=args.kind, count=len(clusters), workers=workers, visualized_count=len(audit_clusters), policy=f"uniform frame sampling; one centre molecule plus {config()['clusters']['allowed_molecules'] - 1} nearest allowed complete molecular neighbours; unique by (trajectory_id, frame, center_component)")
     print(f"Wrote {len(clusters)} {args.kind} clusters: {xyz}")
 
 
@@ -726,7 +1114,7 @@ def write_cluster_gallery(clusters, destination: Path) -> Path:
         for atom_index, (symbol, position) in enumerate(zip(atoms.symbols, atoms.positions, strict=True)):
             central = atom_index < central_count
             axis.scatter(*position, s=90 if central else 28, c="#ff00aa" if central else colors.get(symbol, "black"), edgecolors="black" if central else "none", linewidths=.6 if central else 0, alpha=1 if central else .72)
-        label = f"frame {atoms.info.get('source_frame')} | event {atoms.info.get('event_formula')} excluded | {atoms.info.get('molecules')} allowed molecules"
+        label = f"frame {atoms.info.get('source_frame')} | centre {atoms.info.get('central_allowed_formula')} | {atoms.info.get('molecules')} allowed molecules"
         axis.set_title(label)
         axis.set(xlabel="x / Å", ylabel="y / Å", zlabel="z / Å"); axis.view_init(elev=22, azim=35)
     figure.suptitle("DFT/training clusters: central allowed molecule (magenta) + allowed neighbours; grey H, red O, blue N", fontsize=14)
@@ -759,7 +1147,7 @@ def write_event_videos(events, destination: Path) -> list[Path]:
         axis.set(xlim=(centre[0]-half, centre[0]+half), ylim=(centre[1]-half, centre[1]+half), zlim=(centre[2]-half, centre[2]+half), xlabel="x / Å", ylabel="y / Å", zlabel="z / Å")
         axis.set_title(f"production frame {event_data['frame']}: {event_data['central_formula']} + 3 nearest complete species")
         axis.legend(loc="upper left", fontsize="small")
-        path=destination / f"frame_{event_data['frame']:04d}_{event_data['central_formula']}.gif"
+        path=destination / f"{event_data['trajectory_id']}_frame_{event_data['frame']:04d}_{event_data['central_formula']}.gif"
         writer=PillowWriter(fps=12)
         writer.setup(figure, path, dpi=130)
         try:
@@ -769,9 +1157,9 @@ def write_event_videos(events, destination: Path) -> list[Path]:
             writer.finish()
         plt.close(figure); outputs.append(path)
         print(f"[visualize] wrote {path}", flush=True)
-        summary.append({"frame":event_data["frame"], "event":event_data["central_formula"], "nearest_species": ";".join(event_data["component_formulas"][1:]), "file":path.name})
+        summary.append({"trajectory_id":event_data["trajectory_id"], "frame":event_data["frame"], "event":event_data["central_formula"], "nearest_species": ";".join(event_data["component_formulas"][1:]), "file":path.name})
     with (destination / "README.csv").open("w", newline="", encoding="utf-8") as f:
-        writer=csv.DictWriter(f, fieldnames=["frame","event","nearest_species","file"]); writer.writeheader(); writer.writerows(summary)
+        writer=csv.DictWriter(f, fieldnames=["trajectory_id","frame","event","nearest_species","file"]); writer.writeheader(); writer.writerows(summary)
     outputs.append(destination / "README.csv")
     return outputs
 
@@ -799,9 +1187,9 @@ def write_dft_cluster_videos(clusters, destination: Path) -> list[Path]:
                     if np.linalg.norm(coords[left]-coords[right]) < 1.35:
                         axis.plot(*coords[[left,right]].T, color=color, linewidth=1.8)
         axis.set(xlim=(centre[0]-half, centre[0]+half), ylim=(centre[1]-half, centre[1]+half), zlim=(centre[2]-half, centre[2]+half), xlabel="x / Å", ylabel="y / Å", zlabel="z / Å")
-        axis.set_title(f"DFT input, production frame {cluster['frame']}: {cluster['molecules']} allowed molecules\ntrigger {cluster['event_formula']} excluded")
+        axis.set_title(f"DFT input, production frame {cluster['frame']}: {cluster['molecules']} allowed molecules\ncentre {cluster['centre_formula']}")
         axis.legend(loc="upper left", fontsize="x-small", ncol=2)
-        path=destination / f"frame_{cluster['frame']:04d}_allowed_only.gif"; print(f"[dft-visualize] rendering allowed-only DFT cluster for production frame {cluster['frame']}", flush=True)
+        path=destination / f"{cluster['trajectory_id']}_frame_{cluster['frame']:04d}_allowed_only.gif"; print(f"[dft-visualize] rendering allowed-only DFT cluster for production frame {cluster['frame']}", flush=True)
         writer=PillowWriter(fps=12); writer.setup(figure, path, dpi=130)
         try:
             for angle in np.linspace(-90, 90, 37):
@@ -809,9 +1197,9 @@ def write_dft_cluster_videos(clusters, destination: Path) -> list[Path]:
         finally:
             writer.finish()
         plt.close(figure); outputs.append(path); print(f"[dft-visualize] wrote {path}", flush=True)
-        rows.append({"frame":cluster["frame"], "excluded_event":cluster["event_formula"], "dft_molecules":cluster["molecules"], "allowed_species": ";".join(cluster["component_formulas"]), "file":path.name})
+        rows.append({"trajectory_id":cluster["trajectory_id"], "frame":cluster["frame"], "centre_formula":cluster["centre_formula"], "dft_molecules":cluster["molecules"], "allowed_species": ";".join(cluster["component_formulas"]), "file":path.name})
     with (destination / "README.csv").open("w", newline="", encoding="utf-8") as f:
-        writer=csv.DictWriter(f, fieldnames=["frame","excluded_event","dft_molecules","allowed_species","file"]); writer.writeheader(); writer.writerows(rows)
+        writer=csv.DictWriter(f, fieldnames=["trajectory_id","frame","centre_formula","dft_molecules","allowed_species","file"]); writer.writeheader(); writer.writerows(rows)
     outputs.append(destination / "README.csv")
     return outputs
 
@@ -820,6 +1208,15 @@ def dft_input(atoms, charge: int, multiplicity: int, nprocs: int) -> str:
     # def2-TZVPD is declared in the route line.  In ORCA 6, ``NewGTO all``
     # is not valid %basis syntax (it expects a particular atomic number/name),
     # so do not redundantly redeclare the basis block here.
+    expected_charge = formal_charge(atoms.get_chemical_symbols())
+    if charge != expected_charge:
+        raise ValueError(f"ORCA charge {charge} does not match formal charge {expected_charge}")
+    electron_count = int(sum(atoms.numbers) - charge)
+    if electron_count % 2 or multiplicity != 1:
+        raise ValueError(
+            f"Campaign ORCA inputs require a closed-shell singlet; got "
+            f"electrons={electron_count}, multiplicity={multiplicity}"
+        )
     lines = ["! wB97M-V def2-TZVPD EnGrad RIJCOSX", f"%pal nprocs {nprocs} end", f"* xyz {charge} {multiplicity}"]
     lines += [f"{symbol} {x:.12f} {y:.12f} {z:.12f}" for symbol, (x,y,z) in zip(atoms.symbols, atoms.positions, strict=True)]
     return "\n".join(lines) + "\n*\n"
@@ -883,6 +1280,23 @@ def classify_orca_output(output: Path) -> str:
 
 def run_local_orca(args: argparse.Namespace, ddir: Path) -> None:
     """Run the prepared manifest serially, with one all-core ORCA calculation at a time."""
+    import time
+
+    dashboard_last_update = 0.0
+
+    def refresh_dashboard(*, force: bool = False) -> None:
+        """Refresh live DFT progress without allowing plotting to stop ORCA."""
+        nonlocal dashboard_last_update
+        interval = 30.0
+        if not force and time.monotonic() - dashboard_last_update < interval:
+            return
+        try:
+            from campaign_dashboard import render
+            render()
+            dashboard_last_update = time.monotonic()
+        except Exception as exc:
+            print(f"[local-dft] dashboard update failed: {type(exc).__name__}: {exc}", flush=True)
+
     manifest = ddir / "manifest.csv"
     if not manifest.is_file():
         raise FileNotFoundError(f"Prepare DFT inputs first: {manifest}")
@@ -926,14 +1340,17 @@ def run_local_orca(args: argparse.Namespace, ddir: Path) -> None:
     event("dft_local_started", args.pressure, [manifest], [], kind=args.kind,
           executable=str(executable), mpi_module=mpi_module, mpirun=mpirun,
           cpu_ranks=int(cfg["local_cpu_ranks"]), jobs=len(records))
+    refresh_dashboard(force=True)
     for index, record in enumerate(records, start=1):
         inp = (ddir / record["input"]).resolve()
         output = outputs / f"{record['stem']}.out"
         if local_orca_complete(output):
             print(f"[local-dft] {index}/{len(records)} {record['stem']}: already complete; skipping", flush=True)
+            refresh_dashboard()
             continue
         if record["stem"] in previously_skipped:
             print(f"[local-dft] {index}/{len(records)} {record['stem']}: previously failed; skipping without retry", flush=True)
+            refresh_dashboard()
             continue
         temporary = output.with_suffix(".out.partial")
         if temporary.exists():
@@ -953,6 +1370,7 @@ def run_local_orca(args: argparse.Namespace, ddir: Path) -> None:
                 failures.append({"stem":record["stem"], "exit_code":None, "classification":failure_kind, "output":str(temporary), "action":"skipped_no_scf_retry"})
                 previously_skipped.add(record["stem"])
                 print(f"[local-dft] {index}/{len(records)} {record['stem']}: existing failed output ({failure_kind}); skipping without retry", flush=True)
+                refresh_dashboard()
                 continue
         print(f"[local-dft] {index}/{len(records)} {record['stem']}: starting with {cfg['local_cpu_ranks']} CPU ranks", flush=True)
         with temporary.open("w", encoding="utf-8") as stream:
@@ -963,14 +1381,17 @@ def run_local_orca(args: argparse.Namespace, ddir: Path) -> None:
             failure_kind = classify_orca_output(temporary)
             failures.append({"stem":record["stem"], "exit_code":result.returncode, "classification":failure_kind, "output":str(temporary), "action":"skipped_no_scf_retry"})
             print(f"[local-dft] {index}/{len(records)} {record['stem']}: skipped ({failure_kind}); retained {temporary}", flush=True)
+            refresh_dashboard()
             continue
         temporary.replace(output)
         print(f"[local-dft] {index}/{len(records)} {record['stem']}: complete", flush=True)
+        refresh_dashboard()
     completed = [outputs / f"{row['stem']}.out" for row in records if local_orca_complete(outputs / f"{row['stem']}.out")]
     write_json(failure_report, {"updated_utc":now(), "policy":"no SCF parameter changes; failed jobs skipped", "failures":failures, "completed":len(completed), "requested":len(records)})
     event("dft_local_completed", args.pressure, [manifest], [*completed, failure_report], kind=args.kind,
           executable=str(executable), cpu_ranks=int(cfg["local_cpu_ranks"]),
           mpi_module=mpi_module, mpirun=mpirun, completed=len(completed), failed=len(failures), requested=len(records), started_utc=started)
+    refresh_dashboard(force=True)
     print(f"[local-dft] complete: {len(completed)}/{len(records)} normal; {len(failures)} skipped; report={failure_report}", flush=True)
 
 
@@ -994,8 +1415,7 @@ def command_dft(args: argparse.Namespace) -> None:
         event("dft_parity_completed", args.pressure, [processed], [report, *plots], kind=args.kind, parent_model=current_parent())
         print(f"Re-evaluated parity: {report}"); return
     if args.collect:
-        sys.path.insert(0, str((ROOT / "../C3_DFTproductionstopH2").resolve()))
-        import condense_dft_outputs as condenser
+        import orca_output_validation as condenser
         from ase.io import write
         manifest=ddir / "manifest.csv"; outputs=ddir / "outputs"; accepted=[]; rows=[]
         with manifest.open(newline="", encoding="utf-8") as f:
@@ -1035,20 +1455,34 @@ def command_dft(args: argparse.Namespace) -> None:
     ddir.mkdir(parents=True); inp=ddir / "inputs"; inp.mkdir(); cfg=config()["dft"]
     frames=read(clusters, ":"); records=[]
     for i, atoms in enumerate(frames):
-        stem=f"cluster_{i:03d}"; charge=formal_charge(atoms.get_chemical_symbols()); mult=1 if (sum(atoms.numbers)-charge)%2 == 0 else 2
+        stem=f"cluster_{i:03d}"
+        charge=formal_charge(atoms.get_chemical_symbols())
+        recorded_charge = atoms.info.get("charge")
+        if recorded_charge is None or int(recorded_charge) != charge:
+            raise ValueError(
+                f"{stem}: extxyz charge {recorded_charge!r} does not match formal charge {charge}"
+            )
+        electron_count = int(sum(atoms.numbers) - charge)
+        if electron_count % 2:
+            raise ValueError(f"{stem}: odd electron count {electron_count} is incompatible with multiplicity 1")
+        mult=1
+        if int(atoms.info.get("multiplicity", mult)) != mult:
+            raise ValueError(f"{stem}: extxyz multiplicity is not the required singlet value 1")
         (inp / f"{stem}.inp").write_text(dft_input(atoms, charge, mult, cfg["orca_nprocs"]), encoding="utf-8")
-        records.append({"frame":i,"stem":stem,"input":f"inputs/{stem}.inp","charge":charge,"multiplicity":mult,"n_atoms":len(atoms)})
+        records.append({"frame":i,"stem":stem,"input":f"inputs/{stem}.inp","charge":charge,"multiplicity":mult,"electron_count":electron_count,"n_atoms":len(atoms)})
     with (ddir / "manifest.csv").open("w", newline="", encoding="utf-8") as f:
         writer=csv.DictWriter(f, fieldnames=records[0].keys()); writer.writeheader(); writer.writerows(records)
-    script=ddir / "submit.slurm"
+    launch_root = ROOT / "dft_launches" / (RUN_ID or "default") / tag(args.pressure) / args.kind
+    launch_root.mkdir(parents=True, exist_ok=True)
+    script=launch_root / "submit.slurm"
     stems=" ".join(row["stem"] for row in records)
-    script.write_text(f"#!/bin/bash\n#SBATCH --job-name=sal_{tag(args.pressure)}_{args.kind}\n#SBATCH --partition={cfg['slurm_partition']}\n#SBATCH --ntasks={cfg['orca_nprocs']}\n#SBATCH --time={cfg['slurm_time']}\nset -euo pipefail\nmodule purge\nmodule load {cfg['orca_module']}\nmkdir -p outputs\nfor stem in {stems}; do {cfg['orca_command']} inputs/${{stem}}.inp > outputs/${{stem}}.out; done\n", encoding="utf-8")
+    script.write_text(f"#!/bin/bash\n#SBATCH --job-name=sal_{tag(args.pressure)}_{args.kind}\n#SBATCH --partition={cfg['slurm_partition']}\n#SBATCH --ntasks={cfg['orca_nprocs']}\n#SBATCH --time={cfg['slurm_time']}\nset -euo pipefail\nmodule purge\nmodule load {cfg['orca_module']}\ncd {shlex.quote(str(ddir))}\nmkdir -p outputs\nfor stem in {stems}; do {cfg['orca_command']} inputs/${{stem}}.inp > outputs/${{stem}}.out; done\n", encoding="utf-8")
     event("dft_prepared", args.pressure, [clusters], [ddir / "manifest.csv", script], kind=args.kind, cluster_count=len(frames), formal_charge_verified=True)
     print(f"Generated {len(frames)} ORCA inputs and {script}")
     if args.submit:
         if shutil.which("sbatch") is None:
             raise RuntimeError("sbatch is unavailable on this host. Run locally with --run-local, or generate here and submit from a Slurm login node.")
-        subprocess.run(["sbatch", str(script)], cwd=ddir, check=True)
+        subprocess.run(["sbatch", str(script)], cwd=script.parent, check=True)
         event("dft_submitted", args.pressure, [script], [], kind=args.kind)
 
 
@@ -1092,7 +1526,13 @@ def command_finetune(args: argparse.Namespace) -> None:
     write_json(split, {"created_utc":now(), "method":"deterministic_shuffle_per_campaign_data_snapshot", "seed":split_seed,
                        "validation_fraction":fraction, "total_frames":len(all_frames), "train_count":len(train), "validation_count":len(validation),
                        "train_indices":train_indices, "validation_indices":valid_indices, "acquired_sha256":acquired_sha256})
-    parent=current_parent(); launcher=(ROOT / "../D2_naive/launch_single_gpu.py").resolve()
+    parent=args.parent_model or current_parent()
+    if parent != "polar-1-s":
+        parent_path=Path(parent).expanduser().resolve()
+        if not parent_path.is_file():
+            raise FileNotFoundError(f"Fine-tuning parent model is missing: {parent_path}")
+        parent=str(parent_path)
+    launcher=(ROOT / "../D2_naive/launch_single_gpu.py").resolve()
     lineage=json.loads((OUT / "model_lineage.json").read_text(encoding="utf-8"))
     current_branch = active_branch(lineage)
     batch_number=1 + sum(1 for entry in branch_history(lineage)
@@ -1106,17 +1546,53 @@ def command_finetune(args: argparse.Namespace) -> None:
     # for the final five epochs of *every* autonomous batch.  This repeatedly
     # destabilised validation forces.  Long standalone D2 experiments retain
     # their own opt-in SWA defaults; this policy is campaign-specific.
-    command=[sys.executable, str(launcher), "--gpu", cfg["gpu"], "--", f"--foundation-model={parent}", f"--train-file={merged}", f"--valid-file={valid}", f"--name={finetune_id}", f"--max-num-epochs={epochs}", "--no-swa", f"--changed-parameter={args.changed_parameter}", f"--change-note={args.change_note}"]
+    if not math.isfinite(args.lr) or args.lr <= 0:
+        raise ValueError("--lr must be a finite positive number")
+    command=[sys.executable, str(launcher), "--gpu", cfg["gpu"], "--", f"--foundation-model={parent}", f"--train-file={merged}", f"--valid-file={valid}", f"--name={finetune_id}", f"--max-num-epochs={epochs}", f"--lr={args.lr}", "--no-swa", f"--changed-parameter={args.changed_parameter}", f"--change-note={args.change_note}"]
     (data / "launch_command.sh").write_text("#!/usr/bin/env bash\nset -euo pipefail\n" + shlex.join(command) + "\n", encoding="utf-8")
-    event("finetune_prepared", args.pressure, [*acquired], [all_data, merged, valid, split, data / "launch_command.sh"], parent_model=parent, finetune_id=finetune_id, batch_number=batch_number, batch_epochs=epochs, acquired_datasets=[str(x) for x in acquired], training_data_scope="named_run_campaign_DFT_plus_immutable_inherited_snapshot", validation_policy="randomized_30_percent_campaign_only", validation_fraction=fraction, validation_seed=split_seed, train_count=len(train), validation_count=len(validation), changed_parameter=args.changed_parameter, change_note=args.change_note)
+    status_path=data / "finetune_status.json"
+    status={"state":"prepared", "updated_utc":now(), "pressure_gpa":args.pressure,
+            "finetune_id":finetune_id, "batch_number":batch_number, "batch_epochs":epochs,
+            "gpu":str(cfg["gpu"]), "parent_model":parent, "learning_rate":args.lr, "train_count":len(train),
+            "validation_count":len(validation), "changed_parameter":args.changed_parameter,
+            "change_note":args.change_note}
+    write_json(status_path, status)
+    event("finetune_prepared", args.pressure, [*acquired], [all_data, merged, valid, split, data / "launch_command.sh", status_path], parent_model=parent, finetune_id=finetune_id, batch_number=batch_number, batch_epochs=epochs, learning_rate=args.lr, acquired_datasets=[str(x) for x in acquired], training_data_scope="named_run_campaign_DFT_plus_immutable_inherited_snapshot", validation_policy="randomized_30_percent_campaign_only", validation_fraction=fraction, validation_seed=split_seed, train_count=len(train), validation_count=len(validation), changed_parameter=args.changed_parameter, change_note=args.change_note)
     print(shlex.join(command))
     if args.run:
-        subprocess.run(command, cwd=launcher.parent, check=True)
+        def refresh_dashboard() -> None:
+            try:
+                from campaign_dashboard import render
+                render()
+            except Exception as exc:
+                print(f"[finetune] dashboard update failed: {type(exc).__name__}: {exc}", flush=True)
+
+        status.update({"state":"running", "started_utc":now(), "updated_utc":now()})
+        write_json(status_path, status); refresh_dashboard()
+        process=subprocess.Popen(command, cwd=launcher.parent)
+        try:
+            while True:
+                try:
+                    return_code=process.wait(timeout=30)
+                    break
+                except subprocess.TimeoutExpired:
+                    status["updated_utc"]=now(); write_json(status_path, status); refresh_dashboard()
+        except BaseException as exc:
+            status.update({"state":"interrupted", "updated_utc":now(), "error":f"{type(exc).__name__}: {exc}"})
+            write_json(status_path, status); refresh_dashboard()
+            raise
+        if return_code != 0:
+            status.update({"state":"failed", "updated_utc":now(), "return_code":return_code})
+            write_json(status_path, status); refresh_dashboard()
+            raise subprocess.CalledProcessError(return_code, command)
         candidates=sorted((launcher.parent / "runs").glob(f"{finetune_id}_*/models/*.model"), key=lambda p:p.stat().st_mtime)
         if not candidates: raise RuntimeError("Fine tuning completed but no campaign-named model was found")
-        model=str(candidates[-1].resolve()); state=json.loads((OUT / "model_lineage.json").read_text()); state["history"].append({"pressure_gpa":args.pressure,"parent":parent,"model":model,"train_sha256":sha(merged),"validation_sha256":sha(valid),"split_sha256":sha(split),"acquired_sha256":acquired_sha256,"utc":now(),"batch_number":batch_number,"batch_epochs":epochs,"finetune_id":finetune_id,"branch_id":current_branch,"validation_policy":"randomized_30_percent_campaign_only","validation_fraction":fraction,"validation_seed":split_seed,"train_count":len(train),"validation_count":len(validation)}); state["current_model"]=model; write_json(OUT / "model_lineage.json", state)
-        write_json(data / "batch_complete.json", {"utc":now(), "batch_number":batch_number, "batch_epochs":epochs, "parent_model":parent, "model":model, "train_sha256":sha(merged), "validation_sha256":sha(valid), "split_sha256":sha(split), "validation_policy":"randomized_30_percent_campaign_only", "validation_fraction":fraction, "validation_seed":split_seed, "train_count":len(train), "validation_count":len(validation), "acquired_datasets":[str(x) for x in acquired], "acquired_sha256":acquired_sha256})
-        event("finetune_completed", args.pressure, [merged, valid, split], [Path(model), OUT / "model_lineage.json", data / "batch_complete.json"], parent_model=parent, model=model, batch_number=batch_number, batch_epochs=epochs, validation_policy="randomized_30_percent_campaign_only", validation_fraction=fraction, validation_seed=split_seed)
+        model=str(candidates[-1].resolve()); state=json.loads((OUT / "model_lineage.json").read_text()); state["history"].append({"pressure_gpa":args.pressure,"parent":parent,"model":model,"train_sha256":sha(merged),"validation_sha256":sha(valid),"split_sha256":sha(split),"acquired_sha256":acquired_sha256,"utc":now(),"batch_number":batch_number,"batch_epochs":epochs,"learning_rate":args.lr,"finetune_id":finetune_id,"branch_id":current_branch,"validation_policy":"randomized_30_percent_campaign_only","validation_fraction":fraction,"validation_seed":split_seed,"train_count":len(train),"validation_count":len(validation)}); state["current_model"]=model; write_json(OUT / "model_lineage.json", state)
+        write_json(data / "batch_complete.json", {"utc":now(), "batch_number":batch_number, "batch_epochs":epochs, "learning_rate":args.lr, "parent_model":parent, "model":model, "train_sha256":sha(merged), "validation_sha256":sha(valid), "split_sha256":sha(split), "validation_policy":"randomized_30_percent_campaign_only", "validation_fraction":fraction, "validation_seed":split_seed, "train_count":len(train), "validation_count":len(validation), "acquired_datasets":[str(x) for x in acquired], "acquired_sha256":acquired_sha256})
+        status.update({"state":"completed", "updated_utc":now(), "completed_utc":now(), "model":model})
+        write_json(status_path, status)
+        event("finetune_completed", args.pressure, [merged, valid, split], [Path(model), OUT / "model_lineage.json", data / "batch_complete.json"], parent_model=parent, model=model, batch_number=batch_number, batch_epochs=epochs, learning_rate=args.lr, validation_policy="randomized_30_percent_campaign_only", validation_fraction=fraction, validation_seed=split_seed)
+        refresh_dashboard()
 
 
 def parser() -> argparse.ArgumentParser:
@@ -1141,9 +1617,13 @@ def parser() -> argparse.ArgumentParser:
     q.set_defaults(func=command_promote_best)
     for name, func in (("md", command_md), ("analyze", command_analyze), ("approve", command_approve)):
         q=sub.add_parser(name); q.add_argument("--pressure", type=float, required=True); q.set_defaults(func=func)
-        if name == "md": q.add_argument("--run", action="store_true")
+        if name == "md":
+            q.add_argument("--run", action="store_true")
+            q.add_argument("--gpus", help="Comma-separated CUDA devices; one independently seeded replica is prepared per GPU.")
+            q.add_argument("--seeds", help="Optional comma-separated explicit seeds, one per GPU, for reproducible preparation.")
         if name == "analyze":
-            q.add_argument("--trajectory", type=Path, help="Immutable external or campaign trajectory to analyse.")
+            q.add_argument("--trajectory", type=Path, action="append", help="Immutable trajectory to analyse; repeat to pool replicas.")
+            q.add_argument("--workers", type=int, help="CPU worker processes; defaults to analysis.workers in the run configuration.")
             q.add_argument("--production-start-frame", type=int, default=0, help="First production frame, zero based; earlier frames are excluded.")
             q.add_argument("--production-frame-stride", type=int, default=1, help="Analyse every Nth production frame; must be positive.")
             q.add_argument("--frame-time-ps", type=float, help="Time between stored trajectory frames, in ps; inferred for campaign trajectories.")
@@ -1151,9 +1631,9 @@ def parser() -> argparse.ArgumentParser:
     def kind(value: str) -> str:
         if value == "diagnostic" or re.fullmatch(r"acquisition(?:_r[2-9][0-9]*)?", value): return value
         raise argparse.ArgumentTypeError("kind must be diagnostic, acquisition, or acquisition_r<N> (N >= 2)")
-    q=sub.add_parser("clusters"); q.add_argument("--pressure", type=float, required=True); q.add_argument("--kind", type=kind, required=True); q.set_defaults(func=command_clusters)
+    q=sub.add_parser("clusters"); q.add_argument("--pressure", type=float, required=True); q.add_argument("--kind", type=kind, required=True); q.add_argument("--count", type=int, help="Override the configured cluster count for this selection."); q.add_argument("--workers", type=int, help="CPU worker processes; defaults to analysis.workers in the run configuration."); q.add_argument("--visualization-limit", type=int, default=12, help="Maximum evenly sampled clusters to render for visual audit (default: 12)."); q.set_defaults(func=command_clusters)
     q=sub.add_parser("dft"); q.add_argument("--pressure", type=float, required=True); q.add_argument("--kind", type=kind, required=True); q.add_argument("--submit", action="store_true", help="Submit the prepared job to Slurm."); q.add_argument("--run-local", action="store_true", help="Run already-prepared inputs locally, one 24-rank ORCA job at a time; failed jobs are recorded and skipped."); q.add_argument("--replace-prepared", action="store_true", help="Archive unused prepared inputs before regenerating them; refuses if output files exist."); q.add_argument("--collect", action="store_true"); q.add_argument("--parity", action="store_true", help="Re-evaluate MACE parity from already validated DFT frames."); q.set_defaults(func=command_dft)
-    q=sub.add_parser("finetune"); q.add_argument("--pressure", type=float, required=True); q.add_argument("--run", action="store_true"); q.add_argument("--epochs", type=int, help="Epochs in this continuation batch; defaults to finetune.batch_epochs."); q.add_argument("--changed-parameter", required=True); q.add_argument("--change-note", required=True); q.set_defaults(func=command_finetune)
+    q=sub.add_parser("finetune"); q.add_argument("--pressure", type=float, required=True); q.add_argument("--run", action="store_true"); q.add_argument("--epochs", type=int, help="Epochs in this continuation batch; defaults to finetune.batch_epochs."); q.add_argument("--lr", type=float, default=1e-4, help="Learning rate; default preserves the validated 1e-4 baseline."); q.add_argument("--parent-model", help="Explicit parent checkpoint selected by an auditable workflow launcher; defaults to current lineage parent."); q.add_argument("--changed-parameter", required=True); q.add_argument("--change-note", required=True); q.set_defaults(func=command_finetune)
     return p
 
 

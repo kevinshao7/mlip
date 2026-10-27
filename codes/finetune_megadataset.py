@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import fcntl
 import json
 import re
 from datetime import datetime, timezone
@@ -61,10 +62,11 @@ def metrics(run_dir: Path) -> dict:
     return {"log": str(logs[-1]), "initial": next((x for x in matches if x["epoch"] == -1), None), "final": matches[-1] if matches else None}
 
 
-def existing_ids() -> set[str]:
-    if not REGISTRY.is_file(): return set()
+def existing_ids(text: str | None = None) -> set[str]:
+    if text is None and not REGISTRY.is_file(): return set()
     ids = set()
-    for line in REGISTRY.read_text(encoding="utf-8").splitlines():
+    source = REGISTRY.read_text(encoding="utf-8") if text is None else text
+    for line in source.splitlines():
         try: ids.add(json.loads(line)["run_id"])
         except (json.JSONDecodeError, KeyError): pass
     return ids
@@ -73,7 +75,6 @@ def existing_ids() -> set[str]:
 def record(metadata: dict, *, method: str, wrapper: str, status: str, ended_at: str | None = None, duration_seconds: float | None = None, error: str | None = None) -> bool:
     run_dir = Path(metadata["run_directory"]).resolve()
     run_id = str(run_dir)
-    if run_id in existing_ids(): return False
     arguments = metadata.get("arguments", {})
     observed_metrics = metrics(run_dir)
     if status != "completed" and observed_metrics.get("final") is not None:
@@ -89,8 +90,16 @@ def record(metadata: dict, *, method: str, wrapper: str, status: str, ended_at: 
              "campaign_context": campaign_context(arguments),
              "metrics": observed_metrics, "error": error}
     REGISTRY.parent.mkdir(parents=True, exist_ok=True)
-    with REGISTRY.open("a", encoding="utf-8") as handle:
+    with REGISTRY.open("a+", encoding="utf-8") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX)
+        handle.seek(0)
+        if run_id in existing_ids(handle.read()):
+            fcntl.flock(handle, fcntl.LOCK_UN)
+            return False
+        handle.seek(0, 2)
         handle.write(json.dumps(entry, sort_keys=True) + "\n")
+        handle.flush()
+        fcntl.flock(handle, fcntl.LOCK_UN)
     return True
 
 
