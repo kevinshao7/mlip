@@ -1,5 +1,9 @@
 # Reduce fine-condition trajectories
 
+> [!IMPORTANT]
+> `polar-1-s` is retired for new work. Use `polar-1-l`; any older references
+> are historical and remain only for reproducibility.
+
 `reduce_xyz_stride.py` streams each `production*.xyz` trajectory below
 `outputsfull/conditionsfine`, retains frames 0, 100, 200, ..., and writes the
 result under the matching run directory in `outputsfull/conditionsfinereduced`.

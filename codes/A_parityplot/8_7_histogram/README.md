@@ -1,5 +1,9 @@
 # 8_7 MLIP-vs-DFT Histograms
 
+> [!IMPORTANT]
+> `polar-1-s` is retired for new work. Use `polar-1-l`; commands below that use
+> `polar1s` are historical reproduction examples, not defaults for new work.
+
 Generate four histograms for one MLIP model against the BlueHive ORCA outputs:
 
 ```bash

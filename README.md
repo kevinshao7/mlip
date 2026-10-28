@@ -1,5 +1,10 @@
 # MLIP / ORCA Solubility Workflows
 
+> [!IMPORTANT]
+> **Foundation-model policy (2026-10-28):** `polar-1-s` is retired for new
+> simulations and training. Use the large MACE-POLAR checkpoint `polar-1-l`.
+> Older `polar-1-s` names and artifacts are retained only for reproducibility.
+
 This repository contains scripts and local dependencies for NH3/H2S-in-water simulation workflows using molecular dynamics, ORCA DFT, and MACE-POLAR.
 
 > [!IMPORTANT]

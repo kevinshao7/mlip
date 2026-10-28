@@ -1,5 +1,9 @@
 # Historical D2 split: 90/5/5 formula-level stratification
 
+> [!IMPORTANT]
+> `polar-1-s` is retired for new work. Use `polar-1-l`; any older references
+> are historical and remain only for reproducibility.
+
 These files preserve the active D2 split immediately before the 2026-09-29
 approved change to an 80/10/10 source-family/nitrogen-presence split. They
 remain the exact inputs for the historical runs recorded in

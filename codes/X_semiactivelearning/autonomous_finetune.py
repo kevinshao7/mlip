@@ -21,19 +21,19 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-# This controller is intentionally bound to the active Cycle2 campaign. Avoid
-# accidentally writing a tournament into another run because of an inherited
-# shell variable.
-os.environ["SAL_RUN_ID"] = "cycle2"
+# This controller targets the base campaign (no SAL_RUN_ID).  Explicitly
+# clear the variable so that an inherited shell setting cannot redirect
+# outputs to a named sub-run like cycle2.
+os.environ["SAL_RUN_ID"] = ""
 
 import campaign
-from launch_single_gpu import SAVED_METRIC, select_best_parent
+from launch_single_gpu import SAVED_METRIC
 
 ROOT = Path(__file__).resolve().parent
 MLIP = ROOT.parents[1]
 sys.path.insert(0, str(MLIP / "codes"))
-RUN_ID = "cycle2"
-PRESSURE_GPA = 31.0
+RUN_ID = ""
+PRESSURE_GPA = 31.6227766017
 EPOCHS = 20
 D2 = (ROOT / "../D2_naive").resolve()
 LAUNCHER = D2 / "launch_single_gpu.py"
@@ -81,7 +81,7 @@ def child_specs(round_number: int, parent: Path, learning_rate: float) -> list[d
     specs = []
     for gpu, factor, label in (("0", 2.0, "2x"), ("1", 0.5, "0p5x")):
         child_lr = learning_rate * factor
-        child_id = f"sal_P31p0000GPa_autoround{round_number:03d}_gpu{gpu}_{label}_{stamp}"
+        child_id = f"sal_P31p6228GPa_autoround{round_number:03d}_gpu{gpu}_{label}_{stamp}"
         note = (
             f"Autonomous sibling round {round_number}: start from the same incumbent and immutable "
             f"P31 split; change only learning rate from {learning_rate:g} to {child_lr:g} ({factor:g}x)."
@@ -202,12 +202,37 @@ def promote_winner(incumbent: dict, winner: dict, loser: dict, round_number: int
 
 
 def initial_incumbent() -> dict:
-    selected = select_best_parent()
-    rate = float(selected["learning_rate"])
-    if not math.isfinite(rate) or rate <= 0:
-        raise RuntimeError(f"Selected checkpoint has invalid recorded learning rate: {rate}")
-    return {"model": Path(selected["model"]), "learning_rate": rate,
-            "run_name": selected["run_name"], "metrics": selected["metrics"]}
+    """Select the starting parent from the active lineage branch.
+
+    Reads model_lineage.json and picks the most recent completed batch on the
+    active branch. Falls back to the configured foundation model at lr=1e-4
+    when no completed batch exists (i.e., first run after a foundation restart).
+    """
+    DEFAULT_LR = 1e-4
+    lineage_path = campaign.OUT / "model_lineage.json"
+    if lineage_path.exists():
+        lineage = json.loads(lineage_path.read_text(encoding="utf-8"))
+        active = str(campaign.active_branch(lineage))
+        history = [item for item in lineage.get("history", [])
+                   if str(item.get("branch_id", "legacy")) == active]
+        if history:
+            latest = history[-1]
+            model = Path(latest["model"])
+            if model.is_file():
+                lr = float(latest.get("learning_rate", DEFAULT_LR))
+                if not math.isfinite(lr) or lr <= 0:
+                    raise RuntimeError(f"Latest lineage batch has invalid learning rate: {lr}")
+                return {
+                    "model": model, "learning_rate": lr,
+                    "run_name": latest.get("finetune_id", str(model.name)),
+                    "metrics": {"valid": {
+                        "force_rmse_mev_per_a": latest.get("validation_force_rmse_mev_per_a", float("inf")),
+                    }},
+                }
+            print(f"[autonomous-finetune] Latest lineage model missing at {model}; falling back to configured foundation", flush=True)
+    foundation = campaign.config()["finetune"]["initial_parent"]
+    print(f"[autonomous-finetune] No completed model on active branch; starting from {foundation} at lr={DEFAULT_LR:g}", flush=True)
+    return {"model": Path(foundation), "learning_rate": DEFAULT_LR, "run_name": foundation, "metrics": {}}
 
 
 def main() -> None:

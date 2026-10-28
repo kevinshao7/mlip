@@ -1,6 +1,11 @@
 # X Semi-Active Learning Campaign
 
-NH3/H2O R1 pressure campaign using PolarMACE (polar-1-s foundation).
+> [!IMPORTANT]
+> **Foundation-model policy (2026-10-28):** Do not use `polar-1-s` for new
+> simulations or training. Use the large MACE-POLAR checkpoint `polar-1-l`.
+> Any `polar-1-s` references retained below describe immutable historical runs.
+
+NH3/H2O R1 pressure campaign using the large PolarMACE `polar-1-l` foundation.
 All commands run from `mlip/codes/X_semiactivelearning/`.
 All outputs live under `mlip/outputsfull/X_semiactivelearning/`.
 
@@ -76,6 +81,46 @@ SAL_RUN_ID= /home/kevinsh/env/bin/python campaign.py md --pressure 31.6228
 # Re-run P31 production MD to completion (2000 frames)
 bash /home/kevinsh/mlip/codes/X_semiactivelearning/md_launches/default/P31p6228GPa/run_md.sh
 ```
+
+### Prepared P10 two-GPU, six-hour run
+
+The named run `p10_2gpu_6h` preserves the completed default P10 campaign. It
+uses two independent `polar-1-l` replicas at 10 GPa and 1920 K, one each on
+GPU 0 and GPU 1. Each replica uses a 0.5 fs timestep, unchanged 2 ps pressure
+and 2 ps temperature ramps, and a 45 ps production hold (98,000 total steps).
+The 45-step save interval produces exactly 2,000 production frames per replica.
+
+The six-hour target is an estimate scaled from the recorded 108,000-step run
+that completed in 6 h 36 min; it is not a hard wall-clock cutoff. That earlier
+throughput is not a `polar-1-l` benchmark, so the first large-model run should
+be treated as the calibration for later six-hour jobs.
+
+```bash
+cd /home/kevinsh/mlip/codes/X_semiactivelearning/md_launches/p10_2gpu_6h/P10p0000GPa
+/home/kevinsh/env/bin/python run_md_parallel.py
+```
+
+The official calculator spelling is `mace_polar(model="polar-1-l", ...)`; see
+the [MACE-POLAR guide](https://mace-docs.readthedocs.io/en/latest/guide/polar_mace.html)
+and [MACE v0.3.16 release notes](https://github.com/ACEsuit/mace/releases/tag/v0.3.16).
+
+The completed 2026-10-28 trajectories are not an equilibrium 10 GPa
+acquisition pool. Across both 2,000-frame replicas, the mean virial pressure is
+3.6717 GPa and the cell volume decreases from about 4148 to 2280 A^3. Even the
+last 200 frames average only 5.85 and 5.88 GPa for replicas 0 and 1. After this
+was reviewed, the user explicitly directed the 1,000-cluster extraction and
+DFT preparation to proceed. Those clusters therefore retain a non-equilibrium,
+sub-target-pressure caveat and must not be described as equilibrium 10 GPa
+data. The evidence and override are recorded in the approval JSON,
+`analysis/pressure_volume_time_series.png`, `analysis/summary.json`, and the
+workflow-level `hyperparameters.txt`.
+
+For this explicitly approved acquisition, ORCA 6 uses its documented
+`wB97M-D4rev def2-TZVPD` simple-input keywords with `EnGrad RIJCOSX`. The named
+run is configured for BlueHive ORCA 6.1.1 as 100 grouped Slurm jobs for a
+1,000-cluster set (10 sequential clusters per job, 24 ranks each). Generated
+Slurm logs remain under the run's `dft/<kind>/slurm_logs/` directory in
+`outputsfull/`.
 
 ### Analysis
 

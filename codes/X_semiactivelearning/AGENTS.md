@@ -1,7 +1,8 @@
 # X semi-active-learning campaign rules
 
-This is a new, self-contained pressure campaign.  It starts from foundation
-`polar-1-s`; only an approved campaign fine-tune may become the parent of a
+This is a new, self-contained pressure campaign. New runs start from foundation
+`polar-1-l`; `polar-1-s` is retired and must not be used for new simulations or
+training. Only an approved campaign fine-tune may become the parent of a
 later campaign MD run.
 
 All executable source and generated launch code belongs under
@@ -74,7 +75,7 @@ only gates training; it never suppresses validation diagnostics.
 
 Fine-tuning training data must come only from validated campaign DFT outputs
 under `outputsfull/X_semiactivelearning/cycles/*/dft/acquisition*/`. Do not
-merge a legacy D2 or other external DFT training set; Polar-1-s is the model
+merge a legacy D2 or other external DFT training set; Polar-1-L is the model
 initialization, while fixed validation/test files are evaluation-only.
 
 The user-approved learning-rate tournament in `autonomous_finetune.py` is the

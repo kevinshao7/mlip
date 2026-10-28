@@ -1,5 +1,9 @@
 # 8_16 Process DFT
 
+> [!IMPORTANT]
+> `polar-1-s` is retired for new work. Use `polar-1-l`; any older references
+> are historical and remain only for reproducibility.
+
 Process the ORCA outputs from
 `outputsfull/C_DFTproduction/C_DFTproduction/dft_outputs` into frame-level and
 atom-level reference files for later MLIP parity plots.

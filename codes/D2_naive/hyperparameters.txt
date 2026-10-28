@@ -6795,3 +6795,673 @@ ANALYSIS 2026-10-27T09:26:11-04:00
 - next one-factor test: Before any new fine tuning, repair dataset construction to reject duplicate structure/label identities across all local and inherited sources, then regenerate a deduplicated split from the same existing DFT snapshot and reevaluate the existing parent/model baselines without changing model or optimizer settings. Do not launch this test until the user approves the repair and disposition of contaminated lineage.
 - why this test is informative: Holding the underlying unique DFT configurations and training recipe fixed isolates the effect of duplicate weighting and train/validation leakage while establishing an auditable independent validation set.
 - changed factor relative to this run: dataset identity policy only (path-based concatenation to fail-closed structure/label deduplication).
+
+ANALYSIS 2026-10-27T11:41:02.247012-04:00
+- evidence: Autonomous round 1 uses parent polar-1-s, recorded incumbent lr=0.0001, epochs=20, train_sha256=8f77faa2c92fd58b834d6363fb9ff1e6563f01ae9b06db6c5db552a00066148f, validation_sha256=ac80e05e453ee68a1a7b8bcf122a4906ecbf57b8d551d5c8c5dcfc95b4631f1b, split_sha256=289974cadb7ff46ed2f98c74a5e7f710b49678e07bcb9c89e7d085e29f35438a.
+- diagnosis / uncertainty: The prior validation-force plateau leaves learning-rate scale as the isolated optimization uncertainty.
+- next one-factor test: Launch exactly two sibling children concurrently: GPU 0 at lr=0.0002 (2x) and GPU 1 at lr=5e-05 (0.5x), both for 20 epochs from the same parent and split.
+- why this test is informative: Bracketing the incumbent learning rate tests opposite step-size directions while holding model, data, split, optimizer, loss weights, precision, scheduler/SWA policy, and epoch count fixed.
+- changed factor relative to the incumbent: learning_rate only (0.0001 to 0.0002 or 5e-05).
+
+========================================================================================
+RUN START 2026-10-27T11:41:03.914300-04:00
+created_at=2026-10-27T11:41:03.914307-04:00
+run_name=sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T154102Z_20261027T114103_913882-0400
+run_directory=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T154102Z_20261027T114103_913882-0400
+training_log=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T154102Z_20261027T114103_913882-0400/logs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T154102Z_20261027T114103_913882-0400_run-3.log
+checkpoint_model=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T154102Z_20261027T114103_913882-0400/checkpoints/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T154102Z_20261027T114103_913882-0400_run-3.model
+compiled_model_if_available=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T154102Z_20261027T114103_913882-0400/models/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T154102Z_20261027T114103_913882-0400_compiled.model
+POLICY: Change exactly one scientific/training factor per iteration.
+POLICY: Set changed_parameter and change_note before every non-baseline run.
+changed_parameter=learning_rate
+change_note=Autonomous sibling round 1: start from the same incumbent and immutable P31 split; change only learning rate from 0.0001 to 5e-05 (0.5x).
+
+Resolved wrapper hyperparameters:
+atomic_numbers=[1, 7, 8, 16]
+batch_size=1
+change_note=Autonomous sibling round 1: start from the same incumbent and immutable P31 split; change only learning rate from 0.0001 to 5e-05 (0.5x).
+changed_parameter=learning_rate
+default_dtype=float32
+device=cuda
+dry_run=False
+e0s=foundation
+ema=True
+ema_decay=0.99999
+energy_weight=0.001
+forces_weight=100.0
+foundation_model=polar-1-s
+lr=5e-05
+max_num_epochs=20
+name=sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T154102Z
+num_workers=4
+restart_latest=False
+runs_root=/home/kevinsh/mlip/codes/D2_naive/runs
+seed=3
+start_swa=15
+status_every=250
+swa=False
+swa_energy_weight=1.0
+swa_forces_weight=100000.0
+swa_lr=0.0003
+train_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/cumulative_train.extxyz
+valid_batch_size=1
+valid_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/random_validation.extxyz
+
+Resolved MACE command:
+run_train.py --name=sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T154102Z_20261027T114103_913882-0400 --model=PolarMACE --train_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/cumulative_train.extxyz --valid_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/random_validation.extxyz '--atomic_numbers=[1, 7, 8, 16]' --energy_key=REF_energy --forces_key=REF_forces --total_charge_key=charge --total_spin_key=spin --E0s=foundation --energy_weight=0.001 --forces_weight=100.0 --stress_weight=0.0 --loss=weighted --batch_size=1 --valid_batch_size=1 --max_num_epochs=20 --lr=5e-05 --swa_lr=0.0003 --seed=3 --default_dtype=float32 --device=cuda --num_workers=4 --model_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T154102Z_20261027T114103_913882-0400/models --checkpoints_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T154102Z_20261027T114103_913882-0400/checkpoints --log_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T154102Z_20261027T114103_913882-0400/logs --results_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T154102Z_20261027T114103_913882-0400/results --work_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T154102Z_20261027T114103_913882-0400/work --foundation_model=polar-1-s --multiheads_finetuning=False --ema --ema_decay=0.99999
+
+Analysis notes (append below; add a dated entry after every analysis or decision):
+- evidence: 
+- diagnosis / uncertainty: 
+- next one-factor test: 
+- why this test is informative: 
+- changed factor relative to this run: 
+
+========================================================================================
+RUN START 2026-10-27T11:41:03.918962-04:00
+created_at=2026-10-27T11:41:03.918970-04:00
+run_name=sal_P31p6228GPa_autoround001_gpu0_2x_20261027T154102Z_20261027T114103_918524-0400
+run_directory=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T154102Z_20261027T114103_918524-0400
+training_log=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T154102Z_20261027T114103_918524-0400/logs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T154102Z_20261027T114103_918524-0400_run-3.log
+checkpoint_model=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T154102Z_20261027T114103_918524-0400/checkpoints/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T154102Z_20261027T114103_918524-0400_run-3.model
+compiled_model_if_available=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T154102Z_20261027T114103_918524-0400/models/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T154102Z_20261027T114103_918524-0400_compiled.model
+POLICY: Change exactly one scientific/training factor per iteration.
+POLICY: Set changed_parameter and change_note before every non-baseline run.
+changed_parameter=learning_rate
+change_note=Autonomous sibling round 1: start from the same incumbent and immutable P31 split; change only learning rate from 0.0001 to 0.0002 (2x).
+
+Resolved wrapper hyperparameters:
+atomic_numbers=[1, 7, 8, 16]
+batch_size=1
+change_note=Autonomous sibling round 1: start from the same incumbent and immutable P31 split; change only learning rate from 0.0001 to 0.0002 (2x).
+changed_parameter=learning_rate
+default_dtype=float32
+device=cuda
+dry_run=False
+e0s=foundation
+ema=True
+ema_decay=0.99999
+energy_weight=0.001
+forces_weight=100.0
+foundation_model=polar-1-s
+lr=0.0002
+max_num_epochs=20
+name=sal_P31p6228GPa_autoround001_gpu0_2x_20261027T154102Z
+num_workers=4
+restart_latest=False
+runs_root=/home/kevinsh/mlip/codes/D2_naive/runs
+seed=3
+start_swa=15
+status_every=250
+swa=False
+swa_energy_weight=1.0
+swa_forces_weight=100000.0
+swa_lr=0.0003
+train_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/cumulative_train.extxyz
+valid_batch_size=1
+valid_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/random_validation.extxyz
+
+Resolved MACE command:
+run_train.py --name=sal_P31p6228GPa_autoround001_gpu0_2x_20261027T154102Z_20261027T114103_918524-0400 --model=PolarMACE --train_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/cumulative_train.extxyz --valid_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/random_validation.extxyz '--atomic_numbers=[1, 7, 8, 16]' --energy_key=REF_energy --forces_key=REF_forces --total_charge_key=charge --total_spin_key=spin --E0s=foundation --energy_weight=0.001 --forces_weight=100.0 --stress_weight=0.0 --loss=weighted --batch_size=1 --valid_batch_size=1 --max_num_epochs=20 --lr=0.0002 --swa_lr=0.0003 --seed=3 --default_dtype=float32 --device=cuda --num_workers=4 --model_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T154102Z_20261027T114103_918524-0400/models --checkpoints_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T154102Z_20261027T114103_918524-0400/checkpoints --log_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T154102Z_20261027T114103_918524-0400/logs --results_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T154102Z_20261027T114103_918524-0400/results --work_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T154102Z_20261027T114103_918524-0400/work --foundation_model=polar-1-s --multiheads_finetuning=False --ema --ema_decay=0.99999
+
+Analysis notes (append below; add a dated entry after every analysis or decision):
+- evidence: 
+- diagnosis / uncertainty: 
+- next one-factor test: 
+- why this test is informative: 
+- changed factor relative to this run: 
+
+RUN END 2026-10-27T11:44:30.124725-04:00
+run_name=sal_P31p6228GPa_autoround001_gpu0_2x_20261027T154102Z_20261027T114103_918524-0400
+run_directory=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T154102Z_20261027T114103_918524-0400
+outcome=completed
+elapsed_seconds=205.1
+
+RUN END 2026-10-27T11:44:30.709273-04:00
+run_name=sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T154102Z_20261027T114103_913882-0400
+run_directory=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T154102Z_20261027T114103_913882-0400
+outcome=completed
+elapsed_seconds=205.7
+
+ANALYSIS 2026-10-27T11:44:37.308381-04:00
+- evidence: Round 1 saved-model validation force RMSEs were GPU 0=134.1 meV/A at lr=0.0002 and GPU 1=133.7 meV/A at lr=5e-05; the common parent evaluated at 170.12 meV/A.
+- diagnosis / uncertainty: The lower-RMSE child improves the parent and is promoted.
+- next one-factor test: Use the winning child as parent and bracket its lr by 2x and 0.5x in the next 20-epoch round.
+- why this test is informative: Promotion uses the same frozen validation set and compares saved checkpoints only after the complete 20-epoch sibling group.
+- changed factor relative to this run: learning_rate only in the next sibling pair.
+
+ANALYSIS 2026-10-27T11:44:37.309629-04:00
+- evidence: Autonomous round 2 uses parent /home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T154102Z_20261027T114103_913882-0400/models/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T154102Z_20261027T114103_913882-0400.model, recorded incumbent lr=5e-05, epochs=20, train_sha256=8f77faa2c92fd58b834d6363fb9ff1e6563f01ae9b06db6c5db552a00066148f, validation_sha256=ac80e05e453ee68a1a7b8bcf122a4906ecbf57b8d551d5c8c5dcfc95b4631f1b, split_sha256=289974cadb7ff46ed2f98c74a5e7f710b49678e07bcb9c89e7d085e29f35438a.
+- diagnosis / uncertainty: The prior validation-force plateau leaves learning-rate scale as the isolated optimization uncertainty.
+- next one-factor test: Launch exactly two sibling children concurrently: GPU 0 at lr=0.0001 (2x) and GPU 1 at lr=2.5e-05 (0.5x), both for 20 epochs from the same parent and split.
+- why this test is informative: Bracketing the incumbent learning rate tests opposite step-size directions while holding model, data, split, optimizer, loss weights, precision, scheduler/SWA policy, and epoch count fixed.
+- changed factor relative to the incumbent: learning_rate only (5e-05 to 0.0001 or 2.5e-05).
+
+========================================================================================
+RUN START 2026-10-27T11:44:38.619795-04:00
+created_at=2026-10-27T11:44:38.619804-04:00
+run_name=sal_P31p6228GPa_autoround002_gpu1_0p5x_20261027T154437Z_20261027T114438_619406-0400
+run_directory=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu1_0p5x_20261027T154437Z_20261027T114438_619406-0400
+training_log=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu1_0p5x_20261027T154437Z_20261027T114438_619406-0400/logs/sal_P31p6228GPa_autoround002_gpu1_0p5x_20261027T154437Z_20261027T114438_619406-0400_run-3.log
+checkpoint_model=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu1_0p5x_20261027T154437Z_20261027T114438_619406-0400/checkpoints/sal_P31p6228GPa_autoround002_gpu1_0p5x_20261027T154437Z_20261027T114438_619406-0400_run-3.model
+compiled_model_if_available=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu1_0p5x_20261027T154437Z_20261027T114438_619406-0400/models/sal_P31p6228GPa_autoround002_gpu1_0p5x_20261027T154437Z_20261027T114438_619406-0400_compiled.model
+POLICY: Change exactly one scientific/training factor per iteration.
+POLICY: Set changed_parameter and change_note before every non-baseline run.
+changed_parameter=learning_rate
+change_note=Autonomous sibling round 2: start from the same incumbent and immutable P31 split; change only learning rate from 5e-05 to 2.5e-05 (0.5x).
+
+Resolved wrapper hyperparameters:
+atomic_numbers=[1, 7, 8, 16]
+batch_size=1
+change_note=Autonomous sibling round 2: start from the same incumbent and immutable P31 split; change only learning rate from 5e-05 to 2.5e-05 (0.5x).
+changed_parameter=learning_rate
+default_dtype=float32
+device=cuda
+dry_run=False
+e0s=foundation
+ema=True
+ema_decay=0.99999
+energy_weight=0.001
+forces_weight=100.0
+foundation_model=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T154102Z_20261027T114103_913882-0400/models/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T154102Z_20261027T114103_913882-0400.model
+lr=2.5e-05
+max_num_epochs=20
+name=sal_P31p6228GPa_autoround002_gpu1_0p5x_20261027T154437Z
+num_workers=4
+restart_latest=False
+runs_root=/home/kevinsh/mlip/codes/D2_naive/runs
+seed=3
+start_swa=15
+status_every=250
+swa=False
+swa_energy_weight=1.0
+swa_forces_weight=100000.0
+swa_lr=0.0003
+train_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/cumulative_train.extxyz
+valid_batch_size=1
+valid_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/random_validation.extxyz
+
+Resolved MACE command:
+run_train.py --name=sal_P31p6228GPa_autoround002_gpu1_0p5x_20261027T154437Z_20261027T114438_619406-0400 --model=PolarMACE --train_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/cumulative_train.extxyz --valid_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/random_validation.extxyz '--atomic_numbers=[1, 7, 8, 16]' --energy_key=REF_energy --forces_key=REF_forces --total_charge_key=charge --total_spin_key=spin --E0s=foundation --energy_weight=0.001 --forces_weight=100.0 --stress_weight=0.0 --loss=weighted --batch_size=1 --valid_batch_size=1 --max_num_epochs=20 --lr=2.5e-05 --swa_lr=0.0003 --seed=3 --default_dtype=float32 --device=cuda --num_workers=4 --model_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu1_0p5x_20261027T154437Z_20261027T114438_619406-0400/models --checkpoints_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu1_0p5x_20261027T154437Z_20261027T114438_619406-0400/checkpoints --log_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu1_0p5x_20261027T154437Z_20261027T114438_619406-0400/logs --results_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu1_0p5x_20261027T154437Z_20261027T114438_619406-0400/results --work_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu1_0p5x_20261027T154437Z_20261027T114438_619406-0400/work --foundation_model=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T154102Z_20261027T114103_913882-0400/models/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T154102Z_20261027T114103_913882-0400.model --multiheads_finetuning=False --ema --ema_decay=0.99999
+
+Analysis notes (append below; add a dated entry after every analysis or decision):
+- evidence: 
+- diagnosis / uncertainty: 
+- next one-factor test: 
+- why this test is informative: 
+- changed factor relative to this run: 
+
+========================================================================================
+RUN START 2026-10-27T11:44:38.696704-04:00
+created_at=2026-10-27T11:44:38.696711-04:00
+run_name=sal_P31p6228GPa_autoround002_gpu0_2x_20261027T154437Z_20261027T114438_696264-0400
+run_directory=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu0_2x_20261027T154437Z_20261027T114438_696264-0400
+training_log=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu0_2x_20261027T154437Z_20261027T114438_696264-0400/logs/sal_P31p6228GPa_autoround002_gpu0_2x_20261027T154437Z_20261027T114438_696264-0400_run-3.log
+checkpoint_model=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu0_2x_20261027T154437Z_20261027T114438_696264-0400/checkpoints/sal_P31p6228GPa_autoround002_gpu0_2x_20261027T154437Z_20261027T114438_696264-0400_run-3.model
+compiled_model_if_available=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu0_2x_20261027T154437Z_20261027T114438_696264-0400/models/sal_P31p6228GPa_autoround002_gpu0_2x_20261027T154437Z_20261027T114438_696264-0400_compiled.model
+POLICY: Change exactly one scientific/training factor per iteration.
+POLICY: Set changed_parameter and change_note before every non-baseline run.
+changed_parameter=learning_rate
+change_note=Autonomous sibling round 2: start from the same incumbent and immutable P31 split; change only learning rate from 5e-05 to 0.0001 (2x).
+
+Resolved wrapper hyperparameters:
+atomic_numbers=[1, 7, 8, 16]
+batch_size=1
+change_note=Autonomous sibling round 2: start from the same incumbent and immutable P31 split; change only learning rate from 5e-05 to 0.0001 (2x).
+changed_parameter=learning_rate
+default_dtype=float32
+device=cuda
+dry_run=False
+e0s=foundation
+ema=True
+ema_decay=0.99999
+energy_weight=0.001
+forces_weight=100.0
+foundation_model=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T154102Z_20261027T114103_913882-0400/models/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T154102Z_20261027T114103_913882-0400.model
+lr=0.0001
+max_num_epochs=20
+name=sal_P31p6228GPa_autoround002_gpu0_2x_20261027T154437Z
+num_workers=4
+restart_latest=False
+runs_root=/home/kevinsh/mlip/codes/D2_naive/runs
+seed=3
+start_swa=15
+status_every=250
+swa=False
+swa_energy_weight=1.0
+swa_forces_weight=100000.0
+swa_lr=0.0003
+train_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/cumulative_train.extxyz
+valid_batch_size=1
+valid_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/random_validation.extxyz
+
+Resolved MACE command:
+run_train.py --name=sal_P31p6228GPa_autoround002_gpu0_2x_20261027T154437Z_20261027T114438_696264-0400 --model=PolarMACE --train_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/cumulative_train.extxyz --valid_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/random_validation.extxyz '--atomic_numbers=[1, 7, 8, 16]' --energy_key=REF_energy --forces_key=REF_forces --total_charge_key=charge --total_spin_key=spin --E0s=foundation --energy_weight=0.001 --forces_weight=100.0 --stress_weight=0.0 --loss=weighted --batch_size=1 --valid_batch_size=1 --max_num_epochs=20 --lr=0.0001 --swa_lr=0.0003 --seed=3 --default_dtype=float32 --device=cuda --num_workers=4 --model_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu0_2x_20261027T154437Z_20261027T114438_696264-0400/models --checkpoints_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu0_2x_20261027T154437Z_20261027T114438_696264-0400/checkpoints --log_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu0_2x_20261027T154437Z_20261027T114438_696264-0400/logs --results_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu0_2x_20261027T154437Z_20261027T114438_696264-0400/results --work_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu0_2x_20261027T154437Z_20261027T114438_696264-0400/work --foundation_model=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T154102Z_20261027T114103_913882-0400/models/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T154102Z_20261027T114103_913882-0400.model --multiheads_finetuning=False --ema --ema_decay=0.99999
+
+Analysis notes (append below; add a dated entry after every analysis or decision):
+- evidence: 
+- diagnosis / uncertainty: 
+- next one-factor test: 
+- why this test is informative: 
+- changed factor relative to this run: 
+
+RUN END 2026-10-27T11:47:59.232932-04:00
+run_name=sal_P31p6228GPa_autoround002_gpu1_0p5x_20261027T154437Z_20261027T114438_619406-0400
+run_directory=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu1_0p5x_20261027T154437Z_20261027T114438_619406-0400
+outcome=completed
+elapsed_seconds=199.5
+
+RUN END 2026-10-27T11:47:59.542133-04:00
+run_name=sal_P31p6228GPa_autoround002_gpu0_2x_20261027T154437Z_20261027T114438_696264-0400
+run_directory=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu0_2x_20261027T154437Z_20261027T114438_696264-0400
+outcome=completed
+elapsed_seconds=199.8
+
+ANALYSIS 2026-10-27T11:48:12.318381-04:00
+- evidence: Round 2 saved-model validation force RMSEs were GPU 0=136.4 meV/A at lr=0.0001 and GPU 1=133.8 meV/A at lr=2.5e-05; the common parent evaluated at 133.66 meV/A.
+- diagnosis / uncertainty: Neither completed child improves the parent, so further deterministic repeats from this incumbent are not justified.
+- next one-factor test: Stop autonomous fine tuning for human review.
+- why this test is informative: Promotion uses the same frozen validation set and compares saved checkpoints only after the complete 20-epoch sibling group.
+- changed factor relative to this run: none; controller stopped.
+
+ANALYSIS 2026-10-27T12:06:18.644179-04:00
+- evidence: Autonomous round 1 uses parent /home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T154102Z_20261027T114103_913882-0400/models/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T154102Z_20261027T114103_913882-0400.model, recorded incumbent lr=5e-05, epochs=20, train_sha256=4f78b56ab0a4e408b3d66e0373c62c2b6a04ae1dc25d69a58b27a865ffb440a5, validation_sha256=577ab23f10ac7184600de80479da488aaa695d6090efdabba8f028632ffc7bbd, split_sha256=0e2ff8545c007c6cdcc8d9647937ead51af2e7c21bb2329d2f4356148d6095aa.
+- diagnosis / uncertainty: The prior validation-force plateau leaves learning-rate scale as the isolated optimization uncertainty.
+- next one-factor test: Launch exactly two sibling children concurrently: GPU 0 at lr=0.0001 (2x) and GPU 1 at lr=2.5e-05 (0.5x), both for 20 epochs from the same parent and split.
+- why this test is informative: Bracketing the incumbent learning rate tests opposite step-size directions while holding model, data, split, optimizer, loss weights, precision, scheduler/SWA policy, and epoch count fixed.
+- changed factor relative to the incumbent: learning_rate only (5e-05 to 0.0001 or 2.5e-05).
+
+========================================================================================
+RUN START 2026-10-27T12:06:20.251173-04:00
+created_at=2026-10-27T12:06:20.251180-04:00
+run_name=sal_P31p6228GPa_autoround001_gpu0_2x_20261027T160618Z_20261027T120620_250796-0400
+run_directory=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T160618Z_20261027T120620_250796-0400
+training_log=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T160618Z_20261027T120620_250796-0400/logs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T160618Z_20261027T120620_250796-0400_run-3.log
+checkpoint_model=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T160618Z_20261027T120620_250796-0400/checkpoints/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T160618Z_20261027T120620_250796-0400_run-3.model
+compiled_model_if_available=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T160618Z_20261027T120620_250796-0400/models/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T160618Z_20261027T120620_250796-0400_compiled.model
+POLICY: Change exactly one scientific/training factor per iteration.
+POLICY: Set changed_parameter and change_note before every non-baseline run.
+changed_parameter=learning_rate
+change_note=Autonomous sibling round 1: start from the same incumbent and immutable P31 split; change only learning rate from 5e-05 to 0.0001 (2x).
+
+Resolved wrapper hyperparameters:
+atomic_numbers=[1, 7, 8, 16]
+batch_size=1
+change_note=Autonomous sibling round 1: start from the same incumbent and immutable P31 split; change only learning rate from 5e-05 to 0.0001 (2x).
+changed_parameter=learning_rate
+default_dtype=float32
+device=cuda
+dry_run=False
+e0s=foundation
+ema=True
+ema_decay=0.99999
+energy_weight=0.001
+forces_weight=100.0
+foundation_model=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T154102Z_20261027T114103_913882-0400/models/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T154102Z_20261027T114103_913882-0400.model
+lr=0.0001
+max_num_epochs=20
+name=sal_P31p6228GPa_autoround001_gpu0_2x_20261027T160618Z
+num_workers=4
+restart_latest=False
+runs_root=/home/kevinsh/mlip/codes/D2_naive/runs
+seed=3
+start_swa=15
+status_every=250
+swa=False
+swa_energy_weight=1.0
+swa_forces_weight=100000.0
+swa_lr=0.0003
+train_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/cumulative_train.extxyz
+valid_batch_size=1
+valid_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/random_validation.extxyz
+
+Resolved MACE command:
+run_train.py --name=sal_P31p6228GPa_autoround001_gpu0_2x_20261027T160618Z_20261027T120620_250796-0400 --model=PolarMACE --train_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/cumulative_train.extxyz --valid_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/random_validation.extxyz '--atomic_numbers=[1, 7, 8, 16]' --energy_key=REF_energy --forces_key=REF_forces --total_charge_key=charge --total_spin_key=spin --E0s=foundation --energy_weight=0.001 --forces_weight=100.0 --stress_weight=0.0 --loss=weighted --batch_size=1 --valid_batch_size=1 --max_num_epochs=20 --lr=0.0001 --swa_lr=0.0003 --seed=3 --default_dtype=float32 --device=cuda --num_workers=4 --model_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T160618Z_20261027T120620_250796-0400/models --checkpoints_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T160618Z_20261027T120620_250796-0400/checkpoints --log_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T160618Z_20261027T120620_250796-0400/logs --results_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T160618Z_20261027T120620_250796-0400/results --work_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T160618Z_20261027T120620_250796-0400/work --foundation_model=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T154102Z_20261027T114103_913882-0400/models/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T154102Z_20261027T114103_913882-0400.model --multiheads_finetuning=False --ema --ema_decay=0.99999
+
+Analysis notes (append below; add a dated entry after every analysis or decision):
+- evidence: 
+- diagnosis / uncertainty: 
+- next one-factor test: 
+- why this test is informative: 
+- changed factor relative to this run: 
+
+========================================================================================
+RUN START 2026-10-27T12:06:20.277587-04:00
+created_at=2026-10-27T12:06:20.277595-04:00
+run_name=sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T160618Z_20261027T120620_277209-0400
+run_directory=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T160618Z_20261027T120620_277209-0400
+training_log=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T160618Z_20261027T120620_277209-0400/logs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T160618Z_20261027T120620_277209-0400_run-3.log
+checkpoint_model=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T160618Z_20261027T120620_277209-0400/checkpoints/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T160618Z_20261027T120620_277209-0400_run-3.model
+compiled_model_if_available=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T160618Z_20261027T120620_277209-0400/models/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T160618Z_20261027T120620_277209-0400_compiled.model
+POLICY: Change exactly one scientific/training factor per iteration.
+POLICY: Set changed_parameter and change_note before every non-baseline run.
+changed_parameter=learning_rate
+change_note=Autonomous sibling round 1: start from the same incumbent and immutable P31 split; change only learning rate from 5e-05 to 2.5e-05 (0.5x).
+
+Resolved wrapper hyperparameters:
+atomic_numbers=[1, 7, 8, 16]
+batch_size=1
+change_note=Autonomous sibling round 1: start from the same incumbent and immutable P31 split; change only learning rate from 5e-05 to 2.5e-05 (0.5x).
+changed_parameter=learning_rate
+default_dtype=float32
+device=cuda
+dry_run=False
+e0s=foundation
+ema=True
+ema_decay=0.99999
+energy_weight=0.001
+forces_weight=100.0
+foundation_model=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T154102Z_20261027T114103_913882-0400/models/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T154102Z_20261027T114103_913882-0400.model
+lr=2.5e-05
+max_num_epochs=20
+name=sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T160618Z
+num_workers=4
+restart_latest=False
+runs_root=/home/kevinsh/mlip/codes/D2_naive/runs
+seed=3
+start_swa=15
+status_every=250
+swa=False
+swa_energy_weight=1.0
+swa_forces_weight=100000.0
+swa_lr=0.0003
+train_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/cumulative_train.extxyz
+valid_batch_size=1
+valid_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/random_validation.extxyz
+
+Resolved MACE command:
+run_train.py --name=sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T160618Z_20261027T120620_277209-0400 --model=PolarMACE --train_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/cumulative_train.extxyz --valid_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/random_validation.extxyz '--atomic_numbers=[1, 7, 8, 16]' --energy_key=REF_energy --forces_key=REF_forces --total_charge_key=charge --total_spin_key=spin --E0s=foundation --energy_weight=0.001 --forces_weight=100.0 --stress_weight=0.0 --loss=weighted --batch_size=1 --valid_batch_size=1 --max_num_epochs=20 --lr=2.5e-05 --swa_lr=0.0003 --seed=3 --default_dtype=float32 --device=cuda --num_workers=4 --model_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T160618Z_20261027T120620_277209-0400/models --checkpoints_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T160618Z_20261027T120620_277209-0400/checkpoints --log_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T160618Z_20261027T120620_277209-0400/logs --results_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T160618Z_20261027T120620_277209-0400/results --work_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T160618Z_20261027T120620_277209-0400/work --foundation_model=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T154102Z_20261027T114103_913882-0400/models/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T154102Z_20261027T114103_913882-0400.model --multiheads_finetuning=False --ema --ema_decay=0.99999
+
+Analysis notes (append below; add a dated entry after every analysis or decision):
+- evidence: 
+- diagnosis / uncertainty: 
+- next one-factor test: 
+- why this test is informative: 
+- changed factor relative to this run: 
+
+RUN END 2026-10-27T12:09:57.185836-04:00
+run_name=sal_P31p6228GPa_autoround001_gpu0_2x_20261027T160618Z_20261027T120620_250796-0400
+run_directory=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T160618Z_20261027T120620_250796-0400
+outcome=completed
+elapsed_seconds=215.7
+
+RUN END 2026-10-27T12:10:01.428557-04:00
+run_name=sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T160618Z_20261027T120620_277209-0400
+run_directory=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T160618Z_20261027T120620_277209-0400
+outcome=completed
+elapsed_seconds=220.0
+
+ANALYSIS 2026-10-27T12:10:24.569679-04:00
+- evidence: Round 1 saved-model validation force RMSEs were GPU 0=171.7 meV/A at lr=0.0001 and GPU 1=172.0 meV/A at lr=2.5e-05; the common parent evaluated at 173.54 meV/A.
+- diagnosis / uncertainty: The lower-RMSE child improves the parent and is promoted.
+- next one-factor test: Use the winning child as parent and bracket its lr by 2x and 0.5x in the next 20-epoch round.
+- why this test is informative: Promotion uses the same frozen validation set and compares saved checkpoints only after the complete 20-epoch sibling group.
+- changed factor relative to this run: learning_rate only in the next sibling pair.
+
+ANALYSIS 2026-10-27T12:10:24.570848-04:00
+- evidence: Autonomous round 2 uses parent /home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T160618Z_20261027T120620_250796-0400/models/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T160618Z_20261027T120620_250796-0400.model, recorded incumbent lr=0.0001, epochs=20, train_sha256=4f78b56ab0a4e408b3d66e0373c62c2b6a04ae1dc25d69a58b27a865ffb440a5, validation_sha256=577ab23f10ac7184600de80479da488aaa695d6090efdabba8f028632ffc7bbd, split_sha256=0e2ff8545c007c6cdcc8d9647937ead51af2e7c21bb2329d2f4356148d6095aa.
+- diagnosis / uncertainty: The prior validation-force plateau leaves learning-rate scale as the isolated optimization uncertainty.
+- next one-factor test: Launch exactly two sibling children concurrently: GPU 0 at lr=0.0002 (2x) and GPU 1 at lr=5e-05 (0.5x), both for 20 epochs from the same parent and split.
+- why this test is informative: Bracketing the incumbent learning rate tests opposite step-size directions while holding model, data, split, optimizer, loss weights, precision, scheduler/SWA policy, and epoch count fixed.
+- changed factor relative to the incumbent: learning_rate only (0.0001 to 0.0002 or 5e-05).
+
+========================================================================================
+RUN START 2026-10-27T12:10:25.948834-04:00
+created_at=2026-10-27T12:10:25.948841-04:00
+run_name=sal_P31p6228GPa_autoround002_gpu1_0p5x_20261027T161024Z_20261027T121025_948464-0400
+run_directory=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu1_0p5x_20261027T161024Z_20261027T121025_948464-0400
+training_log=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu1_0p5x_20261027T161024Z_20261027T121025_948464-0400/logs/sal_P31p6228GPa_autoround002_gpu1_0p5x_20261027T161024Z_20261027T121025_948464-0400_run-3.log
+checkpoint_model=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu1_0p5x_20261027T161024Z_20261027T121025_948464-0400/checkpoints/sal_P31p6228GPa_autoround002_gpu1_0p5x_20261027T161024Z_20261027T121025_948464-0400_run-3.model
+compiled_model_if_available=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu1_0p5x_20261027T161024Z_20261027T121025_948464-0400/models/sal_P31p6228GPa_autoround002_gpu1_0p5x_20261027T161024Z_20261027T121025_948464-0400_compiled.model
+POLICY: Change exactly one scientific/training factor per iteration.
+POLICY: Set changed_parameter and change_note before every non-baseline run.
+changed_parameter=learning_rate
+change_note=Autonomous sibling round 2: start from the same incumbent and immutable P31 split; change only learning rate from 0.0001 to 5e-05 (0.5x).
+
+Resolved wrapper hyperparameters:
+atomic_numbers=[1, 7, 8, 16]
+batch_size=1
+change_note=Autonomous sibling round 2: start from the same incumbent and immutable P31 split; change only learning rate from 0.0001 to 5e-05 (0.5x).
+changed_parameter=learning_rate
+default_dtype=float32
+device=cuda
+dry_run=False
+e0s=foundation
+ema=True
+ema_decay=0.99999
+energy_weight=0.001
+forces_weight=100.0
+foundation_model=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T160618Z_20261027T120620_250796-0400/models/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T160618Z_20261027T120620_250796-0400.model
+lr=5e-05
+max_num_epochs=20
+name=sal_P31p6228GPa_autoround002_gpu1_0p5x_20261027T161024Z
+num_workers=4
+restart_latest=False
+runs_root=/home/kevinsh/mlip/codes/D2_naive/runs
+seed=3
+start_swa=15
+status_every=250
+swa=False
+swa_energy_weight=1.0
+swa_forces_weight=100000.0
+swa_lr=0.0003
+train_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/cumulative_train.extxyz
+valid_batch_size=1
+valid_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/random_validation.extxyz
+
+Resolved MACE command:
+run_train.py --name=sal_P31p6228GPa_autoround002_gpu1_0p5x_20261027T161024Z_20261027T121025_948464-0400 --model=PolarMACE --train_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/cumulative_train.extxyz --valid_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/random_validation.extxyz '--atomic_numbers=[1, 7, 8, 16]' --energy_key=REF_energy --forces_key=REF_forces --total_charge_key=charge --total_spin_key=spin --E0s=foundation --energy_weight=0.001 --forces_weight=100.0 --stress_weight=0.0 --loss=weighted --batch_size=1 --valid_batch_size=1 --max_num_epochs=20 --lr=5e-05 --swa_lr=0.0003 --seed=3 --default_dtype=float32 --device=cuda --num_workers=4 --model_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu1_0p5x_20261027T161024Z_20261027T121025_948464-0400/models --checkpoints_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu1_0p5x_20261027T161024Z_20261027T121025_948464-0400/checkpoints --log_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu1_0p5x_20261027T161024Z_20261027T121025_948464-0400/logs --results_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu1_0p5x_20261027T161024Z_20261027T121025_948464-0400/results --work_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu1_0p5x_20261027T161024Z_20261027T121025_948464-0400/work --foundation_model=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T160618Z_20261027T120620_250796-0400/models/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T160618Z_20261027T120620_250796-0400.model --multiheads_finetuning=False --ema --ema_decay=0.99999
+
+Analysis notes (append below; add a dated entry after every analysis or decision):
+- evidence: 
+- diagnosis / uncertainty: 
+- next one-factor test: 
+- why this test is informative: 
+- changed factor relative to this run: 
+
+========================================================================================
+RUN START 2026-10-27T12:10:25.960439-04:00
+created_at=2026-10-27T12:10:25.960445-04:00
+run_name=sal_P31p6228GPa_autoround002_gpu0_2x_20261027T161024Z_20261027T121025_960155-0400
+run_directory=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu0_2x_20261027T161024Z_20261027T121025_960155-0400
+training_log=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu0_2x_20261027T161024Z_20261027T121025_960155-0400/logs/sal_P31p6228GPa_autoround002_gpu0_2x_20261027T161024Z_20261027T121025_960155-0400_run-3.log
+checkpoint_model=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu0_2x_20261027T161024Z_20261027T121025_960155-0400/checkpoints/sal_P31p6228GPa_autoround002_gpu0_2x_20261027T161024Z_20261027T121025_960155-0400_run-3.model
+compiled_model_if_available=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu0_2x_20261027T161024Z_20261027T121025_960155-0400/models/sal_P31p6228GPa_autoround002_gpu0_2x_20261027T161024Z_20261027T121025_960155-0400_compiled.model
+POLICY: Change exactly one scientific/training factor per iteration.
+POLICY: Set changed_parameter and change_note before every non-baseline run.
+changed_parameter=learning_rate
+change_note=Autonomous sibling round 2: start from the same incumbent and immutable P31 split; change only learning rate from 0.0001 to 0.0002 (2x).
+
+Resolved wrapper hyperparameters:
+atomic_numbers=[1, 7, 8, 16]
+batch_size=1
+change_note=Autonomous sibling round 2: start from the same incumbent and immutable P31 split; change only learning rate from 0.0001 to 0.0002 (2x).
+changed_parameter=learning_rate
+default_dtype=float32
+device=cuda
+dry_run=False
+e0s=foundation
+ema=True
+ema_decay=0.99999
+energy_weight=0.001
+forces_weight=100.0
+foundation_model=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T160618Z_20261027T120620_250796-0400/models/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T160618Z_20261027T120620_250796-0400.model
+lr=0.0002
+max_num_epochs=20
+name=sal_P31p6228GPa_autoround002_gpu0_2x_20261027T161024Z
+num_workers=4
+restart_latest=False
+runs_root=/home/kevinsh/mlip/codes/D2_naive/runs
+seed=3
+start_swa=15
+status_every=250
+swa=False
+swa_energy_weight=1.0
+swa_forces_weight=100000.0
+swa_lr=0.0003
+train_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/cumulative_train.extxyz
+valid_batch_size=1
+valid_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/random_validation.extxyz
+
+Resolved MACE command:
+run_train.py --name=sal_P31p6228GPa_autoround002_gpu0_2x_20261027T161024Z_20261027T121025_960155-0400 --model=PolarMACE --train_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/cumulative_train.extxyz --valid_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/random_validation.extxyz '--atomic_numbers=[1, 7, 8, 16]' --energy_key=REF_energy --forces_key=REF_forces --total_charge_key=charge --total_spin_key=spin --E0s=foundation --energy_weight=0.001 --forces_weight=100.0 --stress_weight=0.0 --loss=weighted --batch_size=1 --valid_batch_size=1 --max_num_epochs=20 --lr=0.0002 --swa_lr=0.0003 --seed=3 --default_dtype=float32 --device=cuda --num_workers=4 --model_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu0_2x_20261027T161024Z_20261027T121025_960155-0400/models --checkpoints_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu0_2x_20261027T161024Z_20261027T121025_960155-0400/checkpoints --log_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu0_2x_20261027T161024Z_20261027T121025_960155-0400/logs --results_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu0_2x_20261027T161024Z_20261027T121025_960155-0400/results --work_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu0_2x_20261027T161024Z_20261027T121025_960155-0400/work --foundation_model=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T160618Z_20261027T120620_250796-0400/models/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T160618Z_20261027T120620_250796-0400.model --multiheads_finetuning=False --ema --ema_decay=0.99999
+
+Analysis notes (append below; add a dated entry after every analysis or decision):
+- evidence: 
+- diagnosis / uncertainty: 
+- next one-factor test: 
+- why this test is informative: 
+- changed factor relative to this run: 
+
+RUN END 2026-10-27T12:14:19.676800-04:00
+run_name=sal_P31p6228GPa_autoround002_gpu0_2x_20261027T161024Z_20261027T121025_960155-0400
+run_directory=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu0_2x_20261027T161024Z_20261027T121025_960155-0400
+outcome=completed
+elapsed_seconds=232.7
+
+RUN END 2026-10-27T12:14:19.800120-04:00
+run_name=sal_P31p6228GPa_autoround002_gpu1_0p5x_20261027T161024Z_20261027T121025_948464-0400
+run_directory=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround002_gpu1_0p5x_20261027T161024Z_20261027T121025_948464-0400
+outcome=completed
+elapsed_seconds=232.8
+
+ANALYSIS 2026-10-27T12:14:29.936489-04:00
+- evidence: Round 2 saved-model validation force RMSEs were GPU 0=177.4 meV/A at lr=0.0002 and GPU 1=172.5 meV/A at lr=5e-05; the common parent evaluated at 171.73 meV/A.
+- diagnosis / uncertainty: Neither completed child improves the parent, so further deterministic repeats from this incumbent are not justified.
+- next one-factor test: Stop autonomous fine tuning for human review.
+- why this test is informative: Promotion uses the same frozen validation set and compares saved checkpoints only after the complete 20-epoch sibling group.
+- changed factor relative to this run: none; controller stopped.
+
+ANALYSIS 2026-10-27T13:50:59.553947-04:00
+- evidence: Autonomous round 1 uses parent /home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T160618Z_20261027T120620_250796-0400/models/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T160618Z_20261027T120620_250796-0400.model, recorded incumbent lr=0.0001, epochs=20, train_sha256=34eee16a763a6e43ab54ef85ec219a32ceeb3a58360debf4f21d7f869089d751, validation_sha256=bf577bef39d686b4e5aeea6bcf1f1cacb7d80c5b29da165da9b334fec6635c63, split_sha256=4e5f4218fb017e31685de15bc4091f7b378d3b54642cac84edd92161cd9bdbba.
+- diagnosis / uncertainty: The prior validation-force plateau leaves learning-rate scale as the isolated optimization uncertainty.
+- next one-factor test: Launch exactly two sibling children concurrently: GPU 0 at lr=0.0002 (2x) and GPU 1 at lr=5e-05 (0.5x), both for 20 epochs from the same parent and split.
+- why this test is informative: Bracketing the incumbent learning rate tests opposite step-size directions while holding model, data, split, optimizer, loss weights, precision, scheduler/SWA policy, and epoch count fixed.
+- changed factor relative to the incumbent: learning_rate only (0.0001 to 0.0002 or 5e-05).
+
+========================================================================================
+RUN START 2026-10-27T13:51:01.334796-04:00
+created_at=2026-10-27T13:51:01.334804-04:00
+run_name=sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T175059Z_20261027T135101_334375-0400
+run_directory=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T175059Z_20261027T135101_334375-0400
+training_log=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T175059Z_20261027T135101_334375-0400/logs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T175059Z_20261027T135101_334375-0400_run-3.log
+checkpoint_model=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T175059Z_20261027T135101_334375-0400/checkpoints/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T175059Z_20261027T135101_334375-0400_run-3.model
+compiled_model_if_available=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T175059Z_20261027T135101_334375-0400/models/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T175059Z_20261027T135101_334375-0400_compiled.model
+POLICY: Change exactly one scientific/training factor per iteration.
+POLICY: Set changed_parameter and change_note before every non-baseline run.
+changed_parameter=learning_rate
+change_note=Autonomous sibling round 1: start from the same incumbent and immutable P31 split; change only learning rate from 0.0001 to 5e-05 (0.5x).
+
+Resolved wrapper hyperparameters:
+atomic_numbers=[1, 7, 8, 16]
+batch_size=1
+change_note=Autonomous sibling round 1: start from the same incumbent and immutable P31 split; change only learning rate from 0.0001 to 5e-05 (0.5x).
+changed_parameter=learning_rate
+default_dtype=float32
+device=cuda
+dry_run=False
+e0s=foundation
+ema=True
+ema_decay=0.99999
+energy_weight=0.001
+forces_weight=100.0
+foundation_model=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T160618Z_20261027T120620_250796-0400/models/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T160618Z_20261027T120620_250796-0400.model
+lr=5e-05
+max_num_epochs=20
+name=sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T175059Z
+num_workers=4
+restart_latest=False
+runs_root=/home/kevinsh/mlip/codes/D2_naive/runs
+seed=3
+start_swa=15
+status_every=250
+swa=False
+swa_energy_weight=1.0
+swa_forces_weight=100000.0
+swa_lr=0.0003
+train_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/cumulative_train.extxyz
+valid_batch_size=1
+valid_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/random_validation.extxyz
+
+Resolved MACE command:
+run_train.py --name=sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T175059Z_20261027T135101_334375-0400 --model=PolarMACE --train_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/cumulative_train.extxyz --valid_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/random_validation.extxyz '--atomic_numbers=[1, 7, 8, 16]' --energy_key=REF_energy --forces_key=REF_forces --total_charge_key=charge --total_spin_key=spin --E0s=foundation --energy_weight=0.001 --forces_weight=100.0 --stress_weight=0.0 --loss=weighted --batch_size=1 --valid_batch_size=1 --max_num_epochs=20 --lr=5e-05 --swa_lr=0.0003 --seed=3 --default_dtype=float32 --device=cuda --num_workers=4 --model_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T175059Z_20261027T135101_334375-0400/models --checkpoints_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T175059Z_20261027T135101_334375-0400/checkpoints --log_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T175059Z_20261027T135101_334375-0400/logs --results_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T175059Z_20261027T135101_334375-0400/results --work_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T175059Z_20261027T135101_334375-0400/work --foundation_model=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T160618Z_20261027T120620_250796-0400/models/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T160618Z_20261027T120620_250796-0400.model --multiheads_finetuning=False --ema --ema_decay=0.99999
+
+Analysis notes (append below; add a dated entry after every analysis or decision):
+- evidence: 
+- diagnosis / uncertainty: 
+- next one-factor test: 
+- why this test is informative: 
+- changed factor relative to this run: 
+
+========================================================================================
+RUN START 2026-10-27T13:51:01.346612-04:00
+created_at=2026-10-27T13:51:01.346620-04:00
+run_name=sal_P31p6228GPa_autoround001_gpu0_2x_20261027T175059Z_20261027T135101_346219-0400
+run_directory=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T175059Z_20261027T135101_346219-0400
+training_log=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T175059Z_20261027T135101_346219-0400/logs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T175059Z_20261027T135101_346219-0400_run-3.log
+checkpoint_model=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T175059Z_20261027T135101_346219-0400/checkpoints/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T175059Z_20261027T135101_346219-0400_run-3.model
+compiled_model_if_available=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T175059Z_20261027T135101_346219-0400/models/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T175059Z_20261027T135101_346219-0400_compiled.model
+POLICY: Change exactly one scientific/training factor per iteration.
+POLICY: Set changed_parameter and change_note before every non-baseline run.
+changed_parameter=learning_rate
+change_note=Autonomous sibling round 1: start from the same incumbent and immutable P31 split; change only learning rate from 0.0001 to 0.0002 (2x).
+
+Resolved wrapper hyperparameters:
+atomic_numbers=[1, 7, 8, 16]
+batch_size=1
+change_note=Autonomous sibling round 1: start from the same incumbent and immutable P31 split; change only learning rate from 0.0001 to 0.0002 (2x).
+changed_parameter=learning_rate
+default_dtype=float32
+device=cuda
+dry_run=False
+e0s=foundation
+ema=True
+ema_decay=0.99999
+energy_weight=0.001
+forces_weight=100.0
+foundation_model=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T160618Z_20261027T120620_250796-0400/models/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T160618Z_20261027T120620_250796-0400.model
+lr=0.0002
+max_num_epochs=20
+name=sal_P31p6228GPa_autoround001_gpu0_2x_20261027T175059Z
+num_workers=4
+restart_latest=False
+runs_root=/home/kevinsh/mlip/codes/D2_naive/runs
+seed=3
+start_swa=15
+status_every=250
+swa=False
+swa_energy_weight=1.0
+swa_forces_weight=100000.0
+swa_lr=0.0003
+train_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/cumulative_train.extxyz
+valid_batch_size=1
+valid_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/random_validation.extxyz
+
+Resolved MACE command:
+run_train.py --name=sal_P31p6228GPa_autoround001_gpu0_2x_20261027T175059Z_20261027T135101_346219-0400 --model=PolarMACE --train_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/cumulative_train.extxyz --valid_file=/home/kevinsh/mlip/outputsfull/X_semiactivelearning/cycles/P31p6228GPa/training/random_validation.extxyz '--atomic_numbers=[1, 7, 8, 16]' --energy_key=REF_energy --forces_key=REF_forces --total_charge_key=charge --total_spin_key=spin --E0s=foundation --energy_weight=0.001 --forces_weight=100.0 --stress_weight=0.0 --loss=weighted --batch_size=1 --valid_batch_size=1 --max_num_epochs=20 --lr=0.0002 --swa_lr=0.0003 --seed=3 --default_dtype=float32 --device=cuda --num_workers=4 --model_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T175059Z_20261027T135101_346219-0400/models --checkpoints_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T175059Z_20261027T135101_346219-0400/checkpoints --log_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T175059Z_20261027T135101_346219-0400/logs --results_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T175059Z_20261027T135101_346219-0400/results --work_dir=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T175059Z_20261027T135101_346219-0400/work --foundation_model=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T160618Z_20261027T120620_250796-0400/models/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T160618Z_20261027T120620_250796-0400.model --multiheads_finetuning=False --ema --ema_decay=0.99999
+
+Analysis notes (append below; add a dated entry after every analysis or decision):
+- evidence: 
+- diagnosis / uncertainty: 
+- next one-factor test: 
+- why this test is informative: 
+- changed factor relative to this run: 
+
+RUN END 2026-10-27T13:56:25.523402-04:00
+run_name=sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T175059Z_20261027T135101_334375-0400
+run_directory=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu1_0p5x_20261027T175059Z_20261027T135101_334375-0400
+outcome=completed
+elapsed_seconds=323.0
+
+RUN END 2026-10-27T13:56:29.120987-04:00
+run_name=sal_P31p6228GPa_autoround001_gpu0_2x_20261027T175059Z_20261027T135101_346219-0400
+run_directory=/home/kevinsh/mlip/codes/D2_naive/runs/sal_P31p6228GPa_autoround001_gpu0_2x_20261027T175059Z_20261027T135101_346219-0400
+outcome=completed
+elapsed_seconds=326.6
+
+ANALYSIS 2026-10-27T13:56:36.882790-04:00
+- evidence: Round 1 saved-model validation force RMSEs were GPU 0=236.1 meV/A at lr=0.0002 and GPU 1=236.5 meV/A at lr=5e-05; the common parent evaluated at 234.05 meV/A.
+- diagnosis / uncertainty: Neither completed child improves the parent, so further deterministic repeats from this incumbent are not justified.
+- next one-factor test: Stop autonomous fine tuning for human review.
+- why this test is informative: Promotion uses the same frozen validation set and compares saved checkpoints only after the complete 20-epoch sibling group.
+- changed factor relative to this run: none; controller stopped.

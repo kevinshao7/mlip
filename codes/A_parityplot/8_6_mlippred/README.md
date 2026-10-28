@@ -1,5 +1,9 @@
 # 8_6 MLIP Single-Point Predictions
 
+> [!IMPORTANT]
+> `polar-1-s` is retired for new work. Use `polar-1-l`; commands below that use
+> `polar1s` are historical reproduction examples, not defaults for new work.
+
 Run from the repository root:
 
 ```bash

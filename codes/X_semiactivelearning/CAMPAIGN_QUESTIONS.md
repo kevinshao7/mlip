@@ -28,6 +28,8 @@ configuration and append a provenance event before changing any item.
    clusters.
 7. ORCA is configured for 24 CPU ranks. Two GPUs are reserved operationally:
    MD defaults to GPU 0 and fine tuning to GPU 1; change only in the config.
-8. The first campaign MD model is `polar-1-s`. After an approved campaign fine
-   tune, later campaign MD uses its direct child checkpoint. New validated DFT
-   data accumulates into training while the D2 validation/test sets remain fixed.
+8. Historical campaign runs began from `polar-1-s`; those artifacts remain
+   immutable for reproducibility. As of 2026-10-28, `polar-1-s` is retired for
+   new work. New campaign runs begin from `polar-1-l`. After an approved campaign
+   fine tune, later campaign MD uses its direct child checkpoint. New validated
+   DFT data accumulates into training while the D2 validation/test sets remain fixed.

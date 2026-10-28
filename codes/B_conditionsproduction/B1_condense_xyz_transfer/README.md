@@ -1,5 +1,9 @@
 # B1 Condense XYZ Transfer
 
+> [!IMPORTANT]
+> `polar-1-s` is retired for new work. Use `polar-1-l`; any older references
+> are historical and remain only for reproducibility.
+
 This package streams the DAIS condition-production `.xyz` trajectories and writes
 every 100th frame to a smaller transfer directory. It does not modify source
 files and does not preprocess atom records; selected frames are copied

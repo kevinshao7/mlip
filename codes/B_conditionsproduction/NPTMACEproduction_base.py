@@ -1,4 +1,5 @@
 import os
+os.environ.setdefault("TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD", "1")
 import shutil
 
 from ase import units
@@ -315,7 +316,7 @@ if MACE_DEVICE.startswith("cuda") and not torch.cuda.is_available():
     )
 
 mace_calc = mace_polar(
-    model="polar-1-s",
+    model="polar-1-l",
     device=MACE_DEVICE,
     default_dtype="float32",  # faster for MD
 )

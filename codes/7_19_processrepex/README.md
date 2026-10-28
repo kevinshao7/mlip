@@ -1,5 +1,9 @@
 # Replica-exchange thermo plots
 
+> [!IMPORTANT]
+> `polar-1-s` is retired for new work. Use `polar-1-l`; any older references
+> are historical and remain only for reproducibility.
+
 `process_repex.py` reads `thermo.csv` from every `replica_*` directory and creates
 one figure per replica. Each figure contains time series and normalized
 autocorrelation plots for density, temperature, and total energy. Time and lag

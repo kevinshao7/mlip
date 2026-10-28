@@ -1,12 +1,18 @@
 # PolarMACE Multihead Fine Tuning
 
+> [!IMPORTANT]
+> **Foundation-model policy (2026-10-28):** Do not start new runs from
+> `polar-1-s`. Use `polar-1-l`. Existing `polar1s_*` run names and commands
+> below are historical artifacts retained for exact reproduction only.
+
 Every terminal launch appends one provenance/metrics row to the Git-tracked
 [`../finetuning_megadataset.jsonl`](../finetuning_megadataset.jsonl). It records
 data hashes and sizes, hyperparameters, method, timing, and initial/final MACE
 loss/RMSE; see [`../FINETUNING_MEGADATASET.md`](../FINETUNING_MEGADATASET.md).
 
-This folder prepares ORCA DFT outputs and runs multihead fine tuning of
-`polar-1-s` from the local `mlip/mace` checkout.
+This folder preserves a workflow that prepared ORCA DFT outputs and ran
+multihead fine tuning of the now-retired `polar-1-s` model from the local
+`mlip/mace` checkout. New runs must use `polar-1-l`.
 
 ## Data Prep
 
@@ -93,7 +99,7 @@ C:\Users\shaoq\AppData\Local\Programs\Python\Python312\python.exe .\mlip\codes\D
 
 ## Notes
 
-- `polar-1-s` is the default foundation model.
+- `polar-1-s` was the historical default; new runs must use `polar-1-l`.
 - Target elements are configured as `[1, 7, 8, 16]` for H/N/O/S. Change
   `--atomic-numbers` if target data later includes other elements.
 - MACE's multihead guide recommends explicit E0s for fine tuning; this workflow

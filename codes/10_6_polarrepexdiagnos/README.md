@@ -1,5 +1,9 @@
 # MACE-POLAR / MACE-OFF replica-exchange diagnostic
 
+> [!IMPORTANT]
+> `polar-1-s` is retired for new work. Use `polar-1-l`; any older references
+> are historical and remain only for reproducibility.
+
 This workflow samples 300 configurations from all 16 replica-exchange
 trajectories, balanced across lambda and simulation time, then compares
 MACE-POLAR `polar-1-m` against MACE-OFF `medium`.

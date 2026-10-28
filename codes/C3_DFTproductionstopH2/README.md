@@ -1,5 +1,9 @@
 # C3_DFTproductionstopH2
 
+> [!IMPORTANT]
+> `polar-1-s` is retired for new work. Use `polar-1-l`; any older references
+> are historical and remain only for reproducibility.
+
 `extract_condition_clusters.py` builds one combined DFT cluster XYZ from all
 condensed condition-production trajectories in:
 

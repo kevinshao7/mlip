@@ -234,7 +234,8 @@ def command_init(_: argparse.Namespace) -> None:
     shutil.copy2(active_config, OUT / "campaign_config.initial.json")
     state = OUT / "model_lineage.json"
     if not state.exists():
-        write_json(state, {"current_model": "polar-1-s", "root_model": "polar-1-s",
+        initial_parent = config()["finetune"]["initial_parent"]
+        write_json(state, {"current_model": initial_parent, "root_model": initial_parent,
                            "active_branch": "foundation_initial", "branches": [], "history": []})
     event("initialized", None, [active_config], [OUT / "campaign_config.initial.json", state], campaign=config()["campaign_name"], run_id=RUN_ID or "default")
     print(f"Initialized {OUT} (run={RUN_ID or 'default'})")
@@ -393,21 +394,22 @@ def command_restart_foundation(args: argparse.Namespace) -> None:
     # explicitly marked legacy rather than being discarded or overwritten.
     for entry in state.get("history", []):
         entry.setdefault("branch_id", "legacy")
+    foundation_model = config()["finetune"]["initial_parent"]
     new_branch = "foundation_restart_" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     archive = OUT / "lineage_branches" / f"{new_branch}_previous_state.json"
     write_json(archive, state)
     state.setdefault("branches", []).append({
         "branch_id": new_branch, "utc": now(), "parent_branch": previous_branch,
-        "parent_model": previous_model, "root_model": "polar-1-s",
+        "parent_model": previous_model, "root_model": foundation_model,
         "reason": args.reason, "previous_state": str(archive),
     })
     state["active_branch"] = new_branch
-    state["current_model"] = "polar-1-s"
+    state["current_model"] = foundation_model
     write_json(state_path, state)
     event("lineage_restarted_from_foundation", None, [archive], [state_path],
           branch_id=new_branch, previous_branch=previous_branch,
-          previous_model=previous_model, new_parent="polar-1-s", reason=args.reason)
-    print(f"Started immutable branch {new_branch} from polar-1-s; prior lineage retained at {archive}", flush=True)
+          previous_model=previous_model, new_parent=foundation_model, reason=args.reason)
+    print(f"Started immutable branch {new_branch} from {foundation_model}; prior lineage retained at {archive}", flush=True)
 
 
 def replace_assignment(text: str, name: str, value: str) -> str:
@@ -480,7 +482,9 @@ def command_md(args: argparse.Namespace) -> None:
         text, count=1, flags=re.M,
     )
     if n != 1: raise RuntimeError("Could not add the generated-system atom-count invariant")
-    text = re.sub(r'model="polar-1-s"', f"model={parent!r}", text, count=1)
+    text, n = re.subn(r'model="polar-1-[sml]"', f"model={parent!r}", text, count=1)
+    if n != 1:
+        raise RuntimeError("Could not set the configured PolarMACE parent model")
     # Save exactly the requested production-hold frames, rather than creating
     # high-volume ramp trajectories that cannot enter the cluster workflow.
     text, n = re.subn(r"next_save_step = s", "next_save_step = pressure_ramp_steps + temperature_ramp_steps + s", text, count=1)
@@ -519,47 +523,75 @@ def command_md(args: argparse.Namespace) -> None:
         )
         if count != 1:
             raise RuntimeError("Could not set an explicit reproducible MD replica seed")
-        generated = code_dir / "run_md.py"
-        generated.write_text(replica_text, encoding="utf-8")
-        launcher = launch_root / (f"run_md_gpu{gpu}.sh" if len(gpu_values) > 1 else "run_md.sh")
-        relative_replica = os.path.relpath(code_dir, launch_root)
-        launcher.write_text(
-            "#!/usr/bin/env bash\nset -euo pipefail\n"
-            + f"source {shlex.quote(str(activation_script))}\n"
-            "cd -- \"$(dirname -- \"$0\")\"\n"
-            "case \"$(pwd -P)\" in */md_launches/_history/*) echo 'Refusing to run archived MD launch code; use the active md_launches/<run>/<pressure> directory.' >&2; exit 2;; esac\n"
-            + (f"cd -- {shlex.quote(relative_replica)}\n" if relative_replica != "." else "")
-            + f"export CUDA_VISIBLE_DEVICES={gpu}\n"
-            + "export MLIP_MACE_DEVICE=cuda\n"
-            + "exec python run_md.py\n",
-            encoding="utf-8",
+        replica_text, count = re.subn(
+            r"^import os$",
+            "import os\n"
+            f"os.environ.setdefault(\"CUDA_VISIBLE_DEVICES\", {gpu!r})\n"
+            "os.environ.setdefault(\"MLIP_MACE_DEVICE\", \"cuda\")",
+            replica_text, count=1, flags=re.M,
         )
-        launcher.chmod(0o755)
+        if count != 1:
+            raise RuntimeError("Could not pin the generated MD replica to its CUDA device")
+        generated = code_dir / "run_md.py"
+        generated.write_text(f"#!{sys.executable}\n" + replica_text, encoding="utf-8")
+        generated.chmod(0o755)
         replicas.append({"replica_index": replica_index, "gpu": gpu, "seed": seed,
                          "results_directory": str(result_dir), "code_directory": str(code_dir),
-                         "launcher": str(launcher)})
+                         "launcher": str(generated)})
         generated_files.append(generated)
-        launchers.append(launcher)
+        launchers.append(generated)
     launcher = launchers[0]
     if len(launchers) > 1:
-        launcher = launch_root / "run_md_parallel.sh"
-        commands = "\n".join(f"./{path.name} & pids+=($!)" for path in launchers)
+        launcher = launch_root / "run_md_parallel.py"
+        replica_specs = [
+            (record["gpu"], os.path.relpath(record["launcher"], launch_root))
+            for record in replicas
+        ]
         launcher.write_text(
-            "#!/usr/bin/env bash\nset -euo pipefail\n"
-            "cd -- \"$(dirname -- \"$0\")\"\n"
-            "case \"$(pwd -P)\" in */md_launches/_history/*) echo 'Refusing to run archived MD launch code; use the active md_launches/<run>/<pressure> directory.' >&2; exit 2;; esac\n"
-            "pids=()\n"
-            "trap 'kill \"${pids[@]}\" 2>/dev/null || true' INT TERM\n"
-            f"{commands}\n"
-            "status=0\n"
-            "for pid in \"${pids[@]}\"; do wait \"$pid\" || status=$?; done\n"
-            "trap - INT TERM\n"
-            "exit \"$status\"\n",
+            f"#!{sys.executable}\n"
+            '"""Launch independent MD replicas concurrently on their assigned GPUs."""\n'
+            "import os\n"
+            "import signal\n"
+            "import subprocess\n"
+            "import sys\n"
+            "from pathlib import Path\n\n"
+            "ROOT = Path(__file__).resolve().parent\n"
+            "if \"_history\" in ROOT.parts:\n"
+            "    raise SystemExit(\"Refusing to run archived MD launch code\")\n"
+            f"REPLICAS = {replica_specs!r}\n"
+            "processes = []\n\n"
+            "def stop(_signum=None, _frame=None):\n"
+            "    for process in processes:\n"
+            "        if process.poll() is None:\n"
+            "            process.terminate()\n\n"
+            "signal.signal(signal.SIGINT, stop)\n"
+            "signal.signal(signal.SIGTERM, stop)\n"
+            "status = 0\n"
+            "try:\n"
+            "    for gpu, relative_script in REPLICAS:\n"
+            "        script = ROOT / relative_script\n"
+            "        environment = os.environ.copy()\n"
+            "        environment[\"CUDA_VISIBLE_DEVICES\"] = gpu\n"
+            "        environment[\"MLIP_MACE_DEVICE\"] = \"cuda\"\n"
+            "        processes.append(subprocess.Popen(\n"
+            "            [sys.executable, str(script)], cwd=script.parent, env=environment\n"
+            "        ))\n"
+            "    for process in processes:\n"
+            "        return_code = process.wait()\n"
+            "        if return_code and not status:\n"
+            "            status = return_code\n"
+            "finally:\n"
+            "    stop()\n"
+            "raise SystemExit(status)\n",
             encoding="utf-8",
         )
         launcher.chmod(0o755)
         launchers.append(launcher)
-    manifest = {"pressure_gpa": args.pressure, "density_g_cm3": rho, "temperature_K": temp, "parent_model": parent, "python_environment_activate": str(activation_script), "seed_policy": "explicit independent seed per replica", "replica_count": len(replicas), "replicas": replicas, "target_molecules": target_molecules, "expected_molecule_counts": {"H2O": water_molecules, "NH3": ammonia_molecules}, "expected_atoms_per_replica": expected_atoms, "expected_formula_per_replica": expected_formula, "runtime_target_hours": cfg["md"]["walltime_target_hours"], "runtime_target_hours_per_replica": cfg["md"]["walltime_target_hours"], "runtime_estimate_basis": "Scaled from the 350-atom P17 108000-step run, which completed in 6 h 36 min", "pressure_ramp_ps": cfg["md"]["pressure_ramp_ps"], "temperature_ramp_ps": cfg["md"]["temperature_ramp_ps"], "production_duration_ps": cfg["md"]["production_duration_ps"], "total_steps": total_steps, "production_steps": production_steps, "save_interval_steps": save_interval, "target_production_frames": cfg["md"]["target_production_frames"], "target_production_frames_per_replica": cfg["md"]["target_production_frames"], "generated": now()}
+    runtime_basis = cfg["md"].get(
+        "runtime_estimate_basis",
+        "Scaled from the 350-atom P17 108000-step run, which completed in 6 h 36 min",
+    )
+    manifest = {"pressure_gpa": args.pressure, "density_g_cm3": rho, "temperature_K": temp, "parent_model": parent, "python_environment_activate": str(activation_script), "seed_policy": "explicit independent seed per replica", "replica_count": len(replicas), "replicas": replicas, "target_molecules": target_molecules, "expected_molecule_counts": {"H2O": water_molecules, "NH3": ammonia_molecules}, "expected_atoms_per_replica": expected_atoms, "expected_formula_per_replica": expected_formula, "runtime_target_hours": cfg["md"]["walltime_target_hours"], "runtime_target_hours_per_replica": cfg["md"]["walltime_target_hours"], "runtime_estimate_basis": runtime_basis, "pressure_ramp_ps": cfg["md"]["pressure_ramp_ps"], "temperature_ramp_ps": cfg["md"]["temperature_ramp_ps"], "production_duration_ps": cfg["md"]["production_duration_ps"], "total_steps": total_steps, "production_steps": production_steps, "save_interval_steps": save_interval, "target_production_frames": cfg["md"]["target_production_frames"], "target_production_frames_per_replica": cfg["md"]["target_production_frames"], "generated": now()}
     write_json(md / "manifest.json", manifest)
     event("md_prepared", args.pressure, [source, config_path()], [*generated_files, *launchers, md / "manifest.json"], parent_model=parent, replicas=replicas)
     print(f"Prepared {len(replicas)} MD replica(s). Run: {launcher}")
@@ -869,6 +901,7 @@ def build_cluster_worker(payload):
         ]
         dft_visualization = {
             "trajectory_id": trajectory_id, "frame": int(row["frame"]),
+            "center_component": centre_index,
             "centre_formula": centre_formula, "molecules": len(selected),
             "symbols": [frame.symbols[index] for index in atom_indices], "positions": positions,
             "component_offsets": [
@@ -992,26 +1025,28 @@ def command_clusters(args: argparse.Namespace) -> None:
     for traj_id, candidate_frames in candidates_per_traj.items():
         n_alloc = allocated[traj_id]
         count_for_traj = 0
-        for frame_idx in candidate_frames:
-            if count_for_traj >= n_alloc or len(chosen) >= selected_count:
-                break
-            frame_obj = frames.get((traj_id, frame_idx))
-            if frame_obj is None:
-                continue
-            comps = fast_molecular_components(frame_obj, species)
-            allowed_comps = sorted([
-                ci for ci, comp in enumerate(comps)
-                if species.component_formula(frame_obj, comp) in allowed_set
-            ])
-            if len(allowed_comps) < molecule_count:
-                continue
-            h = int(hashlib.sha256(f"{traj_id}:{frame_idx}".encode()).hexdigest()[:16], 16)
-            for attempt in range(len(allowed_comps)):
+        selection_round = 0
+        while count_for_traj < n_alloc and len(chosen) < selected_count:
+            added_this_round = 0
+            for frame_idx in candidate_frames:
                 if count_for_traj >= n_alloc or len(chosen) >= selected_count:
                     break
-                centre_comp = allowed_comps[(h + attempt) % len(allowed_comps)]
-                key = (traj_id, str(frame_idx), str(centre_comp))
-                if key not in used and key not in used_this_round:
+                frame_obj = frames.get((traj_id, frame_idx))
+                if frame_obj is None:
+                    continue
+                comps = fast_molecular_components(frame_obj, species)
+                allowed_comps = sorted([
+                    ci for ci, comp in enumerate(comps)
+                    if species.component_formula(frame_obj, comp) in allowed_set
+                ])
+                if len(allowed_comps) < molecule_count:
+                    continue
+                h = int(hashlib.sha256(f"{traj_id}:{frame_idx}".encode()).hexdigest()[:16], 16)
+                for attempt in range(len(allowed_comps)):
+                    centre_comp = allowed_comps[(h + selection_round + attempt) % len(allowed_comps)]
+                    key = (traj_id, str(frame_idx), str(centre_comp))
+                    if key in used or key in used_this_round:
+                        continue
                     centre_formula = species.component_formula(frame_obj, comps[centre_comp])
                     chosen.append({
                         "trajectory_id": traj_id,
@@ -1023,6 +1058,11 @@ def command_clusters(args: argparse.Namespace) -> None:
                     })
                     used_this_round.add(key)
                     count_for_traj += 1
+                    added_this_round += 1
+                    break
+            if added_this_round == 0:
+                break
+            selection_round += 1
 
     if args.count is not None and len(chosen) != selected_count:
         raise ValueError(
@@ -1189,7 +1229,7 @@ def write_dft_cluster_videos(clusters, destination: Path) -> list[Path]:
         axis.set(xlim=(centre[0]-half, centre[0]+half), ylim=(centre[1]-half, centre[1]+half), zlim=(centre[2]-half, centre[2]+half), xlabel="x / Å", ylabel="y / Å", zlabel="z / Å")
         axis.set_title(f"DFT input, production frame {cluster['frame']}: {cluster['molecules']} allowed molecules\ncentre {cluster['centre_formula']}")
         axis.legend(loc="upper left", fontsize="x-small", ncol=2)
-        path=destination / f"{cluster['trajectory_id']}_frame_{cluster['frame']:04d}_allowed_only.gif"; print(f"[dft-visualize] rendering allowed-only DFT cluster for production frame {cluster['frame']}", flush=True)
+        path=destination / f"{cluster['trajectory_id']}_frame_{cluster['frame']:04d}_centre_{cluster['center_component']:03d}_allowed_only.gif"; print(f"[dft-visualize] rendering allowed-only DFT cluster for production frame {cluster['frame']}", flush=True)
         writer=PillowWriter(fps=12); writer.setup(figure, path, dpi=130)
         try:
             for angle in np.linspace(-90, 90, 37):
@@ -1197,14 +1237,20 @@ def write_dft_cluster_videos(clusters, destination: Path) -> list[Path]:
         finally:
             writer.finish()
         plt.close(figure); outputs.append(path); print(f"[dft-visualize] wrote {path}", flush=True)
-        rows.append({"trajectory_id":cluster["trajectory_id"], "frame":cluster["frame"], "centre_formula":cluster["centre_formula"], "dft_molecules":cluster["molecules"], "allowed_species": ";".join(cluster["component_formulas"]), "file":path.name})
+        rows.append({"trajectory_id":cluster["trajectory_id"], "frame":cluster["frame"], "center_component":cluster["center_component"], "centre_formula":cluster["centre_formula"], "dft_molecules":cluster["molecules"], "allowed_species": ";".join(cluster["component_formulas"]), "file":path.name})
     with (destination / "README.csv").open("w", newline="", encoding="utf-8") as f:
-        writer=csv.DictWriter(f, fieldnames=["trajectory_id","frame","centre_formula","dft_molecules","allowed_species","file"]); writer.writeheader(); writer.writerows(rows)
+        writer=csv.DictWriter(f, fieldnames=["trajectory_id","frame","center_component","centre_formula","dft_molecules","allowed_species","file"]); writer.writeheader(); writer.writerows(rows)
     outputs.append(destination / "README.csv")
     return outputs
 
 
-def dft_input(atoms, charge: int, multiplicity: int, nprocs: int) -> str:
+def dft_input(
+    atoms,
+    charge: int,
+    multiplicity: int,
+    nprocs: int,
+    functional_basis: str,
+) -> str:
     # def2-TZVPD is declared in the route line.  In ORCA 6, ``NewGTO all``
     # is not valid %basis syntax (it expects a particular atomic number/name),
     # so do not redundantly redeclare the basis block here.
@@ -1217,7 +1263,9 @@ def dft_input(atoms, charge: int, multiplicity: int, nprocs: int) -> str:
             f"Campaign ORCA inputs require a closed-shell singlet; got "
             f"electrons={electron_count}, multiplicity={multiplicity}"
         )
-    lines = ["! wB97M-V def2-TZVPD EnGrad RIJCOSX", f"%pal nprocs {nprocs} end", f"* xyz {charge} {multiplicity}"]
+    if not re.fullmatch(r"[A-Za-z0-9()+,./_-]+(?: [A-Za-z0-9()+,./_-]+)*", functional_basis):
+        raise ValueError(f"Unsafe ORCA functional/basis route: {functional_basis!r}")
+    lines = [f"! {functional_basis} EnGrad RIJCOSX", f"%pal nprocs {nprocs} end", f"* xyz {charge} {multiplicity}"]
     lines += [f"{symbol} {x:.12f} {y:.12f} {z:.12f}" for symbol, (x,y,z) in zip(atoms.symbols, atoms.positions, strict=True)]
     return "\n".join(lines) + "\n*\n"
 
@@ -1468,22 +1516,124 @@ def command_dft(args: argparse.Namespace) -> None:
         mult=1
         if int(atoms.info.get("multiplicity", mult)) != mult:
             raise ValueError(f"{stem}: extxyz multiplicity is not the required singlet value 1")
-        (inp / f"{stem}.inp").write_text(dft_input(atoms, charge, mult, cfg["orca_nprocs"]), encoding="utf-8")
+        (inp / f"{stem}.inp").write_text(
+            dft_input(
+                atoms,
+                charge,
+                mult,
+                cfg["orca_nprocs"],
+                cfg["functional_basis"],
+            ),
+            encoding="utf-8",
+        )
         records.append({"frame":i,"stem":stem,"input":f"inputs/{stem}.inp","charge":charge,"multiplicity":mult,"electron_count":electron_count,"n_atoms":len(atoms)})
     with (ddir / "manifest.csv").open("w", newline="", encoding="utf-8") as f:
         writer=csv.DictWriter(f, fieldnames=records[0].keys()); writer.writeheader(); writer.writerows(records)
     launch_root = ROOT / "dft_launches" / (RUN_ID or "default") / tag(args.pressure) / args.kind
     launch_root.mkdir(parents=True, exist_ok=True)
-    script=launch_root / "submit.slurm"
-    stems=" ".join(row["stem"] for row in records)
-    script.write_text(f"#!/bin/bash\n#SBATCH --job-name=sal_{tag(args.pressure)}_{args.kind}\n#SBATCH --partition={cfg['slurm_partition']}\n#SBATCH --ntasks={cfg['orca_nprocs']}\n#SBATCH --time={cfg['slurm_time']}\nset -euo pipefail\nmodule purge\nmodule load {cfg['orca_module']}\ncd {shlex.quote(str(ddir))}\nmkdir -p outputs\nfor stem in {stems}; do {cfg['orca_command']} inputs/${{stem}}.inp > outputs/${{stem}}.out; done\n", encoding="utf-8")
-    event("dft_prepared", args.pressure, [clusters], [ddir / "manifest.csv", script], kind=args.kind, cluster_count=len(frames), formal_charge_verified=True)
-    print(f"Generated {len(frames)} ORCA inputs and {script}")
+    launch_inputs = launch_root / "inputs"
+    if launch_inputs.exists():
+        raise FileExistsError(f"Refusing to overwrite existing BlueHive input package: {launch_inputs}")
+    launch_inputs.mkdir()
+    for record in records:
+        shutil.copy2(inp / f"{record['stem']}.inp", launch_inputs / f"{record['stem']}.inp")
+    slurm_log_dir = ddir / "slurm_logs"
+    slurm_log_dir.mkdir()
+    group_size = int(cfg.get("slurm_group_size", 10))
+    if group_size < 1:
+        raise ValueError("dft.slurm_group_size must be positive")
+    ddir_relative = ddir.relative_to(MLIP)
+    scripts = []
+    exclude = cfg.get("slurm_exclude", "")
+    exclude_line = f"#SBATCH --exclude={exclude}\n" if exclude else ""
+    bluehive_mlip = Path(cfg.get("bluehive_mlip_dir", "/gpfs/fs2/scratch/kshao4/mlip"))
+    bluehive_log_dir = bluehive_mlip / slurm_log_dir.relative_to(MLIP)
+    launch_relative = launch_root.relative_to(MLIP)
+    for group_index, start in enumerate(range(0, len(records), group_size)):
+        group = records[start:start + group_size]
+        end = start + len(group) - 1
+        group_name = f"sal_{tag(args.pressure)}_{args.kind}_{start:04d}_{end:04d}"
+        stems = " ".join(row["stem"] for row in group)
+        script = launch_root / f"group_{start:04d}_{end:04d}.slurm"
+        script.write_text(
+            "#!/bin/bash\n"
+            f"#SBATCH --job-name={group_name}\n"
+            f"#SBATCH --partition={cfg['slurm_partition']}\n"
+            "#SBATCH --nodes=1\n"
+            f"#SBATCH --ntasks-per-node={cfg['orca_nprocs']}\n"
+            f"#SBATCH -n {cfg['orca_nprocs']}\n"
+            f"{exclude_line}"
+            f"#SBATCH --time={cfg['slurm_time']}\n"
+            f"#SBATCH -o {bluehive_log_dir}/{group_name}_%j.slurmlog.txt\n"
+            f"#SBATCH -e {bluehive_log_dir}/{group_name}_%j.slurmerr.txt\n\n"
+            "set -euo pipefail\n"
+            f"module purge\nmodule load {cfg['orca_module']}\n"
+            f'MLIP_DIR="${{MLIP_DIR:-{bluehive_mlip}}}"\n'
+            f'DFT_DIR="$MLIP_DIR/{ddir_relative.as_posix()}"\n'
+            f'INPUT_DIR="$MLIP_DIR/{launch_relative.as_posix()}/inputs"\n'
+            f'ORCA_COMMAND="${{ORCA_COMMAND:-{cfg["orca_command"]}}}"\n'
+            'cd "$DFT_DIR"\nmkdir -p outputs\n'
+            f"for stem in {stems}; do\n"
+            '    output="outputs/${stem}.out"\n'
+            '    if [[ -f "$output" ]] && grep -q "FINAL SINGLE POINT ENERGY" "$output" && grep -q "ORCA TERMINATED NORMALLY" "$output"; then\n'
+            '        echo "Skipping completed $output"\n        continue\n    fi\n'
+            '    echo "Starting $stem"\n'
+            '    "$ORCA_COMMAND" "$INPUT_DIR/${stem}.inp" > "$output"\n'
+            '    grep -q "FINAL SINGLE POINT ENERGY" "$output"\n'
+            '    grep -q "ORCA TERMINATED NORMALLY" "$output"\n'
+            '    echo "Finished $stem"\n'
+            "done\n",
+            encoding="utf-8",
+        )
+        scripts.append(script)
+    submit_all = launch_root / "submit_all.sh"
+    submit_all.write_text(
+        "#!/bin/bash\nset -euo pipefail\n"
+        f'MLIP_DIR="${{MLIP_DIR:-{bluehive_mlip}}}"\n'
+        f'mkdir -p "$MLIP_DIR/{(ddir / "outputs").relative_to(MLIP).as_posix()}"\n'
+        f'mkdir -p "$MLIP_DIR/{slurm_log_dir.relative_to(MLIP).as_posix()}"\n'
+        'cd "$(dirname "$0")"\n'
+        + "\n".join(f"sbatch {shlex.quote(script.name)}" for script in scripts)
+        + "\n",
+        encoding="utf-8",
+    )
+    package_manifest = launch_root / "bluehive_package.json"
+    write_json(package_manifest, {
+        "generated_utc": now(),
+        "run_id": RUN_ID,
+        "pressure_gpa": args.pressure,
+        "kind": args.kind,
+        "input_count": len(records),
+        "slurm_job_count": len(scripts),
+        "clusters_per_job": group_size,
+        "functional_basis": cfg["functional_basis"],
+        "orca_module": cfg["orca_module"],
+        "orca_nprocs": cfg["orca_nprocs"],
+        "formal_charge_rule": FORMAL_CHARGES,
+        "outputs_relative_to_mlip": str(ddir_relative),
+    })
+    event(
+        "dft_prepared",
+        args.pressure,
+        [clusters],
+        [ddir / "manifest.csv", package_manifest, submit_all, *scripts],
+        kind=args.kind,
+        cluster_count=len(frames),
+        formal_charge_verified=True,
+        functional_basis=cfg["functional_basis"],
+        slurm_group_size=group_size,
+        slurm_job_count=len(scripts),
+    )
+    print(
+        f"Generated {len(frames)} ORCA inputs and {len(scripts)} grouped BlueHive "
+        f"Slurm jobs; submit with {submit_all}"
+    )
     if args.submit:
         if shutil.which("sbatch") is None:
             raise RuntimeError("sbatch is unavailable on this host. Run locally with --run-local, or generate here and submit from a Slurm login node.")
-        subprocess.run(["sbatch", str(script)], cwd=script.parent, check=True)
-        event("dft_submitted", args.pressure, [script], [], kind=args.kind)
+        for script in scripts:
+            subprocess.run(["sbatch", script.name], cwd=script.parent, check=True)
+        event("dft_submitted", args.pressure, scripts, [], kind=args.kind, job_count=len(scripts))
 
 
 def command_finetune(args: argparse.Namespace) -> None:
@@ -1527,7 +1677,8 @@ def command_finetune(args: argparse.Namespace) -> None:
                        "validation_fraction":fraction, "total_frames":len(all_frames), "train_count":len(train), "validation_count":len(validation),
                        "train_indices":train_indices, "validation_indices":valid_indices, "acquired_sha256":acquired_sha256})
     parent=args.parent_model or current_parent()
-    if parent != "polar-1-s":
+    named_foundations = {"polar-1-m", "polar-1-l"}
+    if parent not in named_foundations:
         parent_path=Path(parent).expanduser().resolve()
         if not parent_path.is_file():
             raise FileNotFoundError(f"Fine-tuning parent model is missing: {parent_path}")
@@ -1608,8 +1759,8 @@ def parser() -> argparse.ArgumentParser:
     q.add_argument("--source-kind", default="acquisition_r2")
     q.add_argument("--target-kind", default="acquisition_r3")
     q.set_defaults(func=command_reuse_dft)
-    q=sub.add_parser("restart-foundation", help="Begin a new immutable branch from polar-1-s; preserve all prior batches.")
-    q.add_argument("--reason", default="Validation regression: restart semi-active fine tuning from polar-1-s")
+    q=sub.add_parser("restart-foundation", help="Begin a new immutable branch from the configured foundation model; preserve all prior batches.")
+    q.add_argument("--reason", default="Validation regression: restart semi-active fine tuning from the configured foundation model")
     q.set_defaults(func=command_restart_foundation)
     q=sub.add_parser("promote-best", help="Pin the best completed registry checkpoint as the next MD parent.")
     q.add_argument("--pressure", type=float, required=True, help="Pressure represented by the completed fine-tuning candidates.")

@@ -367,7 +367,7 @@ def render(output: Path = TARGET) -> None:
     for label in ax_model.get_xticklabels():
         label.set_rotation(20)
         label.set_ha("right")
-    current = Path(lineage.get("current_model", "polar-1-s")).name
+    current = Path(lineage.get("current_model", campaign.config()["finetune"]["initial_parent"])).name
     run_label = campaign.RUN_ID or "base campaign"
     fig.suptitle(f"Semi-active-learning campaign dashboard [{run_label}] — updated {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}\nactive branch: {active_branch} | current model: {current}\npriority: {operator_note()}", fontsize=13)
     output.parent.mkdir(parents=True, exist_ok=True)

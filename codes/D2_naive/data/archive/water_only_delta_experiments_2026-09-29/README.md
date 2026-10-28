@@ -1,5 +1,9 @@
 # Archived water-only delta experiment
 
+> [!IMPORTANT]
+> `polar-1-s` is retired for new work. Use `polar-1-l`; any older references
+> are historical and remain only for reproducibility.
+
 These files are preserved artifacts from the pre-nitrogen residual/delta
 training experiments. They are not valid substitutes for the current D2
 authoritative H/N/O dataset (`../../target_all.xyz`) or its active 80/10/10

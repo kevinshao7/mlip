@@ -1,12 +1,17 @@
 # PolarMACE Naive Fine Tuning
 
+> [!IMPORTANT]
+> **Foundation-model policy (2026-10-28):** Do not start new runs from
+> `polar-1-s`. Use `polar-1-l`. Existing `polar1s_*` run names and commands
+> below are historical artifacts retained for exact reproduction only.
+
 Every terminal launch appends one provenance/metrics row to the Git-tracked
 [`../finetuning_megadataset.jsonl`](../finetuning_megadataset.jsonl). It records
 data hashes and sizes, hyperparameters, method, timing, and initial/final MACE
 loss/RMSE; see [`../FINETUNING_MEGADATASET.md`](../FINETUNING_MEGADATASET.md).
 
-This directory is a target-only, **naive** fine-tuning workflow for the
-`polar-1-s` PolarMACE foundation model. It intentionally has no replay data
+This directory preserves a target-only, **naive** fine-tuning workflow developed
+for the now-retired `polar-1-s` PolarMACE foundation model. It intentionally has no replay data
 and does not enable MACE multihead fine tuning. The foundation weights are
 used to initialize one `Default` head, which is then optimized against the
 ORCA DFT target data only.
@@ -56,10 +61,10 @@ Before splitting, records whose stored `charge` disagrees with the project
 formal-charge convention (`H=+1`, `N=-3`, `O=-2`) are rejected. The original
 source is never overwritten: use `--source-target-all` with `--skip-orca` to
 filter an existing extxyz dataset into this directory.
-Training uses `--E0s=foundation`: the atomic-energy table embedded in the
-`polar-1-s` MACE-POLAR checkpoint. This is the active and required default for
-the current D2 workflow, which uses the same DFT standard as that foundation
-model. Data preparation does not generate or select a custom E0 table unless
+Historical training used `--E0s=foundation`: the atomic-energy table embedded
+in its selected MACE-POLAR checkpoint. New runs must explicitly use
+`polar-1-l`; `polar-1-s` remains valid only for reproducing recorded runs. Data
+preparation does not generate or select a custom E0 table unless
 `--write-dft-e0s` is explicitly requested for a separate experiment. Do not
 use `estimated`, `dft`, or an E0 JSON path in a standard D2 run.
 

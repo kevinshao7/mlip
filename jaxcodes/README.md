@@ -1,6 +1,10 @@
 # JAX-MD CLI workflows
 
 > [!IMPORTANT]
+> `polar-1-s` is retired for new work. Use `polar-1-l`; any older references
+> are historical and remain only for reproducibility.
+
+> [!IMPORTANT]
 > **Use the `dev` branch of the external `jax-md-cli` package.** The `dev`
 > branch should now work for MACE-POLAR and is required by the configurations
 > in this directory that set `model_type = "mace_polar"`.

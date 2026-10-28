@@ -1,5 +1,9 @@
 # C2 Atomization DFT
 
+> [!IMPORTANT]
+> `polar-1-s` is retired for new work. Use `polar-1-l`; any older references
+> are historical and remain only for reproducibility.
+
 This directory regenerates isolated-atom ORCA reference energies for:
 
 - `H`
