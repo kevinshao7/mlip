@@ -190,9 +190,9 @@ The active fine-tuning path accepts only frames tagged
 `dft_functional_basis="wB97M-D4rev def2-TZVPD"` and refuses missing, mixed, or
 historical wB97M-V provenance. Both campaign launchers explicitly select the
 custom H/N/O/S E0 JSON produced by `C5_atomizationD4rev`; there is no active
-fallback to foundation or C2 atomic energies. Until the four C5 atomic ORCA
-jobs finish and its CSV/JSON agree exactly, fine tuning stops before creating a
-run directory.
+fallback to foundation or C2 atomic energies. The four C5 atomic ORCA jobs are
+complete, and the launcher verifies exact agreement between their CSV and JSON
+before creating a run directory.
 
 ### Campaign status and dashboard
 
