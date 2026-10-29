@@ -1651,9 +1651,14 @@ def command_finetune(args: argparse.Namespace) -> None:
     all_frames=[]
     for labelled in acquired:
         all_frames.extend(read(labelled, ":"))
-    if len(all_frames) < 2:
-        raise ValueError("Random 70/30 fine-tuning split requires at least two campaign DFT structures")
-    fraction=float(cfg.get("validation_fraction", 0.30))
+    for index, atoms in enumerate(all_frames):
+        expected = formal_charge(atoms.get_chemical_symbols())
+        if (atoms.info.get("charge") != expected or atoms.info.get("spin") != 1
+                or not atoms.info.get("formal_charge_verified", False)):
+            raise ValueError(f"Training pool frame {index}: unverified or inconsistent charge/spin")
+    if len(all_frames) < 30:
+        raise ValueError("Fine tuning requires at least 30 validated campaign DFT structures")
+    fraction=float(cfg.get("validation_fraction", 0.20))
     if not 0.0 < fraction < 1.0:
         raise ValueError("finetune.validation_fraction must lie strictly between zero and one")
     acquired_sha256={str(x.resolve()):sha(x) for x in acquired}
@@ -1664,6 +1669,19 @@ def command_finetune(args: argparse.Namespace) -> None:
     indices=list(range(len(all_frames))); random.Random(split_seed).shuffle(indices)
     valid_count=max(1, min(len(all_frames)-1, round(len(all_frames)*fraction)))
     valid_indices=sorted(indices[:valid_count]); train_indices=sorted(indices[valid_count:])
+    portable = OUT / "hpc_dataset/dataset.json"
+    if RUN_ID == "acquisition_p10" and portable.exists():
+        frozen = json.loads(portable.read_text())
+        if not frozen["ready_for_training"]:
+            raise ValueError("Portable acquisition is a transfer preview; preparation is not complete")
+        if len(acquired) != 1 or sha(acquired[0]) != frozen["files"]["processed.extxyz"]:
+            raise ValueError("Campaign pool differs from the frozen portable acquisition")
+        split_seed = frozen["seed"]
+        valid_indices = frozen["validation_indices"]
+        train_indices = frozen["train_indices"]
+        if (sorted(valid_indices + train_indices) != list(range(len(all_frames)))
+                or set(valid_indices) & set(train_indices)):
+            raise ValueError("Portable split has overlapping or missing members")
     train=[all_frames[index] for index in train_indices]
     validation=[all_frames[index] for index in valid_indices]
     data=cdir / "training"
@@ -1684,6 +1702,8 @@ def command_finetune(args: argparse.Namespace) -> None:
             raise FileNotFoundError(f"Fine-tuning parent model is missing: {parent_path}")
         parent=str(parent_path)
     launcher=(ROOT / "../D2_naive/launch_single_gpu.py").resolve()
+    if RUN_ID == "acquisition_p10":
+        launcher = ROOT / "training_bridge.py"
     lineage=json.loads((OUT / "model_lineage.json").read_text(encoding="utf-8"))
     current_branch = active_branch(lineage)
     batch_number=1 + sum(1 for entry in branch_history(lineage)
@@ -1708,7 +1728,7 @@ def command_finetune(args: argparse.Namespace) -> None:
             "validation_count":len(validation), "changed_parameter":args.changed_parameter,
             "change_note":args.change_note}
     write_json(status_path, status)
-    event("finetune_prepared", args.pressure, [*acquired], [all_data, merged, valid, split, data / "launch_command.sh", status_path], parent_model=parent, finetune_id=finetune_id, batch_number=batch_number, batch_epochs=epochs, learning_rate=args.lr, acquired_datasets=[str(x) for x in acquired], training_data_scope="named_run_campaign_DFT_plus_immutable_inherited_snapshot", validation_policy="randomized_30_percent_campaign_only", validation_fraction=fraction, validation_seed=split_seed, train_count=len(train), validation_count=len(validation), changed_parameter=args.changed_parameter, change_note=args.change_note)
+    event("finetune_prepared", args.pressure, [*acquired], [all_data, merged, valid, split, data / "launch_command.sh", status_path], parent_model=parent, finetune_id=finetune_id, batch_number=batch_number, batch_epochs=epochs, learning_rate=args.lr, acquired_datasets=[str(x) for x in acquired], training_data_scope="named_run_campaign_DFT_plus_immutable_inherited_snapshot", validation_policy="deterministic_random_campaign_snapshot", validation_fraction=fraction, validation_seed=split_seed, train_count=len(train), validation_count=len(validation), changed_parameter=args.changed_parameter, change_note=args.change_note)
     print(shlex.join(command))
     if args.run:
         def refresh_dashboard() -> None:
@@ -1736,13 +1756,13 @@ def command_finetune(args: argparse.Namespace) -> None:
             status.update({"state":"failed", "updated_utc":now(), "return_code":return_code})
             write_json(status_path, status); refresh_dashboard()
             raise subprocess.CalledProcessError(return_code, command)
-        candidates=sorted((launcher.parent / "runs").glob(f"{finetune_id}_*/models/*.model"), key=lambda p:p.stat().st_mtime)
+        candidates=sorted(((OUT / "runs") if RUN_ID == "acquisition_p10" else (launcher.parent / "runs")).glob(f"{finetune_id}_*/models/*.model"), key=lambda p:p.stat().st_mtime)
         if not candidates: raise RuntimeError("Fine tuning completed but no campaign-named model was found")
-        model=str(candidates[-1].resolve()); state=json.loads((OUT / "model_lineage.json").read_text()); state["history"].append({"pressure_gpa":args.pressure,"parent":parent,"model":model,"train_sha256":sha(merged),"validation_sha256":sha(valid),"split_sha256":sha(split),"acquired_sha256":acquired_sha256,"utc":now(),"batch_number":batch_number,"batch_epochs":epochs,"learning_rate":args.lr,"finetune_id":finetune_id,"branch_id":current_branch,"validation_policy":"randomized_30_percent_campaign_only","validation_fraction":fraction,"validation_seed":split_seed,"train_count":len(train),"validation_count":len(validation)}); state["current_model"]=model; write_json(OUT / "model_lineage.json", state)
-        write_json(data / "batch_complete.json", {"utc":now(), "batch_number":batch_number, "batch_epochs":epochs, "learning_rate":args.lr, "parent_model":parent, "model":model, "train_sha256":sha(merged), "validation_sha256":sha(valid), "split_sha256":sha(split), "validation_policy":"randomized_30_percent_campaign_only", "validation_fraction":fraction, "validation_seed":split_seed, "train_count":len(train), "validation_count":len(validation), "acquired_datasets":[str(x) for x in acquired], "acquired_sha256":acquired_sha256})
+        model=str(candidates[-1].resolve()); state=json.loads((OUT / "model_lineage.json").read_text()); state["history"].append({"pressure_gpa":args.pressure,"parent":parent,"model":model,"train_sha256":sha(merged),"validation_sha256":sha(valid),"split_sha256":sha(split),"acquired_sha256":acquired_sha256,"utc":now(),"batch_number":batch_number,"batch_epochs":epochs,"learning_rate":args.lr,"finetune_id":finetune_id,"branch_id":current_branch,"validation_policy":"deterministic_random_campaign_snapshot","validation_fraction":fraction,"validation_seed":split_seed,"train_count":len(train),"validation_count":len(validation)}); state["current_model"]=model; write_json(OUT / "model_lineage.json", state)
+        write_json(data / "batch_complete.json", {"utc":now(), "batch_number":batch_number, "batch_epochs":epochs, "learning_rate":args.lr, "parent_model":parent, "model":model, "train_sha256":sha(merged), "validation_sha256":sha(valid), "split_sha256":sha(split), "validation_policy":"deterministic_random_campaign_snapshot", "validation_fraction":fraction, "validation_seed":split_seed, "train_count":len(train), "validation_count":len(validation), "acquired_datasets":[str(x) for x in acquired], "acquired_sha256":acquired_sha256})
         status.update({"state":"completed", "updated_utc":now(), "completed_utc":now(), "model":model})
         write_json(status_path, status)
-        event("finetune_completed", args.pressure, [merged, valid, split], [Path(model), OUT / "model_lineage.json", data / "batch_complete.json"], parent_model=parent, model=model, batch_number=batch_number, batch_epochs=epochs, learning_rate=args.lr, validation_policy="randomized_30_percent_campaign_only", validation_fraction=fraction, validation_seed=split_seed)
+        event("finetune_completed", args.pressure, [merged, valid, split], [Path(model), OUT / "model_lineage.json", data / "batch_complete.json"], parent_model=parent, model=model, batch_number=batch_number, batch_epochs=epochs, learning_rate=args.lr, validation_policy="deterministic_random_campaign_snapshot", validation_fraction=fraction, validation_seed=split_seed)
         refresh_dashboard()
 
 
@@ -1750,6 +1770,11 @@ def parser() -> argparse.ArgumentParser:
     p=argparse.ArgumentParser(description=__doc__); sub=p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("init").set_defaults(func=command_init)
     sub.add_parser("status").set_defaults(func=command_status)
+    from prepare_acquisition import prepare
+    q = sub.add_parser("prepare-acquisition", help="Condense the incoming approved P10 ORCA transfer without launching training.")
+    q.add_argument("--source", type=Path, default=MLIP / "outputsfull/acquisition/outputs")
+    q.add_argument("--allow-partial", action="store_true", help="Explicitly prepare from a still-incomplete transfer.")
+    q.set_defaults(func=prepare)
     q=sub.add_parser("inherit-dft", help="Snapshot validated acquisition DFT labels from an earlier run into this named run.")
     q.add_argument("--from-run", default="", help="Source run directory below outputsfull/X_semiactivelearning; omit for the legacy/default run.")
     q.set_defaults(func=command_inherit_dft)

@@ -300,3 +300,69 @@ SAL_RUN_ID=cycle2 /home/kevinsh/env/bin/python campaign.py finetune --pressure 1
 ```
 
 Retains all prior lineage in `model_lineage.json` and `lineage_branches/`.
+
+
+## Incoming P10 acquisition (2026-10-29)
+
+From this workflow directory, run `python campaign.py prepare-acquisition` after
+copying ORCA stdout into `outputsfull/acquisition/outputs`. The command checks
+all 1,000 approved inputs from `dft_launches/p10_2gpu_6h/`, saves a dated audit
+under `outputsfull/X_semiactivelearning/acquisition_p10/cycles/P10p0000GPa/dft/acquisition/snapshots/`,
+and preserves every raw file. Missing, changing, incomplete, charge/spin,
+geometry, method, or gradient-invalid outputs are excluded and listed in
+`collection.csv`. `summary.json` records source hashes and counts. A rerun
+creates a fresh snapshot; it never appends duplicate labels to the pool.
+
+By default an incomplete transfer produces an audit only. After transfer is
+complete, rerun the same command. `--allow-partial` explicitly permits preparation
+from the validated subset (at least 30 labels). Presence of all files does not
+imply all DFT calculations succeeded: inspect the rejection report.
+
+Prepared data are this acquisition only, with a deterministic random 80/20
+train/validation split; exact membership, seed, and dataset hashes are in
+`training/random_split.json`. This is a structure-level split, not an
+independent-trajectory generalization estimate; nearby MD frames can be
+correlated. The transient/sub-target-pressure caveat is retained in extxyz.
+Labels use isolated-cluster PBC=False, total energies in eV and forces in eV/A;
+the shared training recipe retains its existing atomic reference convention.
+No labels from earlier cycles or fixed D2 evaluation datasets are added.
+
+Start the prepared experiment with `python launch_single_gpu.py`. Defaults:
+polar-1-l, GPU 1, learning rate 1e-4, 20 epochs, no SWA. The old cycle2 launcher
+is preserved in `deprecated/launch_cycle2_best_parent.py` for reference.
+The campaign uses the existing training recipe through `training_bridge.py`;
+new timestamped runs live under `outputsfull/X_semiactivelearning/acquisition_p10/runs/`.
+Launch and outcome entries, including exact artifact paths, are mirrored to
+this workflow's single `hyperparameters.txt` before optimization begins.
+No training is started by the preparation command.
+
+### GitHub-to-HPC dataset location
+
+The portable dataset is **`outputsfull/X_semiactivelearning/acquisition_p10/hpc_dataset/`**
+(relative to the repository root). It contains `processed.extxyz`, `train.extxyz`,
+`validation.extxyz`, and `dataset.json` with relative filenames, SHA-256 hashes,
+exact frozen split indices, and per-cluster acceptance/rejection results.
+These four files have an explicit `.gitignore` exception. Raw ORCA stdout,
+local audit snapshots, model caches, and training runs remain ignored.
+
+During transfer this directory holds a **preview**, with
+`ready_for_training: false`; the launcher refuses to train from it. Re-running
+`python campaign.py prepare-acquisition` after copying updates the package and
+sets readiness when all expected output files are present (failed DFT labels
+remain excluded). An explicit `--allow-partial` can approve a partial snapshot.
+Check rejection counts even when the package is ready.
+
+After final preparation, add the four package files and changed workflow code
+to Git, commit and push them, then pull on HPC. In the HPC environment, run:
+
+```bash
+cd codes/X_semiactivelearning
+python launch_single_gpu.py
+```
+
+The launcher prints the resolved dataset path and split counts, verifies all
+package hashes, restores the campaign acquisition using repository-relative
+paths, and preserves the exported train/validation membership exactly across
+Windows and Linux. Neither raw ORCA outputs nor local absolute paths are
+required on HPC. The shared D2_naive training recipe and local MACE checkout
+must be available in the repository/environment as before.
