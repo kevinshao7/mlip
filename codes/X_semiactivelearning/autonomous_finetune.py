@@ -92,7 +92,9 @@ def child_specs(round_number: int, parent: Path, learning_rate: float) -> list[d
             f"--train-file={TRAINING / 'cumulative_train.extxyz'}",
             f"--valid-file={TRAINING / 'random_validation.extxyz'}",
             f"--name={child_id}", f"--max-num-epochs={EPOCHS}",
-            f"--lr={child_lr}", "--no-swa",
+            f"--lr={child_lr}", "--e0s=d4rev",
+            f"--reference-method={campaign.config()['dft']['functional_basis']}",
+            "--no-swa",
             "--changed-parameter=learning_rate", f"--change-note={note}",
         ]
         specs.append({"gpu": gpu, "factor": factor, "label": label, "lr": child_lr,

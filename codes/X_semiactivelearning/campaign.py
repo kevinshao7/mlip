@@ -31,6 +31,7 @@ if RUN_ID and (not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", RUN_ID)):
 OUT = BASE_OUT / RUN_ID if RUN_ID else BASE_OUT
 DEFAULT_CONFIG = ROOT / "campaign_config.json"
 FORMAL_CHARGES = {"H": 1, "N": -3, "O": -2, "S": -2}
+D4REV_REFERENCE_METHOD = "wB97M-D4rev def2-TZVPD"
 
 
 def now() -> str:
@@ -1468,7 +1469,7 @@ def command_dft(args: argparse.Namespace) -> None:
         manifest=ddir / "manifest.csv"; outputs=ddir / "outputs"; accepted=[]; rows=[]
         with manifest.open(newline="", encoding="utf-8") as f:
             for raw in csv.DictReader(f):
-                job=condenser.Job(frame=int(raw["frame"]), stem=raw["stem"], input_path=ddir / raw["input"], output_path=outputs / f"{raw['stem']}.out", manifest_charge=int(raw["charge"]), manifest_spin=int(raw["multiplicity"]), manifest_natoms=int(raw["n_atoms"]))
+                job=condenser.Job(frame=int(raw["frame"]), stem=raw["stem"], input_path=ddir / raw["input"], output_path=outputs / f"{raw['stem']}.out", manifest_charge=int(raw["charge"]), manifest_spin=int(raw["multiplicity"]), manifest_natoms=int(raw["n_atoms"]), expected_functional_basis=config()["dft"]["functional_basis"])
                 result, atoms=condenser.process(job); rows.append(result)
                 if atoms is not None: accepted.append(atoms)
         prior_collection = [ddir / name for name in ("processed.extxyz", "collection.csv", "parity.png", "parity_summary.json") if (ddir / name).exists()]
@@ -1649,8 +1650,22 @@ def command_finetune(args: argparse.Namespace) -> None:
     # validation file: it has a different chemistry/size distribution and
     # becomes progressively less representative as campaign labels grow.
     all_frames=[]
+    required_method = str(config()["dft"]["functional_basis"])
+    if required_method != D4REV_REFERENCE_METHOD:
+        raise ValueError(
+            f"Active fine tuning requires {D4REV_REFERENCE_METHOD!r}; "
+            f"campaign configuration declares {required_method!r}"
+        )
     for labelled in acquired:
-        all_frames.extend(read(labelled, ":"))
+        frames = list(read(labelled, ":"))
+        for index, frame in enumerate(frames):
+            actual_method = frame.info.get("dft_functional_basis")
+            if actual_method != required_method:
+                raise ValueError(
+                    f"{labelled} frame {index}: dft_functional_basis={actual_method!r}; "
+                    f"required {required_method!r}. Refusing to mix DFT reference methods."
+                )
+        all_frames.extend(frames)
     for index, atoms in enumerate(all_frames):
         expected = formal_charge(atoms.get_chemical_symbols())
         if (atoms.info.get("charge") != expected or atoms.info.get("spin") != 1
@@ -1692,6 +1707,7 @@ def command_finetune(args: argparse.Namespace) -> None:
     split=data / "random_split.json"
     write(all_data, all_frames, format="extxyz"); write(merged, train, format="extxyz"); write(valid, validation, format="extxyz")
     write_json(split, {"created_utc":now(), "method":"deterministic_shuffle_per_campaign_data_snapshot", "seed":split_seed,
+                       "dft_functional_basis":required_method,
                        "validation_fraction":fraction, "total_frames":len(all_frames), "train_count":len(train), "validation_count":len(validation),
                        "train_indices":train_indices, "validation_indices":valid_indices, "acquired_sha256":acquired_sha256})
     parent=args.parent_model or current_parent()
@@ -1719,14 +1735,15 @@ def command_finetune(args: argparse.Namespace) -> None:
     # their own opt-in SWA defaults; this policy is campaign-specific.
     if not math.isfinite(args.lr) or args.lr <= 0:
         raise ValueError("--lr must be a finite positive number")
-    command=[sys.executable, str(launcher), "--gpu", cfg["gpu"], "--", f"--foundation-model={parent}", f"--train-file={merged}", f"--valid-file={valid}", f"--name={finetune_id}", f"--max-num-epochs={epochs}", f"--lr={args.lr}", "--no-swa", f"--changed-parameter={args.changed_parameter}", f"--change-note={args.change_note}"]
+    command=[sys.executable, str(launcher), "--gpu", cfg["gpu"], "--", f"--foundation-model={parent}", f"--train-file={merged}", f"--valid-file={valid}", f"--name={finetune_id}", f"--max-num-epochs={epochs}", f"--lr={args.lr}", "--e0s=d4rev", f"--reference-method={required_method}", "--no-swa", f"--changed-parameter={args.changed_parameter}", f"--change-note={args.change_note}"]
     (data / "launch_command.sh").write_text("#!/usr/bin/env bash\nset -euo pipefail\n" + shlex.join(command) + "\n", encoding="utf-8")
     status_path=data / "finetune_status.json"
     status={"state":"prepared", "updated_utc":now(), "pressure_gpa":args.pressure,
             "finetune_id":finetune_id, "batch_number":batch_number, "batch_epochs":epochs,
             "gpu":str(cfg["gpu"]), "parent_model":parent, "learning_rate":args.lr, "train_count":len(train),
             "validation_count":len(validation), "changed_parameter":args.changed_parameter,
-            "change_note":args.change_note}
+            "change_note":args.change_note, "dft_functional_basis":required_method,
+            "e0s":"C5_atomizationD4rev/e0s_wb97m_d4rev.json"}
     write_json(status_path, status)
     event("finetune_prepared", args.pressure, [*acquired], [all_data, merged, valid, split, data / "launch_command.sh", status_path], parent_model=parent, finetune_id=finetune_id, batch_number=batch_number, batch_epochs=epochs, learning_rate=args.lr, acquired_datasets=[str(x) for x in acquired], training_data_scope="named_run_campaign_DFT_plus_immutable_inherited_snapshot", validation_policy="deterministic_random_campaign_snapshot", validation_fraction=fraction, validation_seed=split_seed, train_count=len(train), validation_count=len(validation), changed_parameter=args.changed_parameter, change_note=args.change_note)
     print(shlex.join(command))

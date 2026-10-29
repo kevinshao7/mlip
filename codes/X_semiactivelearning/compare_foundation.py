@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Compare polar-1-s foundation, MACE-OFF medium, and best fine-tuned campaign model on DFT data.
+"""Compare polar-1-l foundation, MACE-OFF medium, and best fine-tuned campaign model on DFT data.
 
 Force plot: |F_DFT| per atom (x) vs |ΔF| = |F_pred - F_DFT| per atom (y), element-coloured.
 Energy plot: DFT reference energy (x) vs model predicted energy (y).
   - Polar models share the same E0 reference as the DFT training data.
-  - MACE-OFF energies are shifted to the same E0 reference using target_dft_e0s.json.
+  - MACE-OFF energies are shifted using the custom C5 wB97M-D4rev E0 table.
 
 Usage (from X_semiactivelearning/):
     /home/kevinsh/env/bin/python compare_foundation.py --dataset all
@@ -33,6 +33,7 @@ CODES = Path(__file__).resolve().parent
 MLIP  = CODES.parents[1]
 OUT   = MLIP / "outputsfull" / "X_semiactivelearning"
 D2    = MLIP / "codes" / "D2_naive"
+D4REV_E0S = MLIP / "codes" / "C5_atomizationD4rev" / "e0s_wb97m_d4rev.json"
 
 DATASETS = {
     "p31_r2":  OUT / "cycles" / "P31p6228GPa" / "dft" / "acquisition_r2" / "processed.extxyz",
@@ -139,9 +140,8 @@ def get_maceoff_e0s(device: str) -> dict[int, float]:
 
 
 def get_dft_e0s() -> dict[int, float]:
-    """Return {atomic_number: E0_eV} from target_dft_e0s.json (used for polar-1-s training)."""
-    p = D2 / "data" / "target_dft_e0s.json"
-    raw = json.loads(p.read_text(encoding="utf-8"))
+    """Return the custom wB97M-D4rev H/N/O/S atomic reference energies."""
+    raw = json.loads(D4REV_E0S.read_text(encoding="utf-8"))
     return {int(k): float(v) for k, v in raw.items()}
 
 
@@ -297,7 +297,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--dataset", choices=list(DATASETS), default="p31_r2")
     p.add_argument("--configs", type=Path, default=None)
     p.add_argument("--finetuned-model", type=Path, default=None)
-    p.add_argument("--foundation-model", default="polar-1-s")
+    p.add_argument("--foundation-model", default="polar-1-l")
     p.add_argument("--no-maceoff", action="store_true", help="Skip MACE-OFF evaluation")
     p.add_argument("--device", choices=("cpu", "cuda"), default="cuda")
     p.add_argument("--outliers", type=int, default=12)
@@ -362,13 +362,13 @@ def main() -> None:
     tnd_E = 1000.0 * np.array([f.info["MACE_energy"] for f in tnd_frames])
 
     energy_models = [
-        (fnd_E, "polar-1-s foundation"),
+        (fnd_E, f"{args.foundation_model} foundation"),
         (tnd_E, "Fine-tuned polar (best)"),
     ]
 
     if use_maceoff:
         off_E_raw = 1000.0 * np.array([f.info["MACE_energy"] for f in off_frames])
-        # Align MACE-OFF to the DFT E0 reference used for polar-1-s training
+        # Align MACE-OFF to the custom D4rev reference used for training.
         maceoff_e0s = get_maceoff_e0s(args.device)
         dft_e0s     = get_dft_e0s()
         correction  = 1000.0 * maceoff_energy_correction(dft_frames, maceoff_e0s, dft_e0s)
@@ -395,7 +395,7 @@ def main() -> None:
     tnd_dF   = np.linalg.norm(tnd_Fvec - dft_Fvec, axis=1)
 
     force_models = [
-        (fnd_dF, "polar-1-s foundation"),
+        (fnd_dF, f"{args.foundation_model} foundation"),
         (tnd_dF, "Fine-tuned polar (best)"),
     ]
 

@@ -10,6 +10,7 @@ before selecting code or training data.
 | `C_DFTproduction` | Original water-cluster extraction and ORCA generation | Provenance source | Its 162 water-only DFT structures are retained in D2 for provenance. |
 | `C3_DFTproductionstopH2` | Nitrogen/closest-approach cluster extraction and ORCA generation | Active DFT source | Supplies the newer nitrogen-bearing configurations in the D2 target dataset. |
 | `C2_atomizationDFT` | Isolated-atom ORCA references | Shared reference workflow | Regenerates the H/N/O/S reference-energy CSV. |
+| `C5_atomizationD4rev` | Isolated neutral-atom ORCA references at wB97M-D4rev/def2-TZVPD | Current D4 reference workflow | Generates a separate H/N/O/S D4rev reference-energy CSV without replacing the older wB97M-V values. |
 | `D2_naive` | Target-only PolarMACE fine tuning | **Current target fine-tuning workflow** | `data/target_all.xyz` combines the formal-charge-validated C_DFT and C3 DFT data. |
 | `D_MHFT` | Multihead fine tuning with OMol replay | Separate legacy/experimental workflow | Its 162-frame target data is oxygen-only and must not replace D2 data for N-bearing fine tuning. |
 | `7_29_finetunepolar`, `A_parityplot`, `7_7b_clustervalidation` | Earlier H2/path validation and diagnostic studies | Historical/validation support | Not the source of the D2 training split. |

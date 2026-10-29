@@ -8,6 +8,7 @@ import fcntl
 from datetime import datetime
 import hashlib
 import json
+import math
 import os
 import re
 import shlex
@@ -51,10 +52,11 @@ CACHE_DIR = MLIP_DIR / "outputsfull" / ".cache"
 DATA_DIR = SCRIPT_DIR / "data"
 RUNS_DIR = SCRIPT_DIR / "runs"
 FORMAL_CHARGES = {"H": 1, "N": -3, "O": -2, "S": -2}
-C2_ATOMIZATION_E0S = (
-    SCRIPT_DIR.parent / "C2_atomizationDFT"
-).parent / "7_7b_clustervalidation" / "atomizationenergies.txt"
-DFT_E0S_JSON = DATA_DIR / "target_dft_e0s.json"
+D4REV_REFERENCE_METHOD = "wB97M-D4rev def2-TZVPD"
+D4REV_REFERENCE_DIR = SCRIPT_DIR.parent / "C5_atomizationD4rev"
+D4REV_ATOMIZATION_E0S = D4REV_REFERENCE_DIR / "atomizationenergies_D4rev.txt"
+D4REV_E0S_JSON = D4REV_REFERENCE_DIR / "e0s_wb97m_d4rev.json"
+EXPECTED_E0_ATOMIC_NUMBERS = {1, 7, 8, 16}
 sys.path.insert(0, str(MLIP_DIR / "codes"))
 import finetune_megadataset as megadataset
 
@@ -69,8 +71,8 @@ def require_file(path: Path, message: str) -> str:
     return path_arg(path)
 
 
-def validate_formal_charge_and_spin(path: Path, label: str) -> int:
-    """Reject any frame whose total charge or singlet spin is inconsistent."""
+def validate_training_frames(path: Path, label: str, reference_method: str) -> int:
+    """Reject frames with inconsistent charge, spin, or DFT provenance."""
     require_file(path, f"Missing {label} extxyz")
     count = 0
     for index, atoms in enumerate(iread(path, index=":")):
@@ -100,43 +102,61 @@ def validate_formal_charge_and_spin(path: Path, label: str) -> int:
                 f"{label} frame {index}: odd electron count {electron_count} "
                 "is incompatible with multiplicity 1"
             )
+        actual_method = atoms.info.get("dft_functional_basis")
+        if actual_method != reference_method:
+            raise ValueError(
+                f"{label} frame {index}: dft_functional_basis={actual_method!r}; "
+                f"required {reference_method!r}"
+            )
         count += 1
     if count == 0:
         raise ValueError(f"{label} extxyz contains no structures: {path}")
-    print(f"Validated formal charge and spin multiplicity 1 for {count} {label} structures")
+    print(
+        f"Validated charge, spin multiplicity 1, and {reference_method} provenance "
+        f"for {count} {label} structures"
+    )
     return count
 
 
-def write_dft_e0_json(source: Path, destination: Path) -> str:
-    """Convert the isolated-atom DFT CSV to MACE's atomic-number JSON format."""
-    require_file(source, "Missing C2 DFT atomization-energy CSV")
+def read_d4rev_reference_csv(source: Path) -> dict[int, float]:
+    """Read and method-check the authoritative C5 atomic reference table."""
+    require_file(source, "Missing C5 wB97M-D4rev atomic-reference CSV")
+    lines = source.read_text(encoding="utf-8").splitlines()
+    if not lines or D4REV_REFERENCE_METHOD.lower() not in lines[0].lower():
+        raise ValueError(
+            f"Atomic-reference header does not declare {D4REV_REFERENCE_METHOD}: {source}"
+        )
     e0s: dict[int, float] = {}
-    for line in source.read_text(encoding="utf-8").splitlines():
+    for line in lines[1:]:
         line = line.strip()
-        if not line or line.lower().startswith("atom"):
+        if not line:
             continue
         symbol, value = (field.strip() for field in line.split(",", maxsplit=1))
         e0s[atomic_numbers[symbol]] = float(value)
-    if not e0s:
-        raise ValueError(f"No DFT E0 values found in {source}")
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text(
-        json.dumps({str(z): value for z, value in sorted(e0s.items())}, indent=2)
-        + "\n",
-        encoding="utf-8",
-    )
-    print(f"Using DFT E0s from {source}: {e0s}")
-    return path_arg(destination)
+    if set(e0s) != EXPECTED_E0_ATOMIC_NUMBERS or not all(math.isfinite(x) for x in e0s.values()):
+        raise ValueError(
+            f"C5 D4rev references must contain finite H/N/O/S values exactly; got {sorted(e0s)}"
+        )
+    return e0s
+
+
+def validate_d4rev_e0s() -> str:
+    """Require the C5 JSON and prove that it matches the C5 D4rev CSV."""
+    csv_e0s = read_d4rev_reference_csv(D4REV_ATOMIZATION_E0S)
+    require_file(D4REV_E0S_JSON, "Missing C5 wB97M-D4rev MACE E0 JSON")
+    raw = json.loads(D4REV_E0S_JSON.read_text(encoding="utf-8"))
+    json_e0s = {int(key): float(value) for key, value in raw.items()}
+    if json_e0s != csv_e0s:
+        raise ValueError(
+            f"C5 D4rev E0 JSON does not exactly match its atomic-reference CSV: {D4REV_E0S_JSON}"
+        )
+    print(f"Using custom {D4REV_REFERENCE_METHOD} E0s from {D4REV_E0S_JSON}: {json_e0s}")
+    return path_arg(D4REV_E0S_JSON)
 
 
 def resolve_e0s(e0s_arg: str) -> str:
-    if e0s_arg.lower() == "dft":
-        # Rewriting this file at launch is unnecessary after prepare_data.py
-        # (or the bundled reference file) has created it.
-        if DFT_E0S_JSON.is_file():
-            print(f"Using prepared DFT E0s from {DFT_E0S_JSON}")
-            return require_file(DFT_E0S_JSON, "Missing prepared DFT E0 JSON")
-        return write_dft_e0_json(C2_ATOMIZATION_E0S, DFT_E0S_JSON)
+    if e0s_arg.lower() in {"d4rev", "dft"}:
+        return validate_d4rev_e0s()
     if e0s_arg.lower() == "foundation":
         return "foundation"
     if e0s_arg.lower() == "estimated":
@@ -218,6 +238,13 @@ def git_revision() -> str | None:
 
 def write_run_metadata(args: argparse.Namespace, run_name: str, run_dir: Path, argv: list[str]) -> None:
     """Write immutable machine-readable provenance before optimization begins."""
+    resolved_e0s = next(value.split("=", 1)[1] for value in argv if value.startswith("--E0s="))
+    input_sha256 = {
+        "train_file": sha256(args.train_file),
+        "valid_file": sha256(args.valid_file),
+    }
+    if resolved_e0s not in {"foundation", "estimated"}:
+        input_sha256["e0s"] = sha256(Path(resolved_e0s))
     metadata = {
         "created_at": datetime.now().astimezone().isoformat(),
         "run_name": run_name,
@@ -228,10 +255,9 @@ def write_run_metadata(args: argparse.Namespace, run_name: str, run_dir: Path, a
         "xdg_cache_home": os.environ.get("XDG_CACHE_HOME"),
         "arguments": {key: str(value) for key, value in vars(args).items() if not key.startswith("_")},
         "mace_command": argv,
-        "input_sha256": {
-            "train_file": sha256(args.train_file),
-            "valid_file": sha256(args.valid_file),
-        },
+        "reference_method": args.reference_method,
+        "resolved_e0s": resolved_e0s,
+        "input_sha256": input_sha256,
     }
     (run_dir / "run_metadata.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
 
@@ -324,17 +350,22 @@ def build_train_argv(args: argparse.Namespace, run_name: str, run_dir: Path) -> 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--name", default="polar1s_naive_orca_dft_e0")
-    parser.add_argument("--foundation-model", default="polar-1-s")
+    parser.add_argument("--name", default="polar1l_wb97m_d4rev")
+    parser.add_argument("--foundation-model", default="polar-1-l")
     parser.add_argument("--train-file", type=Path, default=DATA_DIR / "target_train.xyz")
     parser.add_argument("--valid-file", type=Path, default=DATA_DIR / "target_valid.xyz")
     parser.add_argument("--runs-root", type=Path, default=RUNS_DIR,
                         help="Parent directory; each launch creates a unique timestamped child directory.")
     parser.add_argument(
         "--e0s",
-        default="foundation",
-        help="'foundation' (default, embedded MACE-POLAR E0s), 'estimated', 'dft', or an E0 JSON path.",
+        default="d4rev",
+        help=(
+            "'d4rev' (default; custom C5 wB97M-D4rev H/N/O/S references), "
+            "'foundation', 'estimated', or an explicit E0 JSON path. 'dft' is a "
+            "backward-compatible alias for 'd4rev'."
+        ),
     )
+    parser.add_argument("--reference-method", default=D4REV_REFERENCE_METHOD)
     parser.add_argument("--atomic-numbers", default="[1, 7, 8, 16]")
     # Preserve the established force-loss scale while making forces dominate
     # energy by 100,000:1. Raising forces_weight instead would rescale the
@@ -372,11 +403,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--swa-forces-weight", type=float, default=100_000.0)
     parser.add_argument("--swa", action="store_true", default=True, help="Enable baseline MACE Stage Two/SWA.")
     parser.add_argument("--no-swa", action="store_false", dest="swa", help="Disable baseline MACE Stage Two/SWA.")
-    parser.add_argument("--changed-parameter", default="swa_learning_rate",
+    parser.add_argument("--changed-parameter", default="dft_reference_method",
                         help="The one scientific/training factor changed from the preceding run.")
     parser.add_argument("--change-note", default=(
-        "Set only Stage-Two LR to intermediate 3e-4 after 1e-4 underfit "
-        "forces and 1e-3 caused energy drift."
+        "Transition labels and explicit H/N/O/S atomic E0s together from "
+        "wB97M-V to wB97M-D4rev while retaining the training recipe."
     ),
                         help="Short rationale and expected effect for the single change.")
     parser.add_argument("--dry-run", action="store_true")
@@ -388,8 +419,12 @@ def main() -> None:
     args = parse_args()
     if not MACE_REPO.is_dir():
         raise FileNotFoundError(f"Local MACE checkout is missing: {MACE_REPO}")
-    validate_formal_charge_and_spin(args.train_file, "training")
-    validate_formal_charge_and_spin(args.valid_file, "validation")
+    if args.e0s.lower() in {"d4rev", "dft"} and args.reference_method != D4REV_REFERENCE_METHOD:
+        raise ValueError(
+            f"Custom D4rev E0s require --reference-method={D4REV_REFERENCE_METHOD!r}"
+        )
+    validate_training_frames(args.train_file, "training", args.reference_method)
+    validate_training_frames(args.valid_file, "validation", args.reference_method)
     os.environ.setdefault("XDG_CACHE_HOME", str(CACHE_DIR.resolve()))
     sys.path.insert(0, str(MACE_REPO.resolve()))
     run_name, run_dir = unique_run_context(args)

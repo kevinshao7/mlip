@@ -16,6 +16,7 @@ HARTREE_TO_EV = 27.211386245988
 HARTREE_PER_BOHR_TO_EV_PER_ANGSTROM = HARTREE_TO_EV / 0.529177210903
 FLOAT = r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[Ee][+-]?\d+)?"
 XYZ_RE = re.compile(r"^\s*\*\s*xyz\s+([+-]?\d+)\s+(\d+)\s*$", re.I | re.M)
+ROUTE_RE = re.compile(r"^\s*!\s+(.+?)\s+EnGrad\s+RIJCOSX\s*$", re.M)
 ATOM_RE = re.compile(rf"^\s*([A-Za-z]+)\s+({FLOAT})\s+({FLOAT})\s+({FLOAT})\s*$")
 OUTPUT_CHARGE_RE = re.compile(r"Total\s+Charge\s+Charge\s+\.+\s+([+-]?\d+)", re.I)
 OUTPUT_XYZ_RE = re.compile(r"^\s*\|\s*\d+>\s*\*\s*xyz\s+([+-]?\d+)\s+(\d+)\s*$", re.I | re.M)
@@ -32,10 +33,15 @@ class Job:
     manifest_charge: int
     manifest_spin: int
     manifest_natoms: int
+    expected_functional_basis: str
 
 
-def parse_input(path: Path) -> tuple[int, int, list[str], np.ndarray]:
+def parse_input(path: Path) -> tuple[int, int, list[str], np.ndarray, str]:
     text = path.read_text(encoding="utf-8", errors="replace")
+    route = ROUTE_RE.search(text)
+    if route is None:
+        raise ValueError("missing strict '! FUNCTIONAL BASIS EnGrad RIJCOSX' route")
+    functional_basis = route.group(1).strip()
     match = XYZ_RE.search(text)
     if match is None:
         raise ValueError("missing * xyz charge multiplicity declaration")
@@ -55,7 +61,7 @@ def parse_input(path: Path) -> tuple[int, int, list[str], np.ndarray]:
         positions.append([float(x), float(y), float(z)])
     if not symbols:
         raise ValueError("empty * xyz block")
-    return charge, spin, symbols, np.asarray(positions)
+    return charge, spin, symbols, np.asarray(positions), functional_basis
 
 
 def last_gradient(text: str) -> tuple[list[str], np.ndarray] | None:
@@ -82,10 +88,13 @@ def last_gradient(text: str) -> tuple[list[str], np.ndarray] | None:
 def process(job: Job) -> tuple[dict[str, object], Atoms | None]:
     issues: list[str] = []
     input_charge = input_spin = calculated_charge = None
+    functional_basis = None
     symbols: list[str] = []
     positions = np.empty((0, 3))
     try:
-        input_charge, input_spin, symbols, positions = parse_input(job.input_path)
+        input_charge, input_spin, symbols, positions, functional_basis = parse_input(job.input_path)
+        if functional_basis != job.expected_functional_basis:
+            issues.append("input_functional_basis_mismatch")
         unknown = sorted(set(symbols) - FORMAL_CHARGES.keys())
         if unknown:
             issues.append("unsupported_elements:" + ",".join(unknown))
@@ -157,6 +166,7 @@ def process(job: Job) -> tuple[dict[str, object], Atoms | None]:
             "source_file": job.output_path.name,
             "source_frame": job.frame,
             "formal_charge_verified": True,
+            "dft_functional_basis": functional_basis,
         })
         atoms.arrays["REF_forces"] = -gradient * HARTREE_PER_BOHR_TO_EV_PER_ANGSTROM
 
@@ -174,6 +184,8 @@ def process(job: Job) -> tuple[dict[str, object], Atoms | None]:
         "manifest_natoms": job.manifest_natoms, "parsed_natoms": len(symbols),
         "normal_termination": normal,
         "energy_hartree": "" if energy_hartree is None else energy_hartree,
+        "expected_functional_basis": job.expected_functional_basis,
+        "input_functional_basis": "" if functional_basis is None else functional_basis,
         "input_path": str(job.input_path), "output_path": str(job.output_path),
     }
     return row, atoms

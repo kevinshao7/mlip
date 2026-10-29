@@ -23,21 +23,25 @@ DEFAULT_TARGET_ALL = DATA_DIR / "target_all.xyz"
 DEFAULT_TARGET_TRAIN = DATA_DIR / "target_train.xyz"
 DEFAULT_TARGET_VALID = DATA_DIR / "target_valid.xyz"
 DEFAULT_TARGET_TEST = DATA_DIR / "target_test.xyz"
-DEFAULT_E0S = DATA_DIR / "target_dft_e0s.json"
-DEFAULT_ATOMIZATION = MLIP_DIR / "codes" / "7_7b_clustervalidation" / "atomizationenergies.txt"
+DEFAULT_REFERENCE_DIR = MLIP_DIR / "codes" / "C5_atomizationD4rev"
+DEFAULT_E0S = DEFAULT_REFERENCE_DIR / "e0s_wb97m_d4rev.json"
+DEFAULT_ATOMIZATION = DEFAULT_REFERENCE_DIR / "atomizationenergies_D4rev.txt"
 FORMAL_CHARGES = {1: 1, 7: -3, 8: -2}
 
 
 def write_e0_json(atomization_path: Path, output_path: Path) -> dict[int, float]:
+    lines = atomization_path.read_text(encoding="utf-8").splitlines()
+    if not lines or "wb97m-d4rev def2-tzvpd" not in lines[0].lower():
+        raise ValueError(f"Atomic-reference table is not labelled wB97M-D4rev/def2-TZVPD: {atomization_path}")
     e0s: dict[int, float] = {}
-    for line in atomization_path.read_text(encoding="utf-8").splitlines():
+    for line in lines[1:]:
         line = line.strip()
         if not line or line.lower().startswith("atom"):
             continue
         symbol, value = (field.strip() for field in line.split(",", maxsplit=1))
         e0s[atomic_numbers[symbol]] = float(value)
-    if not e0s:
-        raise ValueError(f"No E0 values parsed from {atomization_path}")
+    if set(e0s) != {1, 7, 8, 16}:
+        raise ValueError(f"D4rev E0 table must contain exactly H/N/O/S; got {sorted(e0s)}")
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps({str(z): v for z, v in sorted(e0s.items())}, indent=2) + "\n", encoding="utf-8")
     return e0s
@@ -205,9 +209,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=3, help="Random seed for reproducible stratified splits.")
     parser.add_argument("--atomization-energies", type=Path, default=DEFAULT_ATOMIZATION)
     parser.add_argument("--e0s-json", type=Path, default=DEFAULT_E0S,
-                        help="Destination only when --write-dft-e0s is explicitly requested.")
+                        help="C5 D4rev JSON destination when --write-dft-e0s is requested.")
     parser.add_argument("--write-dft-e0s", action="store_true",
-                        help="Write a custom DFT E0 JSON for a separate, explicitly configured experiment.")
+                        help="Regenerate the custom wB97M-D4rev MACE E0 JSON from the C5 table.")
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--skip-orca", action="store_true")
     parser.add_argument("--allow-incomplete", action="store_true")

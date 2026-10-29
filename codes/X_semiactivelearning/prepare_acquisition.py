@@ -37,6 +37,7 @@ def export_package(frames, rows, ready, campaign):
                           ("processed.extxyz", "train.extxyz", "validation.extxyz")},
                 "caveat": "Non-equilibrium, sub-target-pressure P10 compression transient",
                 "foundation": "polar-1-l", "units": "total energy eV, forces eV/Angstrom; PBC false",
+                "dft_functional_basis": campaign.D4REV_REFERENCE_METHOD,
                 "source_results": [{k: r[k] for k in ("stem", "status", "issues")} for r in rows]}
     campaign.write_json(package / "dataset.json", manifest)
     print(f"Portable dataset: {package} (ready_for_training={ready})")
@@ -58,13 +59,13 @@ def prepare(args):
     snapshot.mkdir(parents=True, exist_ok=False)
     rows, accepted, hashes = [], [], {}
     for path in inputs:
-        charge, spin, symbols, positions = validator.parse_input(path)
+        charge, spin, symbols, positions, functional_basis = validator.parse_input(path)
         output = source / f"{path.stem}.out"
         before = (output.stat().st_size, output.stat().st_mtime_ns) if output.exists() else None
         digest = campaign.sha(output) if before else None
         row, atoms = validator.process(validator.Job(
             int(path.stem.split("_")[-1]), path.stem, path, output,
-            charge, spin, len(symbols)))
+            charge, spin, len(symbols), campaign.D4REV_REFERENCE_METHOD))
         after = (output.stat().st_size, output.stat().st_mtime_ns) if output.exists() else None
         if before != after:
             row.update(status="rejected", issues=str(row["issues"]) + ";changed_during_read")
@@ -77,9 +78,11 @@ def prepare(args):
             temporary = snapshot / "echoed.inp"
             temporary.write_text(echoed, encoding="utf-8")
             try:
-                eq, es, sy, pos = validator.parse_input(temporary)
+                eq, es, sy, pos, echoed_functional_basis = validator.parse_input(temporary)
                 if (eq != charge or es != spin or sy != symbols
                         or not np.allclose(pos, positions, rtol=0, atol=1e-8)
+                        or functional_basis != campaign.D4REV_REFERENCE_METHOD
+                        or echoed_functional_basis != campaign.D4REV_REFERENCE_METHOD
                         or path.read_text().splitlines()[0] not in echoed):
                     raise ValueError("output geometry or method differs from approved input")
                 if not (np.isfinite(atoms.info["REF_energy"])
