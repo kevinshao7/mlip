@@ -1567,7 +1567,7 @@ def command_dft(args: argparse.Namespace) -> None:
             f"#SBATCH -o {bluehive_log_dir}/{group_name}_%j.slurmlog.txt\n"
             f"#SBATCH -e {bluehive_log_dir}/{group_name}_%j.slurmerr.txt\n\n"
             "set -euo pipefail\n"
-            f"module purge\nmodule load {cfg['orca_module']}\n"
+            f"module load {cfg['orca_module']}\n"
             f'MLIP_DIR="${{MLIP_DIR:-{bluehive_mlip}}}"\n'
             f'DFT_DIR="$MLIP_DIR/{ddir_relative.as_posix()}"\n'
             f'INPUT_DIR="$MLIP_DIR/{launch_relative.as_posix()}/inputs"\n'
