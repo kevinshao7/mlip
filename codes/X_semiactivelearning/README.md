@@ -366,3 +366,11 @@ paths, and preserves the exported train/validation membership exactly across
 Windows and Linux. Neither raw ORCA outputs nor local absolute paths are
 required on HPC. The shared D2_naive training recipe and local MACE checkout
 must be available in the repository/environment as before.
+
+Finalized after the operator confirmed transfer completion on 2026-10-29:
+363 outputs were received, 266 passed validation, 97 were rejected for missing
+normal termination/energy/gradient, and 637 of the planned 1000 outputs were
+absent. The available validated subset was finalized with --allow-partial:
+213 training / 53 validation structures. dataset.json explicitly records
+these counts and now has ready_for_training: true. The default HPC launcher
+can use this package. This is a 266-label subset of the planned acquisition.

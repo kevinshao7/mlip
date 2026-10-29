@@ -28,6 +28,8 @@ def export_package(frames, rows, ready, campaign):
                           ("validation.extxyz", [frames[i] for i in valid])):
         write(package / name, members, format="extxyz")
     manifest = {"ready_for_training": ready, "expected_outputs": 1000,
+                "missing_outputs": sum(r["issues"] == "missing_output" for r in rows),
+                "rejected_present_outputs": sum(r["status"] == "rejected" and r["issues"] != "missing_output" for r in rows),
                 "accepted": len(frames), "validation_fraction": 0.2,
                 "seed": seed, "train_indices": train, "validation_indices": valid,
                 "train_count": len(train), "validation_count": len(valid),
