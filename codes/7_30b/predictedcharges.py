@@ -46,7 +46,12 @@ DEFAULT_OUTPUT_DIR = REPO_ROOT / "outputsfull" / "7_30b_predictedcharges_focused
 DEFAULT_MODEL = "polar-1-m"
 DEFAULT_DTYPE = "float32"
 DEFAULT_DEVICE = os.environ.get("MLIP_MACE_DEVICE", "cuda")
-DEFAULT_CHARGE = 0
+DEFAULT_OXIDATION_NUMBERS = {
+    "O": -2,
+    "H": 1,
+    "N": -3,
+}
+DEFAULT_CHARGE = None
 DEFAULT_SPIN = 1
 DEFAULT_EXTERNAL_FIELD = (0.0, 0.0, 0.0)
 
@@ -90,7 +95,15 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_DTYPE,
         help=f"MACE default dtype. Default: {DEFAULT_DTYPE}",
     )
-    parser.add_argument("--charge", type=int, default=DEFAULT_CHARGE, help="Total system charge passed to MACE-POLAR.")
+    parser.add_argument(
+        "--charge",
+        type=int,
+        default=DEFAULT_CHARGE,
+        help=(
+            "Total system charge passed to MACE-POLAR. Default: derive per frame from "
+            "oxidation numbers O=-2, H=+1, N=-3."
+        ),
+    )
     parser.add_argument("--spin", type=int, default=DEFAULT_SPIN, help="Spin multiplicity passed to MACE-POLAR.")
     parser.add_argument(
         "--external-field",
@@ -165,6 +178,27 @@ def sampled_frames(path: Path, start: int, stride: int, max_frames: int | None):
         emitted += 1
         if max_frames is not None and emitted >= max_frames:
             break
+
+
+def oxidation_global_charge(atoms: Atoms) -> int:
+    charge = 0
+    missing_symbols = sorted(set(atoms.get_chemical_symbols()) - set(DEFAULT_OXIDATION_NUMBERS))
+    if missing_symbols:
+        formatted_symbols = ", ".join(missing_symbols)
+        raise ValueError(
+            f"Cannot derive default global charge for element(s): {formatted_symbols}. "
+            "Use --charge to pass an explicit total system charge."
+        )
+
+    for symbol in atoms.get_chemical_symbols():
+        charge += DEFAULT_OXIDATION_NUMBERS[symbol]
+    return charge
+
+
+def frame_charge_setting(atoms: Atoms, explicit_charge: int | None) -> int:
+    if explicit_charge is not None:
+        return explicit_charge
+    return oxidation_global_charge(atoms)
 
 
 def as_numpy(value: Any) -> np.ndarray:
@@ -402,7 +436,16 @@ def evaluate_charges(args: argparse.Namespace) -> tuple[int, Path, Path, Path, P
         for sample_index, (frame_index, raw_atoms) in enumerate(
             sampled_frames(args.input, args.start, args.stride, args.max_frames)
         ):
-            atoms = prepare_atoms(raw_atoms, args.charge, args.spin, args.external_field, calc)
+            charge_setting = frame_charge_setting(raw_atoms, args.charge)
+            if frames_done == 0:
+                if args.charge is None:
+                    status(
+                        "Default global charge from oxidation numbers "
+                        f"O=-2, H=+1, N=-3 for first selected frame {frame_index}: {charge_setting:+d} e"
+                    )
+                else:
+                    status(f"Explicit global charge: {charge_setting:+d} e")
+            atoms = prepare_atoms(raw_atoms, charge_setting, args.spin, args.external_field, calc)
             energy_ev = float(atoms.get_potential_energy())
             charges, charges_up, charges_down = predicted_charge_arrays(calc, atoms)
 
@@ -445,7 +488,7 @@ def evaluate_charges(args: argparse.Namespace) -> tuple[int, Path, Path, Path, P
                     "mean_mace_polar_charge_e": f"{float(np.mean(charges)):.12g}",
                     "min_mace_polar_charge_e": f"{float(np.min(charges)):.12g}",
                     "max_mace_polar_charge_e": f"{float(np.max(charges)):.12g}",
-                    "charge_setting_e": args.charge,
+                    "charge_setting_e": charge_setting,
                     "spin_multiplicity": args.spin,
                     "external_field_x": args.external_field[0],
                     "external_field_y": args.external_field[1],
@@ -481,6 +524,15 @@ def main() -> None:
         status(f"Model: {args.model}")
         status(f"Device: {args.device}")
         status(f"Frame selection: start={args.start}, stride={args.stride}, max_frames={args.max_frames}")
+        first_frame_index, first_atoms = next(sampled_frames(args.input, args.start, args.stride, 1))
+        charge_setting = frame_charge_setting(first_atoms, args.charge)
+        if args.charge is None:
+            status(
+                "Default global charge from oxidation numbers "
+                f"O=-2, H=+1, N=-3 for first selected frame {first_frame_index}: {charge_setting:+d} e"
+            )
+        else:
+            status(f"Explicit global charge: {charge_setting:+d} e")
         status(f"Would write atom charges CSV: {atom_csv}")
         status(f"Would write frame summary CSV: {frame_csv}")
         if args.write_extxyz:

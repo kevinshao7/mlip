@@ -2,7 +2,7 @@
 """Plot molecular-species counts through time for production trajectories.
 
 The default run analyses every condensed frame of all 20 manifest conditions,
-processing conditions sequentially and frames with four worker processes. Raw
+processing conditions sequentially and frames with 24 worker processes. Raw
 zero counts remain zero in the CSV; zeros are replaced by 0.1 only when drawing
 the logarithmic plot. One CSV and one figure are written per condition.
 """
@@ -32,6 +32,7 @@ import plot_final_species_distribution as species_base
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT_OUTPUT_DIR = SCRIPT_DIR / "species_time_series"
+DEFAULT_WORKERS = 24
 # Production writes every 5 MD steps at 0.5 fs/step; condensed files retain
 # every 100th written frame: 5 * 0.5 fs * 100 = 250 fs = 0.25 ps.
 DEFAULT_FRAME_TIME_PS = 0.25
@@ -60,7 +61,15 @@ def parse_args() -> argparse.Namespace:
         help="Restrict analysis to a condition; repeat for several. Default: all conditions.",
     )
     parser.add_argument("--all-conditions", action="store_true")
-    parser.add_argument("--workers", type=int, default=4)
+    parser.add_argument(
+        "--workers",
+        "--cpu",
+        "--cores",
+        dest="workers",
+        type=int,
+        default=DEFAULT_WORKERS,
+        help=f"Frame-analysis worker processes (default: {DEFAULT_WORKERS}).",
+    )
     parser.add_argument("--batch-size", type=int, default=64, help="Frames submitted per parallel batch.")
     parser.add_argument(
         "--progress-every",
