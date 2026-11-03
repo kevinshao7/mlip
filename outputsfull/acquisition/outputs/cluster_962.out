@@ -1,0 +1,2532 @@
+
+                                 *****************
+                                 * O   R   C   A *
+                                 *****************
+
+                                            #,                                       
+                                            ###                                      
+                                            ####                                     
+                                            #####                                    
+                                            ######                                   
+                                           ########,                                 
+                                     ,,################,,,,,                         
+                               ,,#################################,,                 
+                          ,,##########################################,,             
+                       ,#########################################, ''#####,          
+                    ,#############################################,,   '####,        
+                  ,##################################################,,,,####,       
+                ,###########''''           ''''###############################       
+              ,#####''   ,,,,##########,,,,          '''####'''          '####       
+            ,##' ,,,,###########################,,,                        '##       
+           ' ,,###''''                  '''############,,,                           
+         ,,##''                                '''############,,,,        ,,,,,,###''
+      ,#''                                            '''#######################'''  
+     '                                                          ''''####''''         
+             ,#######,   #######,   ,#######,      ##                                
+            ,#'     '#,  ##    ##  ,#'     '#,    #''#        ,####,    ,#,          
+            ##       ##  ##   ,#'  ##            #'  '#       #'       ,# #          
+            ##       ##  #######   ##           ,######,      #####,      #          
+            '#,     ,#'  ##    ##  '#,     ,#' ,#      #,     #,   #      #          
+             '#######'   ##     ##  '#######'  #'      '#     '####' #    #          
+
+
+
+                #########################################################
+                #                        -***-                          #
+                #          Department of theory and spectroscopy        #
+                #                                                       #
+                #                      Frank Neese                      #
+                #                                                       #
+                #     Directorship, Architecture, Infrastructure        #
+                #                    SHARK, DRIVERS                     #
+                #        Core code/Algorithms in most modules           #
+                #                                                       #
+                #        Max Planck Institute fuer Kohlenforschung      #
+                #                Kaiser Wilhelm Platz 1                 #
+                #                 D-45470 Muelheim/Ruhr                 #
+                #                      Germany                          #
+                #                                                       #
+                #                  All rights reserved                  #
+                #                        -***-                          #
+                #########################################################
+
+
+                         Program Version 6.1.1  -  RELEASE   -
+                                (GIT: $487d211c$)
+                          ($2025-11-21 10:33:24 +0100$)
+
+
+ With contributions from (in alphabetic order):
+[Max-Planck-Institut fuer Kohlenforschung]                               
+  Daniel Aravena         : Magnetic Suceptibility                        
+  Michael Atanasov       : Ab Initio Ligand Field Theory (pilot matlab implementation)
+  Alexander A. Auer      : GIAO ZORA, VPT2 properties, NMR spectrum      
+  Ute Becker             : All parallelization in ORCA, NUMFREQ, NUMCALC 
+  Giovanni Bistoni       : ED, misc. LED, open-shell LED, HFLD           
+  Dmytro Bykov           : pre 5.0 version of the SCF Hessian            
+  Marcos Casanova-Páez   : Triplet and SCS-CIS(D). UHF-(DLPNO)-IP/EA/STEOM-CCSD. UHF-CVS-IP/STEOM-CCSD   
+  Vijay G. Chilkuri      : MRCI spin determinant printing, contributions to CSF-ICE 
+  Pauline Colinet        : FMM embedding                                 
+  Dipayan Datta          : RHF DLPNO-CCSD density                        
+  Achintya Kumar Dutta   : EOM-CC, STEOM-CC                              
+  Nicolas Foglia         : Exact transition moments, OPA infrastructure, MCD improvements    
+  Dmitry Ganyushin       : Spin-Orbit,Spin-Spin,Magnetic field MRCI      
+  Miquel Garcia-Rates    : C-PCM and meta-GGA Hessian, CCSD/C-PCM, Gaussian charge scheme 
+  Tiago L. C. Gouveia    : GS-ROHF, GS-ROCIS                             
+  Yang Guo               : DLPNO-NEVPT2, F12-NEVPT2, CIM, IAO-localization        
+  Andreas Hansen         : Spin unrestricted coupled pair/coupled cluster methods 
+  Ingolf Harden          : AUTO-CI MPn and infrastructure                
+  Benjamin Helmich-Paris : MC-RPA, TRAH-(SCF,CASSCF), AVAS, COSX integrals, SCF dyn. polar., MC-PDFT, srDFT 
+  Lee Huntington         : MR-EOM, pCC                                   
+  Robert Izsak           : Overlap fitted RIJCOSX, COSX-SCS-MP3, EOM     
+  Riya Kayal             : Wick's Theorem for AUTO-CI, AUTO-CI UHF-CCSDT 
+  Emily Kempfer          : AUTO-CI RHF CISDT and CCSDT, approximate NEVPT4
+  Christian Kollmar      : KDIIS, OOCD, Brueckner-CCSD(T), CCSD density, CASPT2, CASPT2-K, improved NEVPT2 
+  Axel Koslowski         : Symmetry handling                             
+  Simone Kossmann        : meta-GGA functionals, TD-DFT gradient, OOMP2, (MP2 Hessian; deprecated post 5.0) 
+  Lucas Lang             : DCDCAS, Hyperfine gauge corrections, ICE-SOC+SSC
+  Marvin Lechner         : AUTO-CI (C++ implementation), FIC-MRCC        
+  Spencer Leger          : CASSCF response                               
+  Dagmar Lenk            : GEPOL surface, SMD, ORCA-2-JSON               
+  Dimitrios Liakos       : Extrapolation schemes; Compound Job, Property file
+  Dimitrios Manganas     : Further ROCIS development; embedding schemes. LFT, Crystal Embedding 
+  Dimitrios Pantazis     : SARC Basis sets                               
+  Anastasios Papadopoulos: AUTO-CI, single reference methods and gradients 
+  Taras Petrenko         : pre 6.0 DFT Hessian and TD-DFT gradient,  ECA, NRVS 
+  Petra Pikulova         : Analytic Raman intensities                    
+  Peter Pinski           : DLPNO-MP2, DLPNO-MP2 Gradient                 
+  Shashank Vittal Rao    : ES-AILFT, MagRelax                            
+  Christoph Reimann      : Effective Core Potentials                     
+  Marius Retegan         : Local ZFS, SOC                                
+  Christoph Riplinger    : Optimizer, TS searches, QM/MM, DLPNO-CCSD(T), (RO)-DLPNO pert. Triples 
+  Michael Roemelt        : Original ROCIS implementation, recursive CI coupling coefficients
+  Masaaki Saitow         : Open-shell DLPNO-CCSD energy and density      
+  Barbara Sandhoefer     : DKH picture change effects                    
+  Yorick L. A. Schmerwitz: GMF and freeze-and-release deltaSCF, NEB S-IDPP initial path                    
+  Kantharuban Sivalingam : CASSCF convergence/infrastructure, NEVPT2, NEVPT3, NEVPT4(SD), FIC-MRCI and CEPA variants
+  Bernardo de Souza      : ESD, SOC TD-DFT                               
+  Georgi L. Stoychev     : AutoAux, RI-MP2 NMR, DLPNO-MP2 response, X2C  
+  Van Anh Tran           : RI-MP2 g-tensors                              
+  Willem Van den Heuvel  : Paramagnetic NMR                              
+  Zikuan Wang            : NOTCH, Electric field optimization            
+  Frank Wennmohs         : Technical directorship and infrastructure     
+  Hang Xu                : AUTO-CI-Response properties                   
+                                                                         
+[FACCTs GmbH]                                                            
+  Markus Bursch, Nicolas Foglia, Miquel Garcia-Rates, Ingolf Harden, Hagen Neugebauer, Anastasios Papadopoulos, 
+  Christoph Riplinger, Bernardo de Souza, Georgi L. Stoychev                                                    
+                                                                 
+  APM, various basis sets, CI-OPT, improved COSX, DLPNO-Multilevel,           
+  DOCKER, DRACO, updates on ESD, Fragmentator, GOAT, IRC, LR-CPCM, L-BFGS, MBIS, meta-GGA TD-DFT gradient, ML-optimized integration grids, 
+  MM, NACMEs, nearIR, NEB, NEB-TS, NL-DFT gradient (VV10), 2- and 3-layer-ONIOM, interface openCOSMO-RS, QMMM,   
+  Crystal-QMMM, RESP, rigid body optimization, SF, symmetry and pop. for TD-DFT, various functionals, SOLVATOR                                   
+                                                                         
+[Other institutions]                                                     
+  V. Asgeirsson          : NEB                                           
+  Christoph Bannwarth    : sTDA-DFT, sTD-DFT, PBEh-3c, B97-3c, D3        
+  Giovanni Bistoni       : ETS/NOCV, ADLD/ADEX, COVALED                  
+  Martin Brehm           : Molecular dynamics                            
+  Ronald Cardenas        : ETS/NOCV                                      
+  Martina Colucci        : COVALED                                       
+  Sebastian Ehlert       : rSCAN, r2SCAN, r2SCAN-3c, D4, dhf basis sets  
+  Marvin Friede          : D4 for Fr, Ra, Ac-Lr                          
+  Lars Goerigk           : TD-DFT with DH, B97 family of functionals     
+  Stefan Grimme          : VdW corrections, initial TS optimization, DFT functionals, gCP, sTDA/sTD-DF 
+  Waldemar Hujo          : DFT-NL                                        
+  H. Jonsson             : NEB                                           
+  Holger Kruse           : gCP                                           
+  Marcel Mueller         : wB97X-3c, vDZP basis set                      
+  Hagen Neugebauer       : wr2SCAN, Native XTB                           
+  Gianluca Regni         : ADLD/ADEX                                     
+  Tobias Risthaus        : pre 6.0 range-separated hybrid DFT and stability analysis
+  Lukas Wittmann         : regularized MP2, r2SCAN double-hybrids, wr2SCAN        
+                                                                         
+We gratefully acknowledge several colleagues who have allowed us to      
+interface, adapt or use parts of their codes:                            
+  Ed Valeev, F. Pavosevic, A. Kumar             : LibInt (2-el integral package), F12 methods 
+  Garnet Chan, S. Sharma, J. Yang, R. Olivares  : DMRG                   
+  Ulf Ekstrom                                   : XCFun DFT Library      
+  Mihaly Kallay                                 : mrcc  (arbitrary order and MRCC methods)
+  Frank Weinhold                                : gennbo (NPA and NBO analysis)           
+  Simon Mueller                                 : openCOSMO-RS                            
+  Christopher J. Cramer and Donald G. Truhlar   : smd solvation model                     
+  S Lehtola, MJT Oliveira, MAL Marques          : LibXC Library                           
+  Liviu Ungur et al                             : ANISO software                          
+
+
+ Your calculation uses the libint2 library for the computation of 2-el integrals
+ For citations please refer to: http://libint.valeyev.net
+
+ Your ORCA version has been built with support for libXC version: 7.0.0
+ For citations please refer to: https://libxc.gitlab.io
+
+ This ORCA versions uses:
+   CBLAS   interface :  Fast vector & matrix operations
+   LAPACKE interface :  Fast linear algebra routines
+   SCALAPACK package :  Parallel linear algebra routines
+   Shared memory     :  Shared parallel matrices
+   BLAS/LAPACK       :  OpenBLAS 0.3.29  USE64BITINT DYNAMIC_ARCH NO_AFFINITY Haswell SINGLE_THREADED
+        Core in use  :  Haswell
+   Copyright (c) 2011-2014, The OpenBLAS Project
+
+
+  ***********************************
+  * Starting time: Thu Oct 29 06:23:02 2026
+  * Host name:     bhc0184.bluehive.circ.private
+  * Process ID:    8110
+  * Working dir.:  /gpfs/fs2/scratch/kshao4/mlip/outputsfull/X_semiactivelearning/p10_2gpu_6h/cycles/P10p0000GPa/dft/acquisition
+  ***********************************
+
+Your calculation utilizes the atom-pairwise dispersion correction
+based on EEQ partial charges (D4)
+
+
+Warning: RI is on but no J-basis has been assigned. Assigning Def2/J (nothing to worry about!)
+================================================================================
+
+----- Orbital basis set information -----
+Your calculation utilizes the basis: def2-TZVPD
+   F. Weigend and R. Ahlrichs, Phys. Chem. Chem. Phys. 7, 3297 (2005).
+   D. Rappoport and F. Furche, J. Chem. Phys. 133, 134105 (2010)
+   D. Rappoport, J. Chem. Phys. 155, 124102 (2021).
+
+----- AuxJ basis set information -----
+Your calculation utilizes the auxiliary basis: def2/J
+   H-Rn: F. Weigend, Phys. Chem. Chem. Phys. 8, 1057 (2006).
+   Fr-Lr: K. Eichkorn, F. Weigend, O. Treutler, R. Ahlrichs; Theor. Chem. Acc. 97, 119 (1997).
+
+================================================================================
+                                        WARNINGS
+                       Please study these warnings very carefully!
+================================================================================
+
+
+WARNING: B97M-V or wB97M-V functional requested.
+  ===> : libXC variant has now been activated.
+         Any manually given DFX/HFX/RangeSep scaling parameters are IGNORED!
+
+
+================================================================================
+                                       INPUT FILE
+================================================================================
+NAME = /gpfs/fs2/scratch/kshao4/mlip/codes/X_semiactivelearning/dft_launches/p10_2gpu_6h/P10p0000GPa/acquisition/inputs/cluster_962.inp
+|  1> ! wB97M-D4rev def2-TZVPD EnGrad RIJCOSX
+|  2> %pal nprocs 24 end
+|  3> * xyz 0 1
+|  4> H 0.000000000000 0.000000000000 0.000000000000
+|  5> O 0.091355560000 0.888595130000 -0.181946740000
+|  6> H 0.685406410000 0.877752410000 0.735171600000
+|  7> O 5.835152540000 5.716582990000 -0.087481090000
+|  8> H -6.473793370000 5.350948670000 0.315804950000
+|  9> H 6.072196910000 -6.561099850000 -0.551679150000
+| 10> O 0.610350220000 -0.888936300000 -6.393673180000
+| 11> H 1.238975180000 -0.192924610000 6.410432690000
+| 12> H 0.274686070000 -0.987194070000 5.791957600000
+| 13> O 6.161343870000 2.145706770000 0.310618920000
+| 14> H 6.228650800000 2.279935210000 1.338378290000
+| 15> H -6.389467580000 1.473432580000 0.044698990000
+| 16> H -6.568762520000 1.902045470000 6.242506250000
+| 17> H 4.984887370000 2.142262540000 -6.579834690000
+| 18> N 5.711350480000 1.396237730000 -6.495057270000
+| 19> H 5.312058520000 0.881003790000 5.806564410000
+| 20> H -0.367446720000 -1.849117780000 -1.089936240000
+| 21> O -0.078789710000 -1.783432000000 -0.128431480000
+| 22> H 0.888787750000 -1.613056570000 -0.427085580000
+| 23> *
+| 24> 
+| 25>                          ****END OF INPUT****
+================================================================================
+
+                     *******************************
+                     * Energy+Gradient Calculation *
+                     *******************************
+
+---------------------------------
+CARTESIAN COORDINATES (ANGSTROEM)
+---------------------------------
+  H      0.000000    0.000000    0.000000
+  O      0.091356    0.888595   -0.181947
+  H      0.685406    0.877752    0.735172
+  O      5.835153    5.716583   -0.087481
+  H     -6.473793    5.350949    0.315805
+  H      6.072197   -6.561100   -0.551679
+  O      0.610350   -0.888936   -6.393673
+  H      1.238975   -0.192925    6.410433
+  H      0.274686   -0.987194    5.791958
+  O      6.161344    2.145707    0.310619
+  H      6.228651    2.279935    1.338378
+  H     -6.389468    1.473433    0.044699
+  H     -6.568763    1.902045    6.242506
+  H      4.984887    2.142263   -6.579835
+  N      5.711350    1.396238   -6.495057
+  H      5.312059    0.881004    5.806564
+  H     -0.367447   -1.849118   -1.089936
+  O     -0.078790   -1.783432   -0.128431
+  H      0.888788   -1.613057   -0.427086
+
+----------------------------
+CARTESIAN COORDINATES (A.U.)
+----------------------------
+  NO LB      ZA    FRAG     MASS         X           Y           Z
+   0 H     1.0000    0     1.008    0.000000    0.000000    0.000000
+   1 O     8.0000    0    15.999    0.172637    1.679201   -0.343830
+   2 H     1.0000    0     1.008    1.295230    1.658712    1.389273
+   3 O     8.0000    0    15.999   11.026840   10.802776   -0.165315
+   4 H     1.0000    0     1.008  -12.233697   10.111828    0.596785
+   5 H     1.0000    0     1.008   11.474789  -12.398682   -1.042523
+   6 O     8.0000    0    15.999    1.153395   -1.679846  -12.082291
+   7 H     1.0000    0     1.008    2.341324   -0.364575   12.113962
+   8 H     1.0000    0     1.008    0.519081   -1.865526   10.945214
+   9 O     8.0000    0    15.999   11.643253    4.054798    0.586985
+  10 H     1.0000    0     1.008   11.770444    4.308453    2.529168
+  11 H     1.0000    0     1.008  -12.074344    2.784384    0.084469
+  12 H     1.0000    0     1.008  -12.413162    3.594345   11.796627
+  13 H     1.0000    0     1.008    9.420072    4.048290  -12.434086
+  14 N     7.0000    0    14.007   10.792888    2.638507  -12.273879
+  15 H     1.0000    0     1.008   10.038336    1.664856   10.972817
+  16 H     1.0000    0     1.008   -0.694374   -3.494326   -2.059681
+  17 O     8.0000    0    15.999   -0.148891   -3.370198   -0.242700
+  18 H     1.0000    0     1.008    1.679565   -3.048235   -0.807075
+
+--------------------------------
+INTERNAL COORDINATES (ANGSTROEM)
+--------------------------------
+ H      0   0   0     0.000000000000     0.00000000     0.00000000
+ O      1   0   0     0.911620403238     0.00000000     0.00000000
+ H      2   1   0     1.092757990832    82.95203034     0.00000000
+ O      3   2   1     7.114135508532   106.84106726   146.72684435
+ H      2   1   3     7.953712110325   116.85039182   246.97381842
+ H      1   2   3     8.956782705862   129.33068928   288.71851818
+ O      2   1   3     6.481860751909    86.10012408   140.71596663
+ H      3   2   1     5.801842474934   151.00457903   302.46422932
+ H      8   3   2     1.393997453263    66.74374800    26.83292981
+ O      4   3   2     3.607775128842    51.64540014   243.80127136
+ H     10   4   3     1.038670698322    89.26289543   269.09369657
+ H      5   2   1     3.887896643253    54.42212058   342.82130107
+ H     12   5   2     6.215196740015    82.01352748    93.13667696
+ H      7   2   1     5.325354241002    86.74273104   230.00044960
+ N     14   7   2     1.044743450933    99.31778590   100.70069474
+ H      8   3   2     4.255348047164    84.60283924   175.35697531
+ H      1   2   3     2.177662660656   138.13313415   206.11543396
+ O     17   1   2     1.006046169228    54.39441260   168.59863549
+ H     18  17   1     1.026853543449    90.18479561   280.80615808
+
+---------------------------
+INTERNAL COORDINATES (A.U.)
+---------------------------
+ H      0   0   0     0.000000000000     0.00000000     0.00000000
+ O      1   0   0     1.722712900214     0.00000000     0.00000000
+ H      2   1   0     2.065013333326    82.95203034     0.00000000
+ O      3   2   1    13.443767790730   106.84106726   146.72684435
+ H      2   1   3    15.030337636567   116.85039182   246.97381842
+ H      1   2   3    16.925866355121   129.33068928   288.71851818
+ O      2   1   3    12.248941659321    86.10012408   140.71596663
+ H      3   2   1    10.963893349776   151.00457903   302.46422932
+ H      8   3   2     2.634273418051    66.74374800    26.83292981
+ O      4   3   2     6.817706946284    51.64540014   243.80127136
+ H     10   4   3     1.962803163158    89.26289543   269.09369657
+ H      5   2   1     7.347059892739    54.42212058   342.82130107
+ H     12   5   2    11.745019707068    82.01352748    93.13667696
+ H      7   2   1    10.063461081609    86.74273104   230.00044960
+ N     14   7   2     1.974279002472    99.31778590   100.70069474
+ H      8   3   2     8.041442413657    84.60283924   175.35697531
+ H      1   2   3     4.115186040706   138.13313415   206.11543396
+ O     17   1   2     1.901151737922    54.39441260   168.59863549
+ H     18  17   1     1.940471976766    90.18479561   280.80615808
+
+---------------------
+BASIS SET INFORMATION
+---------------------
+There are 3 groups of distinct atoms
+
+ Group   1 Type H   : 5s2p contracted to 3s2p pattern {311/11}
+ Group   2 Type O   : 12s7p3d1f contracted to 6s4p3d1f pattern {621111/4111/111/1}
+ Group   3 Type N   : 12s6p3d1f contracted to 6s3p3d1f pattern {621111/411/111/1}
+
+Atom   0H    basis set group =>   1
+Atom   1O    basis set group =>   2
+Atom   2H    basis set group =>   1
+Atom   3O    basis set group =>   2
+Atom   4H    basis set group =>   1
+Atom   5H    basis set group =>   1
+Atom   6O    basis set group =>   2
+Atom   7H    basis set group =>   1
+Atom   8H    basis set group =>   1
+Atom   9O    basis set group =>   2
+Atom  10H    basis set group =>   1
+Atom  11H    basis set group =>   1
+Atom  12H    basis set group =>   1
+Atom  13H    basis set group =>   1
+Atom  14N    basis set group =>   3
+Atom  15H    basis set group =>   1
+Atom  16H    basis set group =>   1
+Atom  17O    basis set group =>   2
+Atom  18H    basis set group =>   1
+---------------------------------
+AUXILIARY/J BASIS SET INFORMATION
+---------------------------------
+There are 3 groups of distinct atoms
+
+ Group   1 Type H   : 5s2p1d contracted to 3s1p1d pattern {311/2/1}
+ Group   2 Type O   : 12s5p4d2f1g contracted to 6s4p3d1f1g pattern {711111/2111/211/2/1}
+ Group   3 Type N   : 12s5p4d2f1g contracted to 6s4p3d1f1g pattern {711111/2111/211/2/1}
+
+Atom   0H    basis set group =>   1
+Atom   1O    basis set group =>   2
+Atom   2H    basis set group =>   1
+Atom   3O    basis set group =>   2
+Atom   4H    basis set group =>   1
+Atom   5H    basis set group =>   1
+Atom   6O    basis set group =>   2
+Atom   7H    basis set group =>   1
+Atom   8H    basis set group =>   1
+Atom   9O    basis set group =>   2
+Atom  10H    basis set group =>   1
+Atom  11H    basis set group =>   1
+Atom  12H    basis set group =>   1
+Atom  13H    basis set group =>   1
+Atom  14N    basis set group =>   3
+Atom  15H    basis set group =>   1
+Atom  16H    basis set group =>   1
+Atom  17O    basis set group =>   2
+Atom  18H    basis set group =>   1
+[1793269383.738140] [bhc0184:8115 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269383.738307] [bhc0184:8116 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269383.738143] [bhc0184:8117 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269383.738281] [bhc0184:8118 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269383.738146] [bhc0184:8119 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269383.738277] [bhc0184:8120 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269383.738234] [bhc0184:8121 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269383.738297] [bhc0184:8122 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269383.738134] [bhc0184:8123 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269383.738294] [bhc0184:8124 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269383.738136] [bhc0184:8125 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269383.738302] [bhc0184:8126 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269383.738332] [bhc0184:8127 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269383.738220] [bhc0184:8128 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269383.738247] [bhc0184:8129 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269383.738172] [bhc0184:8130 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269383.738318] [bhc0184:8131 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269383.738310] [bhc0184:8132 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269383.738139] [bhc0184:8134 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269383.738191] [bhc0184:8135 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269383.738292] [bhc0184:8136 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269383.738325] [bhc0184:8137 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269383.738145] [bhc0184:8138 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269383.738261] [bhc0184:8139 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+
+
+           ************************************************************
+           *        Program running with 24 parallel MPI-processes    *
+           *              working on a common directory               *
+           ************************************************************
+------------------------------------------------------------------------------
+                             ORCA STARTUP CALCULATIONS
+                           -- RI-GTO INTEGRALS CHOSEN --
+------------------------------------------------------------------------------
+------------------------------------------------------------------------------
+                   ___                                                        
+                  /   \      - P O W E R E D   B Y -                         
+                 /     \                                                     
+                 |  |  |   _    _      __       _____    __    __             
+                 |  |  |  | |  | |    /  \     |  _  \  |  |  /  |          
+                  \  \/   | |  | |   /    \    | | | |  |  | /  /          
+                 / \  \   | |__| |  /  /\  \   | |_| |  |  |/  /          
+                |  |  |   |  __  | /  /__\  \  |    /   |      \           
+                |  |  |   | |  | | |   __   |  |    \   |  |\   \          
+                \     /   | |  | | |  |  |  |  | |\  \  |  | \   \       
+                 \___/    |_|  |_| |__|  |__|  |_| \__\ |__|  \__/        
+                                                                              
+                      - O R C A' S   B I G   F R I E N D -                    
+                                      &                                       
+                       - I N T E G R A L  F E E D E R -                       
+                                                                              
+ v1 FN, 2020, v2 2021, v3 2022-2024                                           
+------------------------------------------------------------------------------
+
+
+----------------------
+SHARK INTEGRAL PACKAGE
+----------------------
+
+Number of atoms                             ...     19
+Number of basis functions                   ...    354
+Number of shells                            ...    148
+Maximum angular momentum                    ...      3
+Integral batch strategy                     ... SHARK/LIBINT Hybrid
+RI-J (if used) integral strategy            ... SPLIT-RIJ (Revised 2003 algorithm where possible)
+Printlevel                                  ...      1
+Contraction scheme used                     ... SEGMENTED contraction
+Prescreening option                         ... SCHWARTZ
+   Thresh                                   ... 2.500e-11
+   Tcut                                     ... 2.500e-12
+   Tpresel                                  ... 2.500e-12 
+Coulomb Range Separation                    ... NOT USED
+Exchange Range Separation                   ... Long Range
+   Mu parameter                             ... 3.000e-01
+   Scaling (regular/separated)              ... 1.500e-01 8.500e-01
+Robust (split-)RI terms used:
+  metric    (central integrals)             ... YES
+  density   (r.h.s.  integrals)             ... YES
+  potential (l.h.s.  integrals)             ... YES
+Multipole approximations                    ... NOT USED
+Finite Nucleus Model                        ... NOT USED
+CABS basis                                  ... NOT available
+Auxiliary Coulomb fitting basis             ... AVAILABLE
+   # of basis functions in Aux-J            ...    437
+   # of shells in Aux-J                     ...    155
+   Maximum angular momentum in Aux-J        ...      4
+Auxiliary J/K fitting basis                 ... NOT available
+Auxiliary Correlation fitting basis         ... NOT available
+Auxiliary 'external' fitting basis          ... NOT available
+
+Checking pre-screening integrals            ... done (  0.0 sec) Dimension = 148
+   => SHARK Basis and OBASIS are compatible. Storing Pre-screening
+Shell pair information
+Shell pair cut-off parameter TPreSel        ...   2.5e-12
+Total number of shell pairs                 ...     11026
+Shell pairs after pre-screening             ...      5693
+Total number of primitive shell pairs       ...     26277
+Primitive shell pairs kept                  ...      9843
+          la=0 lb=0:   1315 shell pairs
+          la=1 lb=0:   2012 shell pairs
+          la=1 lb=1:    767 shell pairs
+          la=2 lb=0:    647 shell pairs
+          la=2 lb=1:    506 shell pairs
+          la=2 lb=2:    101 shell pairs
+          la=3 lb=0:    160 shell pairs
+          la=3 lb=1:    132 shell pairs
+          la=3 lb=2:     45 shell pairs
+          la=3 lb=3:      8 shell pairs
+
+Checking whether 4 symmetric matrices of dimension 354 fit in memory
+:Max Core in MB      =   4096.00
+ MB in use           =      9.89
+ MB left             =   4086.11
+ MB needed           =      1.92
+ Data fit in memory  = YES
+Calculating RI/J V-Matrix + Cholesky decomp.... done (  0.0 sec)
+Calculating Nuclear repulsion               ... done (  0.0 sec) ENN=    148.927676670105 Eh
+
+Diagonalization of the overlap matrix:
+Smallest eigenvalue                        ... 2.552e-04
+Time for diagonalization                   ...    0.021 sec
+Threshold for overlap eigenvalues          ... 1.000e-07
+Number of eigenvalues below threshold      ... 0
+Time for construction of square roots      ...    0.010 sec
+Total time needed                          ...    0.034 sec
+
+-------------------
+DFT GRID GENERATION
+-------------------
+
+General Integration Accuracy     IntAcc      ... 4.388
+Radial Grid Type                 RadialGrid  ... OptM3 with GC (2021)
+Angular Grid (max. ang.)         AngularGrid ... 4 (Lebedev-302)
+Angular grid pruning method      GridPruning ... 4 (adaptive)
+Weight generation scheme         WeightScheme... mBecke (2022)
+Basis function cutoff            BFCut       ... 1.0000e-11
+Integration weight cutoff        WCut        ... 1.0000e-14
+Partially contracted basis set               ... off
+Rotationally invariant grid construction     ... off
+Angular grids for H and He will be reduced by one unit
+Diffuse basis detected: some atoms will have their outermost
+                        angular grid increased by 1.
+
+Total number of grid points                  ...    85042
+Total number of batches                      ...     1339
+Average number of points per batch           ...       63
+Average number of grid points per atom       ...     4476
+
+--------------------
+COSX GRID GENERATION
+--------------------
+
+GRIDX 1
+-------
+General Integration Accuracy     IntAcc      ... 3.816
+Radial Grid Type                 RadialGrid  ... OptM3 with GC (2021)
+Angular Grid (max. ang.)         AngularGrid ... 1 (Lebedev-50)
+Angular grid pruning method      GridPruning ... 4 (adaptive)
+Weight generation scheme         WeightScheme... mBecke (2022)
+Basis function cutoff            BFCut       ... 1.0000e-11
+Integration weight cutoff        WCut        ... 1.0000e-14
+Partially contracted basis set               ... on
+Rotationally invariant grid construction     ... off
+Angular grids for H and He will be reduced by one unit
+Diffuse basis detected: some atoms will have their outermost
+                        angular grid increased by 1.
+
+Total number of grid points                  ...    10706
+Total number of batches                      ...       93
+Average number of points per batch           ...      115
+Average number of grid points per atom       ...      563
+UseSFitting                                  ... on
+
+GRIDX 2
+-------
+General Integration Accuracy     IntAcc      ... 4.020
+Radial Grid Type                 RadialGrid  ... OptM3 with GC (2021)
+Angular Grid (max. ang.)         AngularGrid ... 2 (Lebedev-110)
+Angular grid pruning method      GridPruning ... 4 (adaptive)
+Weight generation scheme         WeightScheme... mBecke (2022)
+Basis function cutoff            BFCut       ... 1.0000e-11
+Integration weight cutoff        WCut        ... 1.0000e-14
+Partially contracted basis set               ... on
+Rotationally invariant grid construction     ... off
+Angular grids for H and He will be reduced by one unit
+Diffuse basis detected: some atoms will have their outermost
+                        angular grid increased by 1.
+
+Total number of grid points                  ...    25674
+Total number of batches                      ...      211
+Average number of points per batch           ...      121
+Average number of grid points per atom       ...     1351
+UseSFitting                                  ... on
+
+GRIDX 3
+-------
+General Integration Accuracy     IntAcc      ... 4.338
+Radial Grid Type                 RadialGrid  ... OptM3 with GC (2021)
+Angular Grid (max. ang.)         AngularGrid ... 3 (Lebedev-194)
+Angular grid pruning method      GridPruning ... 4 (adaptive)
+Weight generation scheme         WeightScheme... mBecke (2022)
+Basis function cutoff            BFCut       ... 1.0000e-11
+Integration weight cutoff        WCut        ... 1.0000e-14
+Partially contracted basis set               ... on
+Rotationally invariant grid construction     ... off
+Angular grids for H and He will be reduced by one unit
+Diffuse basis detected: some atoms will have their outermost
+                        angular grid increased by 1.
+
+Total number of grid points                  ...    58681
+Total number of batches                      ...      467
+Average number of points per batch           ...      125
+Average number of grid points per atom       ...     3088
+UseSFitting                                  ... on
+Grids setup in   1.0 sec
+Initializing property integral containers    ... done (  0.0 sec)
+
+SHARK setup successfully completed in   1.3 seconds
+
+Maximum memory used throughout the entire STARTUP-calculation: 25.2 MB
+[1793269385.958523] [bhc0184:8193 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269385.958500] [bhc0184:8194 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269385.958523] [bhc0184:8195 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269385.958390] [bhc0184:8196 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269385.958484] [bhc0184:8197 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269385.958557] [bhc0184:8198 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269385.958481] [bhc0184:8199 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269385.958583] [bhc0184:8200 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269385.958570] [bhc0184:8201 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269385.958512] [bhc0184:8202 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269385.958584] [bhc0184:8203 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269385.958573] [bhc0184:8204 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269385.958474] [bhc0184:8205 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269385.958552] [bhc0184:8206 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269385.958445] [bhc0184:8207 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269385.958589] [bhc0184:8208 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269385.958428] [bhc0184:8209 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269385.958562] [bhc0184:8210 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269385.958403] [bhc0184:8211 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269385.958520] [bhc0184:8212 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269385.958567] [bhc0184:8213 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269385.958641] [bhc0184:8214 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269385.958580] [bhc0184:8215 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269385.958547] [bhc0184:8216 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+
+
+           ************************************************************
+           *        Program running with 24 parallel MPI-processes    *
+           *              working on a common directory               *
+           ************************************************************
+-------------------------------------------------------------------------------
+                                 ORCA GUESS
+                   Start orbitals & Density for SCF / CASSCF
+-------------------------------------------------------------------------------
+
+------------
+SCF SETTINGS
+------------
+Hamiltonian:
+ Density Functional     Method          .... DFT(GTOs)
+  Functional kind                       .... Exchange-Correlation
+  Functional name                       .... wB97M-V exchange-correlation functional
+  Functional family                     .... Hybrid MGGA
+  Functional refs                              
+    [ 0] N. Mardirossian and M. Head-Gordon.,  J. Chem. Phys. 144, 214110 (2016), doi: 10.1063/1.4952647
+  Fraction of HF Exchange (short range) .... 0.1500
+  Fraction of HF Exchange ( int64 range )  .... 1.0000
+  Range separation parameter mu         .... 0.3000
+  Functional external parameters        .... 17
+    Parameter  0 _cx00      =  8.500000e-01 : u^00 coefficient for exchange
+    Parameter  1 _cx01      =  1.007000e+00 : u^01 coefficient for exchange
+    Parameter  2 _cx10      =  2.590000e-01 : u^10 coefficient for exchange
+    Parameter  3 _css00     =  4.430000e-01 : u^00 coefficient for same-spin correlation
+    Parameter  4 _css04     = -1.437000e+00 : u^04 coefficient for same-spin correlation
+    Parameter  5 _css10     = -4.535000e+00 : u^10 coefficient for same-spin correlation
+    Parameter  6 _css20     = -3.390000e+00 : u^20 coefficient for same-spin correlation
+    Parameter  7 _css43     =  4.278000e+00 : u^43 coefficient for same-spin correlation
+    Parameter  8 _cos00     =  1.000000e+00 : u^00 coefficient for opposite-spin correlation
+    Parameter  9 _cos10     =  1.358000e+00 : u^10 coefficient for opposite-spin correlation
+    Parameter 10 _cos20     =  2.924000e+00 : u^20 coefficient for opposite-spin correlation
+    Parameter 11 _cos21     = -8.812000e+00 : u^21 coefficient for opposite-spin correlation
+    Parameter 12 _cos60     = -1.390000e+00 : u^60 coefficient for opposite-spin correlation
+    Parameter 13 _cos61     =  9.142000e+00 : u^61 coefficient for opposite-spin correlation
+    Parameter 14 _alpha     =  1.000000e+00 : fraction of HF exchange
+    Parameter 15 _beta      = -8.500000e-01 : fraction of short-range exchange
+    Parameter 16 _omega     =  3.000000e-01 : range-separation constant
+ Long-range corrected/Screened/Range-Separated Hybrid DFT is turned on
+   Amount of maximum screened exact exchange              ....  0.850000
+   Range separation parameter mu (erf(mu*r12)/r12)        ....  0.300000
+ RI-approximation to the Coulomb term is turned on
+   Number of AuxJ basis functions       .... 437
+   RIJ-COSX (HFX calculated with COS-X)).... on
+
+
+General Settings:
+ Integral files         IntName         .... /gpfs/fs2/scratch/kshao4/mlip/codes/X_semiactivelearning/dft_launches/p10_2gpu_6h/P10p0000GPa/acquisition/inputs/cluster_962
+ Hartree-Fock type      HFTyp           .... RHF
+ Total Charge           Charge          ....    0
+ Multiplicity           Mult            ....    1
+ Number of Electrons    NEL             ....   60
+ Basis Dimension        Dim             ....  354
+ Nuclear Repulsion      ENuc            ....    148.9276766701 Eh
+
+Convergence Acceleration:
+ AO-DIIS                CNVDIIS         .... on
+   Start iteration      DIISMaxIt       ....    12
+   Startup error        DIISStart       ....  0.200000
+   # of expansion vecs  DIISMaxEq       ....     5
+   Bias factor          DIISBfac        ....   1.050
+   Max. coefficient     DIISMaxC        ....  10.000
+ MO-DIIS                CNVKDIIS        .... off
+ Trust-Rad. Augm. Hess. CNVTRAH         .... auto
+   Auto Start mean grad. ratio tolernc. ....  1.125000
+   Auto Start start iteration           ....    50
+   Auto Start num. interpolation iter.  ....    10
+   Max. Number of Micro iterations      ....    24
+   Max. Number of Macro iterations      .... Maxiter - #DIIS iter
+   Number of Davidson start vectors     ....     2
+   Converg. threshold    (grad. norm)   ....   1.000e-05
+   Grad. Scal. Fac. for Micro threshold ....   0.100
+   Minimum threshold for Micro iter.    ....   1.000e-02
+   NR start threshold (gradient norm)   ....   1.000e-04
+   Initial trust radius                 ....   0.400
+   Minimum AH scaling param. (alpha)    ....   1.000
+   Maximum AH scaling param. (alpha)    .... 1000.000
+   Quad. conv. algorithm                .... NR
+   White noise on init. David. guess    .... on
+   Maximum white noise                  ....   0.010
+   Pseudo random numbers                .... off
+   Inactive MOs                         .... canonical
+   Orbital update algorithm             .... Taylor
+   Preconditioner                       .... Diag
+   Full preconditioner red. dimension   ....   250
+ SOSCF                 CNVSOSCF           .... on
+   Start iteration     SOSCFMaxIt         ....   150
+   Startup grad/error  SOSCFStart         ....  0.003300
+   Hessian update      SOSCFHessUp        .... L-BFGS
+   Autom. constraints  SOSCFAutoConstrain .... off
+ Level Shifting         CNVShift        .... on
+   Level shift para.    LevelShift      ....    0.2500
+   Turn off err/grad.   ShiftErr        ....    0.0010
+ Zerner damping         CNVZerner       .... off
+ Static damping         CNVDamp         .... on
+   Fraction old density DampFac         ....    0.7000
+   Max. Damping (<1)    DampMax         ....    0.9800
+   Min. Damping (>=0)   DampMin         ....    0.0000
+   Turn off err/grad.   DampErr         ....    0.1000
+
+SCF Procedure:
+ Maximum # iterations   MaxIter         ....   125
+ SCF integral mode      SCFMode         .... Direct
+   Integral package                     .... SHARK and LIBINT hybrid scheme
+ Reset frequency        DirectResetFreq ....    20
+ Integral Threshold     Thresh          ....  2.500e-11 Eh
+ Primitive CutOff       TCut            ....  2.500e-12 Eh
+
+Convergence Tolerance:
+ Convergence Check Mode ConvCheckMode   .... Total+1el-Energy
+ Convergence forced     ConvForced      .... 0
+ Energy Change          TolE            ....  1.000e-08 Eh
+ 1-El. energy change                    ....  1.000e-05 Eh
+ Orbital Gradient       TolG            ....  1.000e-05
+ Orbital Rotation angle TolX            ....  1.000e-05
+ DIIS Error             TolErr          ....  5.000e-07
+
+------------------------------
+INITIAL GUESS: MODEL POTENTIAL
+------------------------------
+Loading Hartree-Fock densities                     ... done
+Calculating cut-offs                               ... done
+Initializing the effective Hamiltonian             ... done
+Setting up the integral package (SHARK)            ... done
+Starting the Coulomb interaction                   ... done (   0.0 sec)
+Making the grid                                    ... done (   0.2 sec)
+Mapping shells                                     ... done
+Starting the XC term evaluation                    ... done (   0.0 sec)
+  promolecular density results
+     # of electrons  =     59.993897873
+     EX              =    -50.318918403
+     EC              =     -1.753462704
+     EX+EC           =    -52.072381107
+Transforming the Hamiltonian                       ... done (   0.0 sec)
+Diagonalizing the Hamiltonian                      ... done (   0.0 sec)
+Back transforming the eigenvectors                 ... done (   0.0 sec)
+Now organizing SCF variables                       ... done
+                      ------------------
+                      INITIAL GUESS DONE (   0.4 sec)
+                      ------------------
+             **** ENERGY FILE WAS UPDATED (/gpfs/fs2/scratch/kshao4/mlip/codes/X_semiactivelearning/dft_launches/p10_2gpu_6h/P10p0000GPa/acquisition/inputs/cluster_962.en.tmp) ****
+Finished Guess after   1.2 sec
+Maximum memory used throughout the entire GUESS-calculation: 15.1 MB
+[1793269387.307233] [bhc0184:8272 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269387.307387] [bhc0184:8273 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269387.307284] [bhc0184:8275 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269387.307320] [bhc0184:8276 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269387.307266] [bhc0184:8277 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269387.307195] [bhc0184:8278 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269387.307219] [bhc0184:8279 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269387.307173] [bhc0184:8280 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269387.307348] [bhc0184:8281 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269387.307335] [bhc0184:8282 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269387.307345] [bhc0184:8283 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269387.307301] [bhc0184:8284 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269387.307276] [bhc0184:8285 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269387.307311] [bhc0184:8286 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269387.307350] [bhc0184:8287 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269387.307294] [bhc0184:8288 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269387.307470] [bhc0184:8289 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269387.307412] [bhc0184:8290 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269387.307449] [bhc0184:8292 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269387.307329] [bhc0184:8293 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269387.307337] [bhc0184:8294 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269387.307356] [bhc0184:8295 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269387.307381] [bhc0184:8296 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269387.307178] [bhc0184:8297 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+
+
+           ************************************************************
+           *        Program running with 24 parallel MPI-processes    *
+           *              working on a common directory               *
+           ************************************************************
+
+-------------------------------------------------------------------------------------------
+                                      ORCA LEAN-SCF
+                              memory conserving SCF solver
+-------------------------------------------------------------------------------------------
+
+----------------------------------------D-I-I-S--------------------------------------------
+Iteration    Energy (Eh)           Delta-E    RMSDP     MaxDP     DIISErr   Damp  Time(sec)
+-------------------------------------------------------------------------------------------
+               ***  Starting incremental Fock matrix formation  ***
+    1    -433.2120336907873934     0.00e+00  3.29e-02  5.80e-01  7.35e-01  0.700   0.9
+Warning: op=0 Small HOMO/LUMO gap (  -1.808) - skipping pre-diagonalization
+         LevelShift set to 1.000 Eh
+         Will do a full diagonalization
+    2    -433.1157524380336099     9.63e-02  1.42e-02  1.74e-01  1.66e-01  0.700   1.3
+    3    -432.9289793628070129     1.87e-01  1.14e-02  1.60e-01  2.46e-01  0.700   0.6
+    4    -434.3699159171131896    -1.44e+00  7.68e-03  8.81e-02  2.40e-01  0.700   0.6
+    5    -434.6476588462163591    -2.78e-01  1.00e-02  1.81e-01  3.10e-01  0.700   0.6
+    6    -435.4635369355745524    -8.16e-01  6.94e-03  1.05e-01  2.13e-01  0.700   0.7
+    7    -435.5292117824058096    -6.57e-02  5.41e-03  1.04e-01  3.87e-01  0.700   0.6
+    8    -435.4336317139207040     9.56e-02  4.94e-03  9.68e-02  4.29e-01  0.700   0.6
+    9    -435.3510487114932630     8.26e-02  4.59e-03  8.60e-02  3.73e-01  0.700   0.6
+   10    -435.3038922742276782     4.72e-02  4.06e-03  7.30e-02  2.74e-01  0.700   0.6
+                               ***Turning on AO-DIIS***
+   11    -435.2820143106790738     2.19e-02  3.32e-03  5.82e-02  1.71e-01  0.700   0.7
+   12    -435.2777126315070291     4.30e-03  4.18e-03  4.70e-02  1.30e-01  0.700   0.6
+   13    -435.4346568221054667    -1.57e-01  5.79e-03  7.75e-02  1.64e-01  0.700   0.6
+   14    -435.8070359288029749    -3.72e-01  6.05e-03  8.41e-02  1.82e-01  0.700   0.6
+   15    -436.0062292551832570    -1.99e-01  5.98e-03  8.13e-02  3.83e-01  0.700   0.6
+   16    -435.7980582477721327     2.08e-01  5.49e-03  8.87e-02  5.07e-01  0.700   0.6
+   17    -435.1712349825935462     6.27e-01  4.59e-03  7.41e-02  5.94e-01  0.700   0.6
+   18    -434.3558649904924778     8.15e-01  3.58e-03  5.30e-02  7.69e-01  0.700   0.6
+   19    -433.5978871030489472     7.58e-01  2.81e-03  3.90e-02  8.31e-01  0.700   0.7
+   20    -433.0577035774413162     5.40e-01  2.80e-03  3.32e-02  8.45e-01  0.700   0.6
+               *** Restarting incremental Fock matrix formation ***
+                             ****Resetting DIIS****
+Warning: op=0 Small HOMO/LUMO gap (  -2.396) - skipping pre-diagonalization
+         LevelShift set to 1.000 Eh
+         Will do a full diagonalization
+   21    -432.8546425424868858     2.03e-01  1.49e-02  3.22e-01  8.32e-01  0.700   0.7
+   22    -435.5152486148083426    -2.66e+00  9.13e-03  1.18e-01  2.30e-01  0.700   0.6
+   23    -436.1118245352802205    -5.97e-01  6.93e-03  1.28e-01  2.96e-01  0.700   0.6
+   24    -436.0720527311925707     3.98e-02  5.78e-03  1.42e-01  4.05e-01  0.700   0.6
+   25    -435.8529011548674816     2.19e-01  4.97e-03  1.38e-01  5.21e-01  0.700   0.6
+   26    -435.5942002946294451     2.59e-01  4.18e-03  1.20e-01  6.16e-01  0.700   0.6
+   27    -435.3539809838202927     2.40e-01  3.42e-03  9.73e-02  6.86e-01  0.700   0.6
+   28    -435.1505883784020625     2.03e-01  3.03e-03  7.61e-02  7.37e-01  0.700   0.6
+   29    -435.0582507783734627     9.23e-02  3.32e-03  5.69e-02  7.32e-01  0.700   0.6
+   30    -435.1066427142412749    -4.84e-02  4.24e-03  5.27e-02  6.51e-01  0.700   0.6
+   31    -435.3126182239047921    -2.06e-01  7.24e-03  8.25e-02  4.90e-01  0.700   0.6
+   32    -436.0195075125075164    -7.07e-01  7.06e-03  9.43e-02  2.96e-01  0.700   0.6
+   33    -436.3502844597097692    -3.31e-01  5.84e-03  8.87e-02  2.41e-01  0.700   0.6
+   34    -436.2613961082865899     8.89e-02  5.00e-03  6.97e-02  2.92e-01  0.700   1.3
+   35    -435.9612653593336518     3.00e-01  4.45e-03  6.25e-02  4.92e-01  0.700   0.6
+   36    -435.5578200105044289     4.03e-01  4.00e-03  7.17e-02  6.55e-01  0.700   0.6
+   37    -435.1329539747091530     4.25e-01  3.51e-03  7.23e-02  7.85e-01  0.700   0.7
+   38    -434.7935414349976782     3.39e-01  3.14e-03  7.65e-02  8.63e-01  0.700   1.5
+   39    -434.6721166893762529     1.21e-01  3.27e-03  6.97e-02  8.99e-01  0.700   0.6
+   40    -434.8993749140419141    -2.27e-01  5.16e-03  7.99e-02  8.76e-01  0.700   0.7
+               *** Restarting incremental Fock matrix formation ***
+                             ****Resetting DIIS****
+Warning: op=0 Small HOMO/LUMO gap (  -0.626) - skipping pre-diagonalization
+         LevelShift set to 0.726 Eh
+         Will do a full diagonalization
+   41    -435.6533998221055981    -7.54e-01  9.84e-03  1.60e-01  6.51e-01  0.700   1.1
+   42    -436.3950016244890548    -7.42e-01  6.53e-03  8.69e-02  2.31e-01  0.700   0.6
+   43    -436.4557824918687174    -6.08e-02  4.83e-03  7.59e-02  2.88e-01  0.700   0.6
+   44    -436.3502485138733391     1.06e-01  3.79e-03  6.02e-02  3.75e-01  0.700   0.7
+   45    -436.2201200123304261     1.30e-01  2.99e-03  4.75e-02  4.18e-01  0.700   0.6
+   46    -436.1168838348081636     1.03e-01  2.39e-03  4.31e-02  4.31e-01  0.700   0.6
+   47    -436.0522159211939197     6.47e-02  2.12e-03  3.82e-02  4.27e-01  0.700   0.6
+   48    -436.0328464442227414     1.94e-02  3.45e-03  4.18e-02  4.02e-01  0.700   0.6
+   49    -436.2368965470187732    -2.04e-01  4.51e-03  5.48e-02  2.81e-01  0.700   0.6
+   50    -436.4905407426581405    -2.54e-01  3.90e-03  6.36e-02  2.04e-01  0.700   0.6
+
+       ******************************************************************************
+       ***                                                                        ***
+       ***                               Auto-TRAH                                ***
+       ***                               ---------                                ***
+       *** the maximum gradient error decreased on average only by a factor   1.0 ***
+       *** during the last  10 iterations                                         ***
+       ***                                                                        ***
+       ***               Leaving SCF to start the TRAH-SCF procedure              ***
+       ***                                                                        ***
+       ******************************************************************************
+
+ --------------------------------------------------------------------------------------------
+   Iter.        energy            ||Error||_2        Shift      TRadius  Mac/Mic        Rej.
+ --------------------------------------------------------------------------------------------
+    0       -436.251091829052     3.202398e+00                     0.400 (TRAH MAcro)   No
+WARNING: 45 diagonal Hessian elements are negative!
+WARNING : negative HOMO - LUMO gap : -0.434810
+WARNING : negative HOMO - LUMO gap : -0.434810
+    0     dE    -5.524371e-01     7.274879e-01    -1.0017e+00      0.321 (TRAH MIcro)
+    0     dE    -6.095159e-01     3.323449e-01    -1.0599e+00      0.387 (TRAH MIcro)
+    0     dE    -6.233347e-01     1.488675e-01    -1.3192e+00      0.400 (TRAH MIcro)
+    0     dE    -6.278517e-01     1.603062e-01    -1.5804e+00      0.400 (TRAH MIcro)
+    0     dE    -5.896528e-01     1.051819e-01    -2.0780e+00      0.340 (TRAH MIcro)
+    0     dE    -5.913181e-01     3.739458e-02    -2.0812e+00      0.341 (TRAH MIcro)
+    0     dE    -5.911426e-01     1.423253e-02    -2.0816e+00      0.341 (TRAH MIcro)
+    0     dE    -5.918135e-01     4.994801e-03    -2.0816e+00      0.342 (TRAH MIcro)
+    1       -436.780909848642     4.368177e-01                     0.480 (TRAH MAcro)   No
+WARNING: 2 diagonal Hessian elements are negative!
+WARNING : negative HOMO - LUMO gap : -0.006584
+WARNING : negative HOMO - LUMO gap : -0.006584
+    1     dE    -1.145045e-02     4.227864e-01    -2.2807e-02      0.064 (TRAH MIcro)
+    1     dE    -4.053604e-02     4.955587e-01    -9.9849e-02      0.480 (TRAH MIcro)
+    1     dE    -5.150499e-02     2.903271e-01    -4.0157e-01      0.376 (TRAH MIcro)
+    1     dE    -6.656102e-02     1.446058e-01    -5.1053e-01      0.382 (TRAH MIcro)
+    1     dE    -7.326863e-02     1.049961e-01    -5.3274e-01      0.400 (TRAH MIcro)
+    1     dE    -7.939700e-02     6.938893e-02    -5.6072e-01      0.410 (TRAH MIcro)
+    1     dE    -8.982378e-02     6.690249e-02    -5.6619e-01      0.450 (TRAH MIcro)
+    1     dE    -9.860348e-02     4.018603e-02    -5.7934e-01      0.480 (TRAH MIcro)
+    1     dE    -9.884270e-02     2.449473e-02    -5.8382e-01      0.480 (TRAH MIcro)
+    1     dE    -9.892895e-02     1.025566e-02    -5.8603e-01      0.480 (TRAH MIcro)
+    1     dE    -9.893676e-02     3.536910e-03    -5.8578e-01      0.480 (TRAH MIcro)
+    2       -436.862316041817     2.162743e-01                     0.576 (TRAH MAcro)   No
+WARNING : small    HOMO - LUMO gap : 0.014659
+WARNING : small    HOMO - LUMO gap : 0.014659
+    2     dE    -1.099679e-02     3.261888e-01    -2.1704e-02      0.116 (TRAH MIcro)
+    2     dE    -8.366962e-02     3.131252e-01    -2.1385e-01      0.575 (TRAH MIcro)
+    2     dE    -9.875683e-02     1.552751e-01    -3.0453e-01      0.576 (TRAH MIcro)
+    2     dE    -1.020899e-01     1.334438e-01    -3.2618e-01      0.576 (TRAH MIcro)
+    2     dE    -1.086085e-01     1.375232e-01    -3.8318e-01      0.576 (TRAH MIcro)
+    2     dE    -1.098034e-01     6.844860e-02    -3.9760e-01      0.576 (TRAH MIcro)
+    2     dE    -1.107611e-01     3.916074e-02    -4.1025e-01      0.576 (TRAH MIcro)
+    2     dE    -1.098587e-01     2.064356e-02    -4.1519e-01      0.571 (TRAH MIcro)
+    2     dE    -1.107417e-01     1.486525e-02    -4.1540e-01      0.575 (TRAH MIcro)
+    2     dE    -1.110899e-01     8.620517e-03    -4.1551e-01      0.576 (TRAH MIcro)
+    3       -436.944095802725     2.102694e-01                     0.576 (TRAH MAcro)   No
+WARNING : small    HOMO - LUMO gap : 0.010133
+WARNING : small    HOMO - LUMO gap : 0.010133
+    3     dE    -8.384061e-03     1.969018e-01    -1.6563e-02      0.111 (TRAH MIcro)
+    3     dE    -2.853052e-02     4.115820e-01    -4.6984e-02      0.463 (TRAH MIcro)
+    3     dE    -5.274612e-02     1.215714e-01    -1.8730e-01      0.554 (TRAH MIcro)
+    3     dE    -5.425635e-02     1.020777e-01    -1.9230e-01      0.555 (TRAH MIcro)
+    3     dE    -5.414161e-02     8.769954e-02    -1.9890e-01      0.537 (TRAH MIcro)
+    3     dE    -5.944268e-02     6.076009e-02    -1.8594e-01      0.576 (TRAH MIcro)
+    3     dE    -5.999826e-02     3.292020e-02    -1.8204e-01      0.576 (TRAH MIcro)
+    3     dE    -6.019145e-02     1.269912e-02    -1.7777e-01      0.576 (TRAH MIcro)
+    3     dE    -6.023032e-02     6.043197e-03    -1.7605e-01      0.576 (TRAH MIcro)
+    4       -436.977800878534     1.270458e-01                     0.576 (TRAH MAcro)   No
+WARNING : small    HOMO - LUMO gap : 0.014660
+WARNING : small    HOMO - LUMO gap : 0.014660
+    4     dE    -2.648502e-03     1.207298e-01    -5.2789e-03      0.058 (TRAH MIcro)
+    4     dE    -5.685329e-03     1.105716e-01    -1.1065e-02      0.166 (TRAH MIcro)
+    4     dE    -1.029516e-02     2.602043e-01    -1.7618e-02      0.411 (TRAH MIcro)
+    4     dE    -3.234114e-02     4.844987e-02    -1.5075e-01      0.575 (TRAH MIcro)
+    4     dE    -3.263450e-02     2.738752e-02    -1.5283e-01      0.576 (TRAH MIcro)
+    4     dE    -3.276285e-02     1.150964e-02    -1.5433e-01      0.576 (TRAH MIcro)
+    4     dE    -3.277667e-02     3.892648e-03    -1.5457e-01      0.576 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -3.277666921304e-02
+  actual energy  change   =     4.199131926379e-02
+  energy change ratio     = -1.281134
+  old trust radius        = 0.576000
+  new trust radius        = 0.385920
+  reject step?            = YES
+    5       -436.935809559270     1.270458e-01                     0.386 (TRAH MAcro)  Yes
+    6       -436.935809559270     6.327027e-01                     0.386 (TRAH MAcro)   No
+WARNING: 2 diagonal Hessian elements are negative!
+WARNING : negative HOMO - LUMO gap : -0.087751
+WARNING : negative HOMO - LUMO gap : -0.087751
+    6     dE    -5.374452e-02     3.990109e-01    -1.0321e-01      0.204 (TRAH MIcro)
+    6     dE    -5.730379e-02     2.956943e-01    -1.0874e-01      0.232 (TRAH MIcro)
+    6     dE    -8.319162e-02     2.018095e-01    -4.3627e-01      0.354 (TRAH MIcro)
+    6     dE    -9.358437e-02     1.637779e-02    -5.4026e-01      0.386 (TRAH MIcro)
+    6     dE    -9.360396e-02     4.877007e-03    -5.4080e-01      0.386 (TRAH MIcro)
+    7       -436.983872047098     1.999566e-01                     0.386 (TRAH MAcro)   No
+WARNING : small    HOMO - LUMO gap : 0.019120
+WARNING : small    HOMO - LUMO gap : 0.019120
+    7     dE    -4.479879e-03     7.245797e-02    -8.9309e-03      0.057 (TRAH MIcro)
+    7     dE    -4.895460e-03     6.116844e-02    -9.7528e-03      0.063 (TRAH MIcro)
+    7     dE    -6.946617e-03     7.291380e-02    -1.3282e-02      0.215 (TRAH MIcro)
+    7     dE    -1.036333e-02     6.057140e-02    -5.3920e-02      0.358 (TRAH MIcro)
+    7     dE    -1.134381e-02     4.350485e-02    -6.0042e-02      0.386 (TRAH MIcro)
+    7     dE    -1.146263e-02     1.816783e-02    -6.5775e-02      0.381 (TRAH MIcro)
+    7     dE    -1.163529e-02     8.539791e-03    -6.6408e-02      0.386 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -1.163529384482e-02
+  actual energy  change   =     1.233514848877e-02
+  energy change ratio     = -1.060149
+  old trust radius        = 0.385920
+  new trust radius        = 0.258566
+  reject step?            = YES
+    8       -436.971536898609     1.999566e-01                     0.259 (TRAH MAcro)  Yes
+    9       -436.971536898609     2.553460e-01                     0.259 (TRAH MAcro)   No
+WARNING: 1 diagonal Hessian elements are negative!
+WARNING : negative HOMO - LUMO gap : -0.042837
+WARNING : negative HOMO - LUMO gap : -0.042837
+    9     dE    -1.401447e-02     1.850594e-01    -2.7530e-02      0.135 (TRAH MIcro)
+    9     dE    -1.489066e-02     1.452403e-01    -2.9154e-02      0.147 (TRAH MIcro)
+    9     dE    -1.542695e-02     1.146975e-01    -3.0115e-02      0.157 (TRAH MIcro)
+    9     dE    -2.012261e-02     1.934885e-01    -9.4101e-02      0.259 (TRAH MIcro)
+    9     dE    -1.441913e-02     1.283132e-02    -5.2567e-01      0.115 (TRAH MIcro)
+    9     dE    -1.458883e-02     6.964086e-03    -5.2725e-01      0.117 (TRAH MIcro)
+   10       -436.986101669286     6.644635e-02                     0.310 (TRAH MAcro)   No
+   10     dE    -1.989093e-03     7.275083e-02    -3.9615e-03      0.065 (TRAH MIcro)
+   10     dE    -2.155282e-03     5.323454e-02    -4.2897e-03      0.070 (TRAH MIcro)
+   10     dE    -2.533807e-03     3.696598e-02    -5.0349e-03      0.081 (TRAH MIcro)
+   10     dE    -2.621238e-03     2.271124e-02    -5.2053e-03      0.084 (TRAH MIcro)
+   10     dE    -3.113125e-03     1.033435e-01    -6.0384e-03      0.176 (TRAH MIcro)
+   10     dE    -2.944518e-03     8.909002e-03    -1.1530e-01      0.097 (TRAH MIcro)
+   10     dE    -3.022954e-03     4.299253e-03    -1.1580e-01      0.103 (TRAH MIcro)
+   11       -436.989277225949     2.022452e-02                     0.372 (TRAH MAcro)   No
+   11     dE    -3.201660e-04     2.477618e-02    -6.3965e-04      0.033 (TRAH MIcro)
+   11     dE    -3.764526e-04     3.528894e-02    -7.5175e-04      0.039 (TRAH MIcro)
+   11     dE    -6.049602e-04     3.070522e-02    -1.2023e-03      0.079 (TRAH MIcro)
+   11     dE    -7.665231e-04     2.795982e-02    -1.5085e-03      0.128 (TRAH MIcro)
+   11     dE    -9.346959e-04     2.982403e-02    -1.8100e-03      0.181 (TRAH MIcro)
+   11     dE    -1.015924e-03     2.552346e-02    -1.9467e-03      0.209 (TRAH MIcro)
+   11     dE    -1.102668e-03     8.063632e-03    -2.0859e-03      0.239 (TRAH MIcro)
+   11     dE    -1.120954e-03     1.106145e-02    -2.1158e-03      0.244 (TRAH MIcro)
+   11     dE    -1.155586e-03     1.634032e-02    -2.1739e-03      0.251 (TRAH MIcro)
+   11     dE    -1.222397e-03     2.145857e-02    -2.2830e-03      0.266 (TRAH MIcro)
+   11     dE    -1.339877e-03     2.809390e-02    -2.4595e-03      0.299 (TRAH MIcro)
+   11     dE    -1.576425e-03     3.266298e-02    -2.9841e-03      0.372 (TRAH MIcro)
+   11     dE    -1.729548e-03     2.332618e-02    -5.8709e-03      0.371 (TRAH MIcro)
+   11     dE    -1.790699e-03     1.668254e-02    -6.8127e-03      0.372 (TRAH MIcro)
+   11     dE    -1.822497e-03     1.311212e-02    -7.3540e-03      0.372 (TRAH MIcro)
+   11     dE    -1.843073e-03     6.359688e-03    -7.7126e-03      0.372 (TRAH MIcro)
+   11     dE    -1.842886e-03     3.015726e-03    -7.8244e-03      0.371 (TRAH MIcro)
+   11     dE    -1.845949e-03     1.645125e-03    -7.8294e-03      0.372 (TRAH MIcro)
+   12       -436.990142384616     7.272361e-02                     0.372 (TRAH MAcro)   No
+   12     dE    -1.888422e-04     5.488505e-02    -3.7760e-04      0.015 (TRAH MIcro)
+   12     dE    -3.430190e-04     4.520684e-02    -6.8534e-04      0.032 (TRAH MIcro)
+   12     dE    -4.196646e-04     1.875664e-02    -8.3791e-04      0.041 (TRAH MIcro)
+   12     dE    -5.202177e-04     1.943459e-02    -1.0375e-03      0.053 (TRAH MIcro)
+   12     dE    -5.446000e-04     7.610072e-03    -1.0850e-03      0.062 (TRAH MIcro)
+   12     dE    -5.521283e-04     4.956377e-03    -1.0995e-03      0.066 (TRAH MIcro)
+   13       -436.990760940080     7.995911e-03                     0.447 (TRAH MAcro)   No
+   13     dE    -1.307579e-05     1.030037e-02    -2.6151e-05      0.005 (TRAH MIcro)
+   13     dE    -2.381224e-05     1.028498e-02    -4.7619e-05      0.011 (TRAH MIcro)
+   13     dE    -2.986519e-05     5.152646e-03    -5.9718e-05      0.014 (TRAH MIcro)
+   13     dE    -4.565741e-05     6.966243e-03    -9.1260e-05      0.024 (TRAH MIcro)
+   13     dE    -5.036959e-05     5.872323e-03    -1.0066e-04      0.028 (TRAH MIcro)
+   13     dE    -5.634561e-05     5.440102e-03    -1.1258e-04      0.032 (TRAH MIcro)
+   13     dE    -1.087592e-04     2.833018e-02    -2.1631e-04      0.075 (TRAH MIcro)
+   13     dE    -2.605427e-04     2.164550e-02    -4.9625e-04      0.224 (TRAH MIcro)
+   13     dE    -3.571734e-04     1.910874e-02    -6.5328e-04      0.306 (TRAH MIcro)
+   13     dE    -4.485066e-04     2.513010e-02    -7.8727e-04      0.373 (TRAH MIcro)
+   13     dE    -5.796087e-04     2.349006e-02    -1.1549e-03      0.447 (TRAH MIcro)
+   13     dE    -6.358243e-04     9.982542e-03    -1.7366e-03      0.447 (TRAH MIcro)
+   13     dE    -6.422349e-04     3.938632e-03    -1.8045e-03      0.447 (TRAH MIcro)
+   13     dE    -6.433504e-04     1.920688e-03    -1.8166e-03      0.447 (TRAH MIcro)
+   13     dE    -6.437541e-04     1.038281e-03    -1.8212e-03      0.447 (TRAH MIcro)
+   13     dE    -6.438930e-04     7.365717e-04    -1.8229e-03      0.447 (TRAH MIcro)
+   14       -436.990844904479     1.137380e-01                     0.299 (TRAH MAcro)   No
+   14     dE    -3.304765e-04     1.133590e-02    -6.6089e-04      0.010 (TRAH MIcro)
+   14     dE    -3.348342e-04     6.786611e-03    -6.6961e-04      0.009 (TRAH MIcro)
+   15       -436.991179816818     6.756475e-03                     0.359 (TRAH MAcro)   No
+   15     dE    -1.087282e-06     6.274577e-03    -2.1746e-06      0.001 (TRAH MIcro)
+   15     dE    -3.190910e-06     2.334685e-03    -6.3818e-06      0.003 (TRAH MIcro)
+   15     dE    -4.243914e-06     3.357886e-03    -8.4877e-06      0.004 (TRAH MIcro)
+   15     dE    -4.760636e-06     4.083134e-03    -9.5210e-06      0.005 (TRAH MIcro)
+   15     dE    -6.450978e-06     3.925169e-03    -1.2901e-05      0.010 (TRAH MIcro)
+   15     dE    -7.774317e-06     3.479262e-03    -1.5545e-05      0.015 (TRAH MIcro)
+   15     dE    -1.097965e-05     6.689961e-03    -2.1944e-05      0.026 (TRAH MIcro)
+   15     dE    -1.705651e-05     6.204146e-03    -3.4041e-05      0.046 (TRAH MIcro)
+   15     dE    -2.541142e-05     9.359241e-03    -5.0553e-05      0.073 (TRAH MIcro)
+   15     dE    -3.608651e-05     9.564706e-03    -7.1354e-05      0.107 (TRAH MIcro)
+   15     dE    -5.568183e-05     1.929741e-02    -1.0825e-04      0.169 (TRAH MIcro)
+   15     dE    -1.244755e-04     1.644048e-02    -2.5729e-04      0.359 (TRAH MIcro)
+   15     dE    -1.382823e-04     7.056242e-03    -4.7878e-04      0.359 (TRAH MIcro)
+   15     dE    -1.409136e-04     3.285462e-03    -5.2156e-04      0.359 (TRAH MIcro)
+   15     dE    -1.421218e-04     2.654690e-03    -5.4203e-04      0.359 (TRAH MIcro)
+   15     dE    -1.434447e-04     4.186999e-03    -5.6670e-04      0.359 (TRAH MIcro)
+   15     dE    -1.472276e-04     5.732798e-03    -6.4186e-04      0.359 (TRAH MIcro)
+   15     dE    -1.617028e-04     1.521615e-02    -9.4890e-04      0.359 (TRAH MIcro)
+   15     dE    -1.680749e-04     7.387079e-03    -1.4919e-03      0.332 (TRAH MIcro)
+   15     dE    -1.790473e-04     3.881228e-03    -1.5193e-03      0.348 (TRAH MIcro)
+   15     dE    -1.819342e-04     1.351900e-03    -1.5261e-03      0.352 (TRAH MIcro)
+   15     dE    -1.825448e-04     8.204052e-04    -1.5276e-03      0.352 (TRAH MIcro)
+   15     dE    -1.828488e-04     8.891673e-04    -1.5284e-03      0.353 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -1.828488028473e-04
+  actual energy  change   =     5.773159570538e-03
+  energy change ratio     = -31.573406
+  old trust radius        = 0.359229
+  new trust radius        = 0.240684
+  reject step?            = YES
+   16       -436.985406657248     6.756475e-03                     0.241 (TRAH MAcro)  Yes
+   17       -436.985406657248     2.566063e-01                     0.241 (TRAH MAcro)   No
+   17     dE    -5.627310e-03     6.621710e-02    -1.1221e-02      0.055 (TRAH MIcro)
+   17     dE    -5.861626e-03     2.244152e-02    -1.1675e-02      0.064 (TRAH MIcro)
+   17     dE    -5.888151e-03     2.301942e-02    -1.1727e-02      0.065 (TRAH MIcro)
+   17     dE    -5.922396e-03     8.242318e-03    -1.1794e-02      0.065 (TRAH MIcro)
+   18       -436.991314237456     8.776222e-03                     0.289 (TRAH MAcro)   No
+   18     dE    -1.010579e-05     9.312007e-03    -2.0211e-05      0.006 (TRAH MIcro)
+   18     dE    -1.633726e-05     6.399238e-03    -3.2672e-05      0.010 (TRAH MIcro)
+   18     dE    -1.772769e-05     3.093158e-03    -3.5452e-05      0.010 (TRAH MIcro)
+   18     dE    -1.910224e-05     1.677952e-03    -3.8201e-05      0.010 (TRAH MIcro)
+   18     dE    -1.947985e-05     1.214627e-03    -3.8955e-05      0.010 (TRAH MIcro)
+   18     dE    -2.004885e-05     2.010092e-03    -4.0092e-05      0.012 (TRAH MIcro)
+   18     dE    -2.136213e-05     3.245559e-03    -4.2715e-05      0.015 (TRAH MIcro)
+   18     dE    -2.420069e-05     4.525414e-03    -4.8373e-05      0.024 (TRAH MIcro)
+   18     dE    -3.895986e-05     1.160467e-02    -7.7373e-05      0.084 (TRAH MIcro)
+   18     dE    -7.144991e-05     1.164175e-02    -1.3667e-04      0.213 (TRAH MIcro)
+   18     dE    -8.314885e-05     6.443409e-03    -1.5606e-04      0.256 (TRAH MIcro)
+   18     dE    -8.671665e-05     1.974935e-03    -1.6175e-04      0.269 (TRAH MIcro)
+   18     dE    -8.734600e-05     1.462919e-03    -1.6274e-04      0.271 (TRAH MIcro)
+   18     dE    -8.779575e-05     1.786688e-03    -1.6345e-04      0.273 (TRAH MIcro)
+   18     dE    -8.834107e-05     1.748006e-03    -1.6429e-04      0.275 (TRAH MIcro)
+   18     dE    -8.908876e-05     1.680100e-03    -1.6542e-04      0.278 (TRAH MIcro)
+   18     dE    -8.981698e-05     1.359242e-03    -1.6650e-04      0.281 (TRAH MIcro)
+   18     dE    -9.034990e-05     1.496011e-03    -1.6729e-04      0.283 (TRAH MIcro)
+   18     dE    -9.208952e-05     3.964618e-03    -1.8464e-04      0.289 (TRAH MIcro)
+   18     dE    -9.512538e-05     4.126314e-03    -2.8983e-04      0.289 (TRAH MIcro)
+   18     dE    -9.716771e-05     2.442717e-03    -3.6442e-04      0.289 (TRAH MIcro)
+   18     dE    -9.780110e-05     1.114527e-03    -3.8799e-04      0.289 (TRAH MIcro)
+   18     dE    -9.789003e-05     5.207723e-04    -3.9122e-04      0.289 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -9.789002664794e-05
+  actual energy  change   =     2.367161016934e-03
+  energy change ratio     = -24.181841
+  old trust radius        = 0.288820
+  new trust radius        = 0.193510
+  reject step?            = YES
+   19       -436.988947076439     8.776222e-03                     0.194 (TRAH MAcro)  Yes
+   20       -436.988947076439     1.665273e-01                     0.194 (TRAH MAcro)   No
+   20     dE    -2.370262e-03     4.114162e-02    -4.7342e-03      0.037 (TRAH MIcro)
+   20     dE    -2.452880e-03     1.319847e-02    -4.8973e-03      0.041 (TRAH MIcro)
+   20     dE    -2.458494e-03     1.181936e-02    -4.9085e-03      0.042 (TRAH MIcro)
+   20     dE    -2.470122e-03     4.647811e-03    -4.9315e-03      0.042 (TRAH MIcro)
+   21       -436.991427277005     4.999887e-03                     0.232 (TRAH MAcro)   No
+   21     dE    -1.535289e-06     4.497614e-03    -3.0706e-06      0.001 (TRAH MIcro)
+   21     dE    -5.241336e-06     2.621528e-03    -1.0482e-05      0.005 (TRAH MIcro)
+   21     dE    -5.367588e-06     2.188647e-03    -1.0735e-05      0.005 (TRAH MIcro)
+   21     dE    -5.894138e-06     1.233764e-03    -1.1788e-05      0.006 (TRAH MIcro)
+   21     dE    -6.062649e-06     1.027837e-03    -1.2125e-05      0.006 (TRAH MIcro)
+   21     dE    -6.239788e-06     1.162549e-03    -1.2479e-05      0.006 (TRAH MIcro)
+   21     dE    -6.544641e-06     1.205054e-03    -1.3088e-05      0.008 (TRAH MIcro)
+   21     dE    -7.371604e-06     3.413419e-03    -1.4741e-05      0.012 (TRAH MIcro)
+   21     dE    -1.241486e-05     5.829261e-03    -2.4771e-05      0.049 (TRAH MIcro)
+   21     dE    -1.764399e-05     3.598225e-03    -3.5020e-05      0.087 (TRAH MIcro)
+   21     dE    -1.986024e-05     2.670690e-03    -3.9297e-05      0.104 (TRAH MIcro)
+   21     dE    -2.039660e-05     1.465816e-03    -4.0325e-05      0.108 (TRAH MIcro)
+   21     dE    -2.062599e-05     6.140313e-04    -4.0763e-05      0.109 (TRAH MIcro)
+   21     dE    -2.067748e-05     3.867250e-04    -4.0862e-05      0.110 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -2.067747913373e-05
+  actual energy  change   =     2.458894891788e-05
+  energy change ratio     = -1.189166
+  old trust radius        = 0.232212
+  new trust radius        = 0.155582
+  reject step?            = YES
+   22       -436.991402688056     4.999887e-03                     0.156 (TRAH MAcro)  Yes
+   23       -436.991402688056     2.358020e-02                     0.156 (TRAH MAcro)   No
+   23     dE    -4.791852e-05     5.656517e-03    -9.5834e-05      0.005 (TRAH MIcro)
+   23     dE    -4.951483e-05     2.210462e-03    -9.9026e-05      0.006 (TRAH MIcro)
+   24       -436.991452273448     2.202955e-03                     0.187 (TRAH MAcro)   No
+   24     dE    -9.905980e-08     1.959968e-03    -1.9812e-07      0.000 (TRAH MIcro)
+   24     dE    -3.003443e-07     8.191823e-04    -6.0069e-07      0.001 (TRAH MIcro)
+   24     dE    -3.826788e-07     7.682135e-04    -7.6536e-07      0.001 (TRAH MIcro)
+   24     dE    -4.691094e-07     1.153114e-03    -9.3822e-07      0.001 (TRAH MIcro)
+   24     dE    -5.565334e-07     7.638712e-04    -1.1131e-06      0.002 (TRAH MIcro)
+   24     dE    -6.230271e-07     1.197689e-03    -1.2460e-06      0.003 (TRAH MIcro)
+   24     dE    -8.051632e-07     1.655995e-03    -1.6103e-06      0.005 (TRAH MIcro)
+   24     dE    -1.345284e-06     3.687617e-03    -2.6901e-06      0.013 (TRAH MIcro)
+   24     dE    -1.954007e-06     2.425127e-03    -3.9062e-06      0.022 (TRAH MIcro)
+   24     dE    -2.266760e-06     1.345240e-03    -4.5304e-06      0.026 (TRAH MIcro)
+   24     dE    -2.614896e-06     2.468785e-03    -5.2249e-06      0.031 (TRAH MIcro)
+   24     dE    -3.346157e-06     1.863540e-03    -6.6815e-06      0.040 (TRAH MIcro)
+   24     dE    -4.213859e-06     3.138829e-03    -8.4048e-06      0.052 (TRAH MIcro)
+   24     dE    -5.417586e-06     2.731619e-03    -1.0783e-05      0.070 (TRAH MIcro)
+   24     dE    -5.954122e-06     1.366896e-03    -1.1837e-05      0.077 (TRAH MIcro)
+   24     dE    -6.067276e-06     3.732852e-04    -1.2059e-05      0.079 (TRAH MIcro)
+   24     dE    -6.083896e-06     2.938585e-04    -1.2092e-05      0.079 (TRAH MIcro)
+   24     dE    -6.127705e-06     7.043559e-04    -1.2177e-05      0.080 (TRAH MIcro)
+   24     dE    -6.273890e-06     1.186955e-03    -1.2462e-05      0.083 (TRAH MIcro)
+   24     dE    -6.728966e-06     2.159326e-03    -1.3346e-05      0.092 (TRAH MIcro)
+   24     dE    -8.264883e-06     3.455423e-03    -1.6274e-05      0.125 (TRAH MIcro)
+   24     dE    -9.739254e-06     2.095310e-03    -1.8991e-05      0.160 (TRAH MIcro)
+   24     dE    -1.014105e-05     7.969085e-04    -1.9714e-05      0.170 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -1.014105192051e-05
+  actual energy  change   =     2.285271326627e-04
+  energy change ratio     = -22.534855
+  old trust radius        = 0.186698
+  new trust radius        = 0.125088
+  reject step?            = YES
+   25       -436.991223746315     2.202955e-03                     0.125 (TRAH MAcro)  Yes
+   26       -436.991223746314     5.070716e-02                     0.125 (TRAH MAcro)   No
+   26     dE    -2.213132e-04     1.233392e-02    -4.4257e-04      0.012 (TRAH MIcro)
+   26     dE    -2.285263e-04     4.331771e-03    -4.5698e-04      0.013 (TRAH MIcro)
+   27       -436.991453020982     4.302476e-03                     0.125 (TRAH MAcro)   No
+   27     dE    -3.854424e-07     3.854515e-03    -7.7088e-07      0.001 (TRAH MIcro)
+   27     dE    -1.133879e-06     1.852521e-03    -2.2678e-06      0.002 (TRAH MIcro)
+   27     dE    -1.333617e-06     1.017511e-03    -2.6672e-06      0.002 (TRAH MIcro)
+   27     dE    -1.699538e-06     1.629658e-03    -3.3991e-06      0.002 (TRAH MIcro)
+   27     dE    -1.805870e-06     6.337792e-04    -3.6117e-06      0.003 (TRAH MIcro)
+   27     dE    -1.841854e-06     9.191353e-04    -3.6837e-06      0.003 (TRAH MIcro)
+   27     dE    -1.959006e-06     1.115849e-03    -3.9180e-06      0.004 (TRAH MIcro)
+   27     dE    -2.382852e-06     4.000044e-03    -4.7654e-06      0.008 (TRAH MIcro)
+   27     dE    -3.501217e-06     4.794288e-03    -6.9994e-06      0.021 (TRAH MIcro)
+   27     dE    -4.858037e-06     2.413242e-03    -9.7029e-06      0.037 (TRAH MIcro)
+   27     dE    -5.775704e-06     3.242861e-03    -1.1525e-05      0.048 (TRAH MIcro)
+   27     dE    -6.451484e-06     1.164364e-03    -1.2863e-05      0.056 (TRAH MIcro)
+   27     dE    -6.581843e-06     8.641453e-04    -1.3121e-05      0.057 (TRAH MIcro)
+   27     dE    -6.702956e-06     1.027227e-03    -1.3360e-05      0.058 (TRAH MIcro)
+   27     dE    -6.928615e-06     1.443497e-03    -1.3806e-05      0.061 (TRAH MIcro)
+   27     dE    -7.115167e-06     5.520027e-04    -1.4173e-05      0.063 (TRAH MIcro)
+   27     dE    -7.140307e-06     2.574565e-04    -1.4223e-05      0.064 (TRAH MIcro)
+   28       -436.991456035629     5.648162e-03                     0.125 (TRAH MAcro)   No
+   28     dE    -2.612676e-06     1.689593e-03    -5.2253e-06      0.001 (TRAH MIcro)
+   28     dE    -2.737556e-06     6.311677e-04    -5.4751e-06      0.001 (TRAH MIcro)
+   28     dE    -2.749202e-06     4.117298e-04    -5.4984e-06      0.001 (TRAH MIcro)
+   29       -436.991458782867     4.112102e-04                     0.150 (TRAH MAcro)   No
+   29     dE    -7.572516e-09     4.480795e-04    -1.5145e-08      0.000 (TRAH MIcro)
+   29     dE    -2.335697e-08     2.849171e-04    -4.6714e-08      0.000 (TRAH MIcro)
+   29     dE    -7.226538e-08     6.293446e-04    -1.4453e-07      0.001 (TRAH MIcro)
+   29     dE    -9.341453e-08     7.099400e-04    -1.8683e-07      0.001 (TRAH MIcro)
+   29     dE    -2.462360e-07     9.282979e-04    -4.9247e-07      0.004 (TRAH MIcro)
+   29     dE    -7.699537e-07     2.308110e-03    -1.5397e-06      0.012 (TRAH MIcro)
+   29     dE    -1.208840e-06     1.253567e-03    -2.4168e-06      0.019 (TRAH MIcro)
+   29     dE    -1.404070e-06     1.095487e-03    -2.8068e-06      0.022 (TRAH MIcro)
+   29     dE    -1.588739e-06     9.654233e-04    -3.1755e-06      0.025 (TRAH MIcro)
+   29     dE    -1.645895e-06     4.449922e-04    -3.2896e-06      0.026 (TRAH MIcro)
+   29     dE    -1.677303e-06     5.667846e-04    -3.3523e-06      0.026 (TRAH MIcro)
+   29     dE    -1.767798e-06     5.321745e-04    -3.5329e-06      0.028 (TRAH MIcro)
+   29     dE    -1.798060e-06     3.433967e-04    -3.5933e-06      0.028 (TRAH MIcro)
+   29     dE    -1.815223e-06     3.412798e-04    -3.6275e-06      0.028 (TRAH MIcro)
+   29     dE    -1.826228e-06     1.601638e-04    -3.6495e-06      0.029 (TRAH MIcro)
+   29     dE    -1.829959e-06     1.331114e-04    -3.6569e-06      0.029 (TRAH MIcro)
+   29     dE    -1.833877e-06     1.893925e-04    -3.6647e-06      0.029 (TRAH MIcro)
+   29     dE    -1.861558e-06     7.270378e-04    -3.7199e-06      0.029 (TRAH MIcro)
+   29     dE    -2.167574e-06     2.203692e-03    -4.3278e-06      0.041 (TRAH MIcro)
+   29     dE    -8.789000e-06     5.411634e-03    -5.3247e-04      0.142 (TRAH MIcro)
+   29     dE    -1.172359e-05     2.275834e-03    -7.6984e-04      0.148 (TRAH MIcro)
+   29     dE    -1.264337e-05     1.671184e-03    -8.2798e-04      0.150 (TRAH MIcro)
+   29     dE    -4.236325e-06     4.349651e-04    -1.1319e-03      0.062 (TRAH MIcro)
+   30       -436.991459128580     3.934253e-03                     0.101 (TRAH MAcro)   No
+   30     dE    -1.200302e-06     1.456973e-03    -2.4006e-06      0.001 (TRAH MIcro)
+   30     dE    -1.287676e-06     4.294429e-04    -2.5753e-06      0.001 (TRAH MIcro)
+   30     dE    -1.292117e-06     3.321276e-04    -2.5842e-06      0.001 (TRAH MIcro)
+   31       -436.991460418197     3.320931e-04                     0.121 (TRAH MAcro)   No
+   31     dE    -3.179433e-09     3.376051e-04    -6.3589e-09      0.000 (TRAH MIcro)
+   31     dE    -1.413356e-08     2.523188e-04    -2.8267e-08      0.000 (TRAH MIcro)
+   31     dE    -3.198393e-08     3.519908e-04    -6.3968e-08      0.001 (TRAH MIcro)
+   31     dE    -3.853088e-08     3.428419e-04    -7.7062e-08      0.001 (TRAH MIcro)
+   31     dE    -6.557358e-08     3.806188e-04    -1.3115e-07      0.001 (TRAH MIcro)
+   31     dE    -1.363724e-07     9.452351e-04    -2.7274e-07      0.003 (TRAH MIcro)
+   31     dE    -2.210836e-07     1.406170e-03    -4.4216e-07      0.005 (TRAH MIcro)
+   31     dE    -5.373418e-07     1.127165e-03    -1.0745e-06      0.013 (TRAH MIcro)
+   31     dE    -8.067240e-07     1.141423e-03    -1.6128e-06      0.020 (TRAH MIcro)
+   31     dE    -8.691412e-07     4.077394e-04    -1.7374e-06      0.022 (TRAH MIcro)
+   31     dE    -8.830709e-07     2.618954e-04    -1.7652e-06      0.023 (TRAH MIcro)
+   31     dE    -8.928691e-07     1.591182e-04    -1.7848e-06      0.023 (TRAH MIcro)
+   31     dE    -8.959425e-07     1.371700e-04    -1.7909e-06      0.023 (TRAH MIcro)
+   31     dE    -9.024434e-07     3.330660e-04    -1.8039e-06      0.023 (TRAH MIcro)
+   31     dE    -9.184725e-07     2.702993e-04    -1.8359e-06      0.024 (TRAH MIcro)
+   31     dE    -9.260422e-07     1.898912e-04    -1.8510e-06      0.024 (TRAH MIcro)
+   31     dE    -9.349320e-07     2.548789e-04    -1.8688e-06      0.024 (TRAH MIcro)
+   31     dE    -9.596586e-07     5.452277e-04    -1.9181e-06      0.025 (TRAH MIcro)
+   31     dE    -1.057078e-06     9.777987e-04    -2.1123e-06      0.030 (TRAH MIcro)
+   31     dE    -3.510688e-06     9.124748e-03    -1.5808e-04      0.121 (TRAH MIcro)
+   31     dE    -5.881652e-06     2.481964e-03    -9.1552e-04      0.096 (TRAH MIcro)
+   31     dE    -7.854857e-06     1.054070e-03    -9.8721e-04      0.111 (TRAH MIcro)
+   31     dE    -8.504159e-06     8.197863e-04    -1.0079e-03      0.115 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -8.504158890756e-06
+  actual energy  change   =     1.246240100272e-05
+  energy change ratio     = -1.465448
+  old trust radius        = 0.120685
+  new trust radius        = 0.080859
+  reject step?            = YES
+   32       -436.991447955796     3.320931e-04                     0.081 (TRAH MAcro)  Yes
+   33       -436.991447955796     1.173620e-02                     0.081 (TRAH MAcro)   No
+   33     dE    -9.800935e-06     5.195953e-03    -1.9602e-05      0.002 (TRAH MIcro)
+   33     dE    -1.067219e-05     9.217174e-04    -2.1344e-05      0.003 (TRAH MIcro)
+   34       -436.991458627782     9.203407e-04                     0.097 (TRAH MAcro)   No
+   34     dE    -1.706527e-08     8.401639e-04    -3.4131e-08      0.000 (TRAH MIcro)
+   34     dE    -7.410282e-08     4.398885e-04    -1.4821e-07      0.000 (TRAH MIcro)
+   34     dE    -1.349068e-07     7.681898e-04    -2.6981e-07      0.001 (TRAH MIcro)
+   34     dE    -1.569065e-07     8.168217e-04    -3.1381e-07      0.001 (TRAH MIcro)
+   34     dE    -2.655037e-07     9.480117e-04    -5.3100e-07      0.002 (TRAH MIcro)
+   34     dE    -4.265448e-07     1.714434e-03    -8.5307e-07      0.004 (TRAH MIcro)
+   34     dE    -8.967546e-07     2.968302e-03    -1.7933e-06      0.010 (TRAH MIcro)
+   34     dE    -1.925534e-06     3.063455e-03    -3.8489e-06      0.024 (TRAH MIcro)
+   34     dE    -2.824880e-06     3.072626e-03    -5.6426e-06      0.036 (TRAH MIcro)
+   34     dE    -3.055684e-06     7.905186e-04    -6.1023e-06      0.039 (TRAH MIcro)
+   34     dE    -3.121286e-06     8.414248e-04    -6.2328e-06      0.040 (TRAH MIcro)
+   34     dE    -3.173844e-06     3.390345e-04    -6.3374e-06      0.040 (TRAH MIcro)
+   34     dE    -3.188319e-06     3.187768e-04    -6.3662e-06      0.040 (TRAH MIcro)
+   34     dE    -3.206865e-06     4.886213e-04    -6.4031e-06      0.041 (TRAH MIcro)
+   34     dE    -3.251364e-06     5.564141e-04    -6.4914e-06      0.042 (TRAH MIcro)
+   34     dE    -3.275532e-06     2.983039e-04    -6.5394e-06      0.042 (TRAH MIcro)
+   34     dE    -3.286226e-06     2.514286e-04    -6.5606e-06      0.042 (TRAH MIcro)
+   34     dE    -3.328259e-06     7.481441e-04    -6.6439e-06      0.044 (TRAH MIcro)
+   34     dE    -3.506225e-06     1.266651e-03    -6.9957e-06      0.049 (TRAH MIcro)
+   34     dE    -3.793331e-06     1.042137e-03    -7.5602e-06      0.059 (TRAH MIcro)
+   34     dE    -3.868235e-06     4.586331e-04    -7.7068e-06      0.062 (TRAH MIcro)
+   34     dE    -3.884660e-06     2.649033e-04    -7.7389e-06      0.063 (TRAH MIcro)
+   34     dE    -3.889045e-06     9.753653e-05    -7.7475e-06      0.063 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -3.889045318968e-06
+  actual energy  change   =     1.907087948894e-06
+  energy change ratio     = -0.490374
+  old trust radius        = 0.097030
+  new trust radius        = 0.065010
+  reject step?            = YES
+   35       -436.991456720694     9.203407e-04                     0.065 (TRAH MAcro)  Yes
+   36       -436.991456720694     7.539980e-03                     0.065 (TRAH MAcro)   No
+   36     dE    -4.898391e-06     1.888212e-03    -9.7968e-06      0.002 (TRAH MIcro)
+   36     dE    -5.056144e-06     8.388065e-04    -1.0112e-05      0.002 (TRAH MIcro)
+   36     dE    -5.075753e-06     4.340822e-04    -1.0151e-05      0.002 (TRAH MIcro)
+   37       -436.991461794081     4.333231e-04                     0.078 (TRAH MAcro)   No
+   37     dE    -9.327618e-09     4.088584e-04    -1.8655e-08      0.000 (TRAH MIcro)
+   37     dE    -1.742090e-08     1.767450e-04    -3.4842e-08      0.000 (TRAH MIcro)
+   37     dE    -2.513890e-08     1.428797e-04    -5.0278e-08      0.000 (TRAH MIcro)
+   37     dE    -2.739294e-08     1.318060e-04    -5.4786e-08      0.000 (TRAH MIcro)
+   37     dE    -3.040614e-08     9.460168e-05    -6.0812e-08      0.000 (TRAH MIcro)
+   37     dE    -3.547801e-08     1.759495e-04    -7.0956e-08      0.001 (TRAH MIcro)
+   37     dE    -4.025384e-08     2.263960e-04    -8.0508e-08      0.001 (TRAH MIcro)
+   37     dE    -7.100466e-08     6.384838e-04    -1.4201e-07      0.003 (TRAH MIcro)
+   37     dE    -1.244571e-07     6.797519e-04    -2.4891e-07      0.006 (TRAH MIcro)
+   37     dE    -1.518192e-07     2.721566e-04    -3.0362e-07      0.007 (TRAH MIcro)
+   37     dE    -1.649686e-07     3.147980e-04    -3.2992e-07      0.008 (TRAH MIcro)
+   37     dE    -1.742196e-07     1.851020e-04    -3.4841e-07      0.009 (TRAH MIcro)
+   37     dE    -1.782331e-07     1.481426e-04    -3.5644e-07      0.009 (TRAH MIcro)
+   37     dE    -1.823056e-07     2.058027e-04    -3.6458e-07      0.009 (TRAH MIcro)
+   37     dE    -1.882409e-07     1.482095e-04    -3.7645e-07      0.009 (TRAH MIcro)
+   37     dE    -1.904631e-07     6.934369e-05    -3.8089e-07      0.010 (TRAH MIcro)
+   37     dE    -1.907707e-07     1.878564e-05    -3.8151e-07      0.010 (TRAH MIcro)
+   38       -436.991461918874     1.292189e-04                     0.078 (TRAH MAcro)   No
+   38     dE    -8.285460e-10     8.568872e-05    -1.6571e-09      0.000 (TRAH MIcro)
+   38     dE    -1.736018e-09     8.886148e-05    -3.4720e-09      0.000 (TRAH MIcro)
+   38     dE    -1.855951e-09     9.947906e-05    -3.7119e-09      0.000 (TRAH MIcro)
+   38     dE    -6.607341e-09     2.274177e-04    -1.3215e-08      0.000 (TRAH MIcro)
+   38     dE    -2.005541e-08     2.764059e-04    -4.0111e-08      0.002 (TRAH MIcro)
+   38     dE    -3.789508e-08     2.953862e-04    -7.5789e-08      0.003 (TRAH MIcro)
+   38     dE    -4.559409e-08     2.310657e-04    -9.1187e-08      0.004 (TRAH MIcro)
+   38     dE    -5.426416e-08     1.613953e-04    -1.0853e-07      0.005 (TRAH MIcro)
+   38     dE    -5.806527e-08     1.111682e-04    -1.1613e-07      0.005 (TRAH MIcro)
+   38     dE    -5.920765e-08     4.248672e-05    -1.1841e-07      0.005 (TRAH MIcro)
+   38     dE    -5.951467e-08     3.908731e-05    -1.1903e-07      0.005 (TRAH MIcro)
+   38     dE    -5.974894e-08     4.910339e-05    -1.1949e-07      0.005 (TRAH MIcro)
+   38     dE    -6.018743e-08     4.925457e-05    -1.2037e-07      0.005 (TRAH MIcro)
+   38     dE    -6.050914e-08     4.069736e-05    -1.2101e-07      0.005 (TRAH MIcro)
+   38     dE    -6.075496e-08     3.186011e-05    -1.2151e-07      0.005 (TRAH MIcro)
+   38     dE    -6.088784e-08     2.896672e-05    -1.2177e-07      0.005 (TRAH MIcro)
+   38     dE    -6.106730e-08     4.158125e-05    -1.2213e-07      0.005 (TRAH MIcro)
+   38     dE    -6.160428e-08     8.166508e-05    -1.2320e-07      0.005 (TRAH MIcro)
+   38     dE    -6.474587e-08     1.521561e-04    -1.2949e-07      0.006 (TRAH MIcro)
+   38     dE    -6.882324e-08     1.046837e-04    -1.3764e-07      0.007 (TRAH MIcro)
+   38     dE    -6.994762e-08     5.017536e-05    -1.3989e-07      0.007 (TRAH MIcro)
+   38     dE    -7.028660e-08     2.649120e-05    -1.4057e-07      0.007 (TRAH MIcro)
+   38     dE    -7.034610e-08     1.280220e-05    -1.4068e-07      0.007 (TRAH MIcro)
+   39       -436.991461941919     7.419698e-05                           (NR   MAcro)
+   39     dE    -1.917301e-10     5.848713e-05                           (NR   MIcro)
+   39     dE    -6.295400e-10     5.778953e-05                           (NR   MIcro)
+   39     dE    -6.897535e-10     6.148740e-05                           (NR   MIcro)
+   39     dE    -2.270520e-09     1.590874e-04                           (NR   MIcro)
+   39     dE    -1.100829e-08     2.224003e-04                           (NR   MIcro)
+   39     dE    -2.111396e-08     2.507627e-04                           (NR   MIcro)
+   39     dE    -2.613121e-08     1.506352e-04                           (NR   MIcro)
+   39     dE    -2.958814e-08     9.607699e-05                           (NR   MIcro)
+   39     dE    -3.065073e-08     5.209318e-05                           (NR   MIcro)
+   39     dE    -3.097847e-08     2.361860e-05                           (NR   MIcro)
+   39     dE    -3.105795e-08     2.222871e-05                           (NR   MIcro)
+   39     dE    -3.113803e-08     2.770218e-05                           (NR   MIcro)
+   39     dE    -3.131296e-08     3.295306e-05                           (NR   MIcro)
+   39     dE    -3.150924e-08     2.626753e-05                           (NR   MIcro)
+   39     dE    -3.162032e-08     2.896986e-05                           (NR   MIcro)
+   39     dE    -3.173988e-08     2.556811e-05                           (NR   MIcro)
+   39     dE    -3.191687e-08     3.852469e-05                           (NR   MIcro)
+   39     dE    -3.238515e-08     7.477262e-05                           (NR   MIcro)
+   39     dE    -3.430006e-08     1.227001e-04                           (NR   MIcro)
+   39     dE    -3.614609e-08     8.163014e-05                           (NR   MIcro)
+   39     dE    -3.673693e-08     2.992476e-05                           (NR   MIcro)
+   39     dE    -3.683417e-08     1.589154e-05                           (NR   MIcro)
+   39     dE    -3.685775e-08     8.368202e-06                           (NR   MIcro)
+   39     dE    -3.686758e-08     6.444478e-06                           (NR   MIcro)
+   40       -436.991461959788     5.501526e-05                           (NR   MAcro)
+   40     dE    -7.844549e-11     4.400700e-05                           (NR   MIcro)
+   40     dE    -2.935904e-10     3.847171e-05                           (NR   MIcro)
+   40     dE    -3.424458e-10     4.109506e-05                           (NR   MIcro)
+   40     dE    -1.992689e-09     1.391283e-04                           (NR   MIcro)
+   40     dE    -6.673175e-09     1.920838e-04                           (NR   MIcro)
+   40     dE    -1.265173e-08     1.594236e-04                           (NR   MIcro)
+   40     dE    -1.438813e-08     9.176971e-05                           (NR   MIcro)
+   40     dE    -1.530428e-08     5.313377e-05                           (NR   MIcro)
+   40     dE    -1.567203e-08     3.627954e-05                           (NR   MIcro)
+   40     dE    -1.581023e-08     1.726745e-05                           (NR   MIcro)
+   40     dE    -1.585154e-08     1.357770e-05                           (NR   MIcro)
+   40     dE    -1.588105e-08     1.698224e-05                           (NR   MIcro)
+   40     dE    -1.595592e-08     2.936958e-05                           (NR   MIcro)
+   40     dE    -1.619123e-08     4.083608e-05                           (NR   MIcro)
+   40     dE    -1.660360e-08     5.720945e-05                           (NR   MIcro)
+   40     dE    -1.707030e-08     4.776218e-05                           (NR   MIcro)
+   40     dE    -1.728795e-08     3.404297e-05                           (NR   MIcro)
+   40     dE    -1.755267e-08     4.840592e-05                           (NR   MIcro)
+   40     dE    -1.844464e-08     7.298395e-05                           (NR   MIcro)
+   40     dE    -1.916241e-08     4.456359e-05                           (NR   MIcro)
+   40     dE    -1.934165e-08     1.598112e-05                           (NR   MIcro)
+   40     dE    -1.937141e-08     9.126890e-06                           (NR   MIcro)
+   40     dE    -1.937873e-08     4.959187e-06                           (NR   MIcro)
+   40     dE    -1.938271e-08     5.418010e-06                           (NR   MIcro)
+   41       -436.991461964655     4.209963e-05                           (NR   MAcro)
+   41     dE    -5.482465e-11     3.333377e-05                           (NR   MIcro)
+   41     dE    -1.647037e-10     2.414826e-05                           (NR   MIcro)
+   41     dE    -1.801838e-10     2.530136e-05                           (NR   MIcro)
+   41     dE    -5.008287e-10     6.717407e-05                           (NR   MIcro)
+   41     dE    -1.974533e-09     1.056129e-04                           (NR   MIcro)
+   41     dE    -4.573818e-09     1.289279e-04                           (NR   MIcro)
+   41     dE    -6.716401e-09     7.312228e-05                           (NR   MIcro)
+   41     dE    -7.317968e-09     6.805448e-05                           (NR   MIcro)
+   41     dE    -7.847441e-09     3.771001e-05                           (NR   MIcro)
+   41     dE    -7.970697e-09     1.291481e-05                           (NR   MIcro)
+   41     dE    -7.989311e-09     9.325908e-06                           (NR   MIcro)
+   41     dE    -8.002349e-09     1.209276e-05                           (NR   MIcro)
+   41     dE    -8.058509e-09     2.547320e-05                           (NR   MIcro)
+   41     dE    -8.236418e-09     3.256024e-05                           (NR   MIcro)
+   41     dE    -8.516588e-09     5.563818e-05                           (NR   MIcro)
+   41     dE    -8.993245e-09     5.865806e-05                           (NR   MIcro)
+   41     dE    -9.301724e-09     2.812677e-05                           (NR   MIcro)
+   41     dE    -9.423419e-09     2.628403e-05                           (NR   MIcro)
+   41     dE    -9.601726e-09     3.481160e-05                           (NR   MIcro)
+   41     dE    -9.800954e-09     2.985845e-05                           (NR   MIcro)
+   41     dE    -9.918731e-09     1.594135e-05                           (NR   MIcro)
+   41     dE    -9.951118e-09     7.435631e-06                           (NR   MIcro)
+   41     dE    -9.956498e-09     3.569872e-06                           (NR   MIcro)
+   41     dE    -9.959607e-09     3.905159e-06                           (NR   MIcro)
+   42       -436.991461970689     3.015225e-05                           (NR   MAcro)
+   42     dE    -2.312122e-11     2.413500e-05                           (NR   MIcro)
+   42     dE    -7.976938e-11     1.718597e-05                           (NR   MIcro)
+   42     dE    -8.982495e-11     1.814339e-05                           (NR   MIcro)
+   42     dE    -4.817423e-10     6.474774e-05                           (NR   MIcro)
+   42     dE    -1.435539e-09     8.722463e-05                           (NR   MIcro)
+   42     dE    -3.046521e-09     7.452878e-05                           (NR   MIcro)
+   42     dE    -3.685259e-09     3.535816e-05                           (NR   MIcro)
+   42     dE    -3.839505e-09     3.223264e-05                           (NR   MIcro)
+   42     dE    -4.061590e-09     2.190487e-05                           (NR   MIcro)
+   42     dE    -4.109873e-09     1.301245e-05                           (NR   MIcro)
+   42     dE    -4.137093e-09     1.318814e-05                           (NR   MIcro)
+   42     dE    -4.173363e-09     1.876167e-05                           (NR   MIcro)
+   42     dE    -4.223629e-09     1.703561e-05                           (NR   MIcro)
+   42     dE    -4.253009e-09     9.265056e-06                           (NR   MIcro)
+   42     dE    -4.270958e-09     1.095965e-05                           (NR   MIcro)
+   42     dE    -4.285171e-09     1.049180e-05                           (NR   MIcro)
+   42     dE    -4.316127e-09     1.761999e-05                           (NR   MIcro)
+   42     dE    -4.476159e-09     4.035148e-05                           (NR   MIcro)
+   42     dE    -4.827865e-09     4.629163e-05                           (NR   MIcro)
+   42     dE    -5.120700e-09     3.151092e-05                           (NR   MIcro)
+   42     dE    -5.232425e-09     1.655988e-05                           (NR   MIcro)
+   42     dE    -5.257895e-09     5.395954e-06                           (NR   MIcro)
+   42     dE    -5.260143e-09     2.628130e-06                           (NR   MIcro)
+   42     dE    -5.261403e-09     3.074343e-06                           (NR   MIcro)
+   43       -436.991461971295     2.118137e-05                           (NR   MAcro)
+   43     dE    -1.053644e-11     1.752208e-05                           (NR   MIcro)
+   43     dE    -4.077419e-11     1.258212e-05                           (NR   MIcro)
+   43     dE    -4.806447e-11     1.328756e-05                           (NR   MIcro)
+   43     dE    -1.616187e-10     4.135681e-05                           (NR   MIcro)
+   43     dE    -6.447041e-10     6.437743e-05                           (NR   MIcro)
+   43     dE    -1.478608e-09     6.544219e-05                           (NR   MIcro)
+   43     dE    -1.987378e-09     3.445082e-05                           (NR   MIcro)
+   43     dE    -2.118901e-09     3.006646e-05                           (NR   MIcro)
+   43     dE    -2.226962e-09     1.666674e-05                           (NR   MIcro)
+   43     dE    -2.251792e-09     5.976784e-06                           (NR   MIcro)
+   43     dE    -2.257967e-09     6.021173e-06                           (NR   MIcro)
+   43     dE    -2.264005e-09     8.311771e-06                           (NR   MIcro)
+   43     dE    -2.289395e-09     1.656507e-05                           (NR   MIcro)
+   43     dE    -2.325031e-09     1.310004e-05                           (NR   MIcro)
+   43     dE    -2.357440e-09     1.520663e-05                           (NR   MIcro)
+   43     dE    -2.390425e-09     1.576932e-05                           (NR   MIcro)
+   43     dE    -2.422303e-09     1.413622e-05                           (NR   MIcro)
+   43     dE    -2.482043e-09     2.300816e-05                           (NR   MIcro)
+   43     dE    -2.675375e-09     3.455420e-05                           (NR   MIcro)
+   43     dE    -2.814354e-09     2.198717e-05                           (NR   MIcro)
+   43     dE    -2.860290e-09     9.712174e-06                           (NR   MIcro)
+   43     dE    -2.870182e-09     5.385511e-06                           (NR   MIcro)
+   43     dE    -2.872864e-09     2.229287e-06                           (NR   MIcro)
+   43     dE    -2.873918e-09     2.589299e-06                           (NR   MIcro)
+   44       -436.991461973622     1.560519e-05                           (NR   MAcro)
+   44     dE    -5.067013e-12     1.269347e-05                           (NR   MIcro)
+   44     dE    -2.099308e-11     9.084858e-06                           (NR   MIcro)
+   44     dE    -2.835515e-11     9.899253e-06                           (NR   MIcro)
+   44     dE    -1.261281e-10     3.716535e-05                           (NR   MIcro)
+   44     dE    -5.018111e-10     5.530512e-05                           (NR   MIcro)
+   44     dE    -9.510957e-10     4.164534e-05                           (NR   MIcro)
+   44     dE    -1.133292e-09     2.299811e-05                           (NR   MIcro)
+   44     dE    -1.179089e-09     1.810401e-05                           (NR   MIcro)
+   44     dE    -1.229380e-09     1.292460e-05                           (NR   MIcro)
+   44     dE    -1.241877e-09     5.597968e-06                           (NR   MIcro)
+   44     dE    -1.246144e-09     4.351612e-06                           (NR   MIcro)
+   44     dE    -1.250549e-09     6.022337e-06                           (NR   MIcro)
+   44     dE    -1.260070e-09     9.903722e-06                           (NR   MIcro)
+   44     dE    -1.277045e-09     1.140871e-05                           (NR   MIcro)
+   44     dE    -1.337272e-09     2.211755e-05                           (NR   MIcro)
+   44     dE    -1.385590e-09     1.484159e-05                           (NR   MIcro)
+   44     dE    -1.408504e-09     1.093256e-05                           (NR   MIcro)
+   44     dE    -1.435237e-09     1.566619e-05                           (NR   MIcro)
+   44     dE    -1.496997e-09     2.046640e-05                           (NR   MIcro)
+   44     dE    -1.556038e-09     1.550023e-05                           (NR   MIcro)
+   44     dE    -1.584969e-09     8.632001e-06                           (NR   MIcro)
+   44     dE    -1.592863e-09     3.932913e-06                           (NR   MIcro)
+   44     dE    -1.594027e-09     1.619894e-06                           (NR   MIcro)
+   44     dE    -1.594495e-09     1.738884e-06                           (NR   MIcro)
+   45       -436.991461973542     1.152114e-05                           (NR   MAcro)
+   45     dE    -2.912639e-12     9.400187e-06                           (NR   MIcro)
+   45     dE    -1.167079e-11     6.560305e-06                           (NR   MIcro)
+   45     dE    -1.611709e-11     7.581609e-06                           (NR   MIcro)
+   45     dE    -3.620266e-11     1.815557e-05                           (NR   MIcro)
+   45     dE    -1.961444e-10     3.846408e-05                           (NR   MIcro)
+   45     dE    -4.572216e-10     3.158797e-05                           (NR   MIcro)
+   45     dE    -6.018813e-10     1.981868e-05                           (NR   MIcro)
+   45     dE    -6.549177e-10     1.646109e-05                           (NR   MIcro)
+   45     dE    -6.886831e-10     9.545775e-06                           (NR   MIcro)
+   45     dE    -6.974806e-10     4.036115e-06                           (NR   MIcro)
+   45     dE    -7.004417e-10     3.977763e-06                           (NR   MIcro)
+   45     dE    -7.035128e-10     5.805231e-06                           (NR   MIcro)
+   45     dE    -7.112944e-10     8.338520e-06                           (NR   MIcro)
+   45     dE    -7.184786e-10     5.562962e-06                           (NR   MIcro)
+   45     dE    -7.239120e-10     6.092682e-06                           (NR   MIcro)
+   45     dE    -7.297593e-10     6.403373e-06                           (NR   MIcro)
+   45     dE    -7.368886e-10     8.212143e-06                           (NR   MIcro)
+   45     dE    -7.559357e-10     1.486813e-05                           (NR   MIcro)
+   45     dE    -8.299363e-10     2.140988e-05                           (NR   MIcro)
+   45     dE    -8.797795e-10     1.169537e-05                           (NR   MIcro)
+   45     dE    -8.918360e-10     4.858451e-06                           (NR   MIcro)
+   45     dE    -8.941732e-10     2.801307e-06                           (NR   MIcro)
+   45     dE    -8.948946e-10     1.352207e-06                           (NR   MIcro)
+   45     dE    -8.952344e-10     1.428367e-06                           (NR   MIcro)
+   46       -436.991461974460     8.582764e-06                           (NR   MAcro)
+
+               *****************************************************
+               *                     SUCCESS                       *
+               *           SCF CONVERGED AFTER 601 CYCLES          *
+               *****************************************************
+
+Recomputing exchange energy using gridx3       ... done (    1.104 sec)
+Old exchange energy                            :    -15.305729401 Eh
+New exchange energy                            :    -15.305715575 Eh
+Exchange energy change after final integration :      0.000013826 Eh
+Total energy after final integration           :   -436.991448149 Eh
+Warning: op=0 Small HOMO/LUMO gap (   0.033) - skipping pre-diagonalization
+         Will do a full diagonalization
+             **** ENERGY FILE WAS UPDATED (/gpfs/fs2/scratch/kshao4/mlip/codes/X_semiactivelearning/dft_launches/p10_2gpu_6h/P10p0000GPa/acquisition/inputs/cluster_962.en.tmp) ****
+
+----------------
+TOTAL SCF ENERGY
+----------------
+
+Total Energy       :       -436.99144814893782 Eh          -11891.14184 eV
+
+Components:
+Nuclear Repulsion  :        148.92767667010511 Eh            4052.52811 eV
+Electronic Energy  :       -585.91913864456501 Eh          -15943.67032 eV
+One Electron Energy:       -895.70325432417610 Eh          -24373.32467 eV
+Two Electron Energy:        309.78411567961109 Eh            8429.65434 eV
+
+Virial components:
+Potential Energy   :       -872.24815099539751 Eh          -23735.07886 eV
+Kinetic Energy     :        435.25670284645963 Eh           11843.93702 eV
+Virial Ratio       :          2.00398556826611
+
+DFT components:
+N(Alpha)           :       29.998873990298 electrons
+N(Beta)            :       29.998873990298 electrons
+N(Total)           :       59.997747980596 electrons
+E(XC)              :      -37.702274483443 Eh       
+
+---------------
+SCF CONVERGENCE
+---------------
+
+  Last Energy change         ...   -9.1836e-10  Tolerance :   1.0000e-08
+  Last MAX-Density change    ...    5.3490e-02  Tolerance :   1.0000e-07
+  Last RMS-Density change    ...    3.6292e-03  Tolerance :   5.0000e-09
+  Last DIIS Error            ...    2.3090e-01  Tolerance :   5.0000e-07
+
+
+----------------
+ORBITAL ENERGIES
+----------------
+
+  NO   OCC          E(Eh)            E(eV) 
+   0   2.0000     -19.492558      -530.4195 
+   1   2.0000     -19.468090      -529.7537 
+   2   2.0000     -19.378258      -527.3092 
+   3   2.0000     -19.355288      -526.6842 
+   4   2.0000     -19.324274      -525.8402 
+   5   2.0000     -14.591571      -397.0568 
+   6   2.0000      -1.164213       -31.6798 
+   7   2.0000      -1.122833       -30.5538 
+   8   2.0000      -1.085464       -29.5370 
+   9   2.0000      -1.061161       -28.8757 
+  10   2.0000      -1.048805       -28.5394 
+  11   2.0000      -0.916556       -24.9407 
+  12   2.0000      -0.624879       -17.0038 
+  13   2.0000      -0.575550       -15.6615 
+  14   2.0000      -0.554894       -15.0994 
+  15   2.0000      -0.521584       -14.1930 
+  16   2.0000      -0.520187       -14.1550 
+  17   2.0000      -0.498535       -13.5658 
+  18   2.0000      -0.489453       -13.3187 
+  19   2.0000      -0.489226       -13.3125 
+  20   2.0000      -0.465449       -12.6655 
+  21   2.0000      -0.465253       -12.6602 
+  22   2.0000      -0.447433       -12.1753 
+  23   2.0000      -0.441644       -12.0177 
+  24   2.0000      -0.409004       -11.1296 
+  25   2.0000      -0.396729       -10.7955 
+  26   2.0000      -0.374733       -10.1970 
+  27   2.0000      -0.315317        -8.5802 
+  28   2.0000      -0.300878        -8.1873 
+  29   2.0000      -0.273775        -7.4498 
+  30   0.0000       0.008893         0.2420 
+  31   0.0000       0.025938         0.7058 
+  32   0.0000       0.070989         1.9317 
+  33   0.0000       0.073870         2.0101 
+  34   0.0000       0.095589         2.6011 
+  35   0.0000       0.160374         4.3640 
+  36   0.0000       0.238144         6.4802 
+  37   0.0000       0.268219         7.2986 
+  38   0.0000       0.294704         8.0193 
+  39   0.0000       0.307440         8.3659 
+  40   0.0000       0.309671         8.4266 
+*Only the first 10 virtual orbitals were printed.
+
+                    ********************************
+                    * MULLIKEN POPULATION ANALYSIS *
+                    ********************************
+
+-----------------------
+MULLIKEN ATOMIC CHARGES
+-----------------------
+   0 H :    0.333329
+   1 O :   -0.645100
+   2 H :    0.333322
+   3 O :   -0.011219
+   4 H :    0.003226
+   5 H :    0.055123
+   6 O :   -0.000996
+   7 H :   -0.008173
+   8 H :    0.007796
+   9 O :   -0.489338
+  10 H :    0.297861
+  11 H :    0.003669
+  12 H :    0.056085
+  13 H :    0.179222
+  14 N :   -0.178186
+  15 H :    0.085943
+  16 H :    0.357088
+  17 O :   -0.746192
+  18 H :    0.366539
+Sum of atomic charges:    0.0000000
+
+--------------------------------
+MULLIKEN REDUCED ORBITAL CHARGES
+--------------------------------
+  0 H s       :     0.616332  s :     0.616332
+      pz      :     0.012774  p :     0.050339
+      px      :     0.021775
+      py      :     0.015790
+
+  1 O s       :     3.855692  s :     3.855692
+      pz      :     1.540993  p :     4.755845
+      px      :     1.761985
+      py      :     1.452867
+      dz2     :     0.008078  d :     0.032435
+      dxz     :     0.008472
+      dyz     :     0.005867
+      dx2y2   :     0.006019
+      dxy     :     0.003999
+      f0      :     0.000052  f :     0.001129
+      f+1     :     0.000354
+      f-1     :     0.000092
+      f+2     :     0.000192
+      f-2     :     0.000025
+      f+3     :     0.000072
+      f-3     :     0.000342
+
+  2 H s       :     0.609682  s :     0.609682
+      pz      :     0.019573  p :     0.056996
+      px      :     0.024663
+      py      :     0.012760
+
+  3 O s       :     3.998640  s :     3.998640
+      pz      :     1.997326  p :     4.011812
+      px      :     1.998193
+      py      :     0.016294
+      dz2     :     0.000146  d :     0.000598
+      dxz     :     0.000001
+      dyz     :     0.000003
+      dx2y2   :     0.000417
+      dxy     :     0.000032
+      f0      :     0.000031  f :     0.000169
+      f+1     :     0.000005
+      f-1     :     0.000001
+      f+2     :     0.000052
+      f-2     :     0.000000
+      f+3     :     0.000078
+      f-3     :     0.000001
+
+  4 H s       :     0.996879  s :     0.996879
+      pz      :     0.000009  p :    -0.000105
+      px      :     0.000008
+      py      :    -0.000122
+
+  5 H s       :     0.944869  s :     0.944869
+      pz      :     0.000002  p :     0.000008
+      px      :     0.000005
+      py      :     0.000001
+
+  6 O s       :     3.999928  s :     3.999928
+      pz      :     1.944036  p :     4.000666
+      px      :     0.056881
+      py      :     1.999749
+      dz2     :     0.000048  d :     0.000228
+      dxz     :     0.000017
+      dyz     :     0.000001
+      dx2y2   :     0.000152
+      dxy     :     0.000012
+      f0      :     0.000023  f :     0.000173
+      f+1     :     0.000017
+      f-1     :     0.000004
+      f+2     :     0.000044
+      f-2     :     0.000006
+      f+3     :     0.000002
+      f-3     :     0.000077
+
+  7 H s       :     0.993091  s :     0.993091
+      pz      :     0.002895  p :     0.015081
+      px      :     0.007579
+      py      :     0.004607
+
+  8 H s       :     0.978562  s :     0.978562
+      pz      :     0.002850  p :     0.013641
+      px      :     0.006573
+      py      :     0.004218
+
+  9 O s       :     3.933520  s :     3.933520
+      pz      :     1.402715  p :     4.538382
+      px      :     1.431525
+      py      :     1.704142
+      dz2     :     0.011106  d :     0.016780
+      dxz     :     0.002407
+      dyz     :     0.002940
+      dx2y2   :     0.000214
+      dxy     :     0.000113
+      f0      :     0.000486  f :     0.000656
+      f+1     :     0.000042
+      f-1     :     0.000095
+      f+2     :     0.000001
+      f-2     :     0.000012
+      f+3     :     0.000012
+      f-3     :     0.000007
+
+ 10 H s       :     0.634582  s :     0.634582
+      pz      :     0.022061  p :     0.067557
+      px      :     0.021918
+      py      :     0.023578
+
+ 11 H s       :     0.996416  s :     0.996416
+      pz      :     0.000001  p :    -0.000084
+      px      :    -0.000001
+      py      :    -0.000084
+
+ 12 H s       :     0.943903  s :     0.943903
+      pz      :     0.000010  p :     0.000012
+      px      :     0.000001
+      py      :     0.000001
+
+ 13 H s       :     0.730309  s :     0.730309
+      pz      :     0.002690  p :     0.090469
+      px      :     0.044763
+      py      :     0.043016
+
+ 14 N s       :     3.913674  s :     3.913674
+      pz      :     0.075395  p :     3.245851
+      px      :     1.620175
+      py      :     1.550280
+      dz2     :     0.003937  d :     0.017876
+      dxz     :     0.000165
+      dyz     :     0.000317
+      dx2y2   :     0.002641
+      dxy     :     0.010816
+      f0      :     0.000005  f :     0.000785
+      f+1     :    -0.000030
+      f-1     :    -0.000016
+      f+2     :     0.000005
+      f-2     :     0.000033
+      f+3     :     0.000420
+      f-3     :     0.000368
+
+ 15 H s       :     0.913463  s :     0.913463
+      pz      :     0.000260  p :     0.000594
+      px      :     0.000296
+      py      :     0.000038
+
+ 16 H s       :     0.593105  s :     0.593105
+      pz      :     0.014359  p :     0.049807
+      px      :     0.017690
+      py      :     0.017757
+
+ 17 O s       :     3.861343  s :     3.861343
+      pz      :     1.479118  p :     4.841435
+      px      :     1.410804
+      py      :     1.951513
+      dz2     :     0.017477  d :     0.042367
+      dxz     :     0.008891
+      dyz     :     0.005380
+      dx2y2   :     0.006419
+      dxy     :     0.004200
+      f0      :     0.000315  f :     0.001046
+      f+1     :     0.000106
+      f-1     :     0.000049
+      f+2     :     0.000145
+      f-2     :     0.000020
+      f+3     :     0.000272
+      f-3     :     0.000139
+
+ 18 H s       :     0.593884  s :     0.593884
+      pz      :     0.008894  p :     0.039577
+      px      :     0.019040
+      py      :     0.011642
+
+
+
+                     *******************************
+                     * LOEWDIN POPULATION ANALYSIS *
+                     *******************************
+
+----------------------
+LOEWDIN ATOMIC CHARGES
+----------------------
+   0 H :   -0.118545
+   1 O :   -0.106942
+   2 H :    0.141641
+   3 O :   -0.018431
+   4 H :    0.003227
+   5 H :    0.055116
+   6 O :   -0.000801
+   7 H :   -0.004463
+   8 H :    0.003821
+   9 O :   -0.191337
+  10 H :    0.006136
+  11 H :    0.003572
+  12 H :    0.056085
+  13 H :   -0.100318
+  14 N :    0.101098
+  15 H :    0.086896
+  16 H :    0.088680
+  17 O :   -0.107010
+  18 H :    0.101575
+
+-------------------------------
+LOEWDIN REDUCED ORBITAL CHARGES
+-------------------------------
+  0 H s       :     0.605450  s :     0.605450
+      pz      :     0.130983  p :     0.513095
+      px      :     0.132504
+      py      :     0.249608
+
+  1 O s       :     3.440265  s :     3.440265
+      pz      :     1.486837  p :     4.584893
+      px      :     1.636565
+      py      :     1.461492
+      dz2     :     0.018402  d :     0.079402
+      dxz     :     0.016166
+      dyz     :     0.007366
+      dx2y2   :     0.032542
+      dxy     :     0.004927
+      f0      :     0.000173  f :     0.002383
+      f+1     :     0.000633
+      f-1     :     0.000283
+      f+2     :     0.000443
+      f-2     :     0.000002
+      f+3     :     0.000083
+      f-3     :     0.000767
+
+  2 H s       :     0.581745  s :     0.581745
+      pz      :     0.120604  p :     0.276615
+      px      :     0.095954
+      py      :     0.060057
+
+  3 O s       :     3.996144  s :     3.996144
+      pz      :     1.996890  p :     4.018816
+      px      :     1.998159
+      py      :     0.023768
+      dz2     :     0.000775  d :     0.003302
+      dxz     :     0.000003
+      dyz     :     0.000159
+      dx2y2   :     0.002151
+      dxy     :     0.000214
+      f0      :     0.000031  f :     0.000168
+      f+1     :     0.000005
+      f-1     :     0.000001
+      f+2     :     0.000052
+      f-2     :     0.000000
+      f+3     :     0.000078
+      f-3     :     0.000001
+
+  4 H s       :     0.993952  s :     0.993952
+      pz      :     0.000023  p :     0.002820
+      px      :     0.000009
+      py      :     0.002789
+
+  5 H s       :     0.944876  s :     0.944876
+      pz      :     0.000002  p :     0.000008
+      px      :     0.000005
+      py      :     0.000001
+
+  6 O s       :     3.999848  s :     3.999848
+      pz      :     1.944071  p :     4.000561
+      px      :     0.056761
+      py      :     1.999728
+      dz2     :     0.000048  d :     0.000219
+      dxz     :     0.000017
+      dyz     :     0.000001
+      dx2y2   :     0.000149
+      dxy     :     0.000004
+      f0      :     0.000023  f :     0.000173
+      f+1     :     0.000017
+      f-1     :     0.000004
+      f+2     :     0.000044
+      f-2     :     0.000006
+      f+3     :     0.000002
+      f-3     :     0.000077
+
+  7 H s       :     0.955397  s :     0.955397
+      pz      :     0.009451  p :     0.049066
+      px      :     0.024049
+      py      :     0.015566
+
+  8 H s       :     0.947560  s :     0.947560
+      pz      :     0.009449  p :     0.048618
+      px      :     0.023496
+      py      :     0.015673
+
+  9 O s       :     3.693618  s :     3.693618
+      pz      :     1.456852  p :     4.470644
+      px      :     1.376284
+      py      :     1.637509
+      dz2     :     0.022698  d :     0.026088
+      dxz     :     0.000940
+      dyz     :     0.001981
+      dx2y2   :     0.000274
+      dxy     :     0.000195
+      f0      :     0.000847  f :     0.000986
+      f+1     :     0.000018
+      f-1     :     0.000091
+      f+2     :     0.000000
+      f-2     :     0.000010
+      f+3     :     0.000012
+      f-3     :     0.000007
+
+ 10 H s       :     0.641063  s :     0.641063
+      pz      :     0.176505  p :     0.352801
+      px      :     0.081540
+      py      :     0.094756
+
+ 11 H s       :     0.993568  s :     0.993568
+      pz      :     0.000016  p :     0.002861
+      px      :     0.000005
+      py      :     0.002840
+
+ 12 H s       :     0.943902  s :     0.943902
+      pz      :     0.000010  p :     0.000013
+      px      :     0.000001
+      py      :     0.000001
+
+ 13 H s       :     0.737541  s :     0.737541
+      pz      :     0.006834  p :     0.362777
+      px      :     0.179554
+      py      :     0.176389
+
+ 14 N s       :     3.622170  s :     3.622170
+      pz      :     0.072990  p :     3.241914
+      px      :     1.616545
+      py      :     1.552380
+      dz2     :     0.008208  d :     0.032818
+      dxz     :     0.000306
+      dyz     :     0.000441
+      dx2y2   :     0.001115
+      dxy     :     0.022748
+      f0      :     0.000035  f :     0.002000
+      f+1     :     0.000242
+      f-1     :     0.000257
+      f+2     :     0.000006
+      f-2     :     0.000054
+      f+3     :     0.000767
+      f-3     :     0.000640
+
+ 15 H s       :     0.912086  s :     0.912086
+      pz      :     0.000219  p :     0.001018
+      px      :     0.000736
+      py      :     0.000063
+
+ 16 H s       :     0.592248  s :     0.592248
+      pz      :     0.152037  p :     0.319072
+      px      :     0.078204
+      py      :     0.088831
+
+ 17 O s       :     3.435597  s :     3.435597
+      pz      :     1.444151  p :     4.576731
+      px      :     1.371806
+      py      :     1.760773
+      dz2     :     0.031727  d :     0.092645
+      dxz     :     0.011659
+      dyz     :     0.005275
+      dx2y2   :     0.037737
+      dxy     :     0.006247
+      f0      :     0.000763  f :     0.002037
+      f+1     :     0.000412
+      f-1     :     0.000043
+      f+2     :     0.000250
+      f-2     :     0.000035
+      f+3     :     0.000374
+      f-3     :     0.000160
+
+ 18 H s       :     0.581648  s :     0.581648
+      pz      :     0.081748  p :     0.316777
+      px      :     0.139829
+      py      :     0.095200
+
+
+
+                      *****************************
+                      * MAYER POPULATION ANALYSIS *
+                      *****************************
+
+  NA   - Mulliken gross atomic population
+  ZA   - Total nuclear charge
+  QA   - Mulliken gross atomic charge
+  VA   - Mayer's total valence
+  BVA  - Mayer's bonded valence
+  FA   - Mayer's free valence
+
+  ATOM       NA         ZA         QA         VA         BVA        FA
+  0 H      0.6667     1.0000     0.3333     0.9012     0.9012    -0.0000
+  1 O      8.6451     8.0000    -0.6451     1.7261     1.7261     0.0000
+  2 H      0.6667     1.0000     0.3333     0.9231     0.9231     0.0000
+  3 O      8.0112     8.0000    -0.0112     0.0260     0.0260     0.0000
+  4 H      0.9968     1.0000     0.0032     1.0000     1.0000     0.0000
+  5 H      0.9449     1.0000     0.0551     0.9970     0.9970     0.0000
+  6 O      8.0010     8.0000    -0.0010     0.0020     0.0020     0.0000
+  7 H      1.0082     1.0000    -0.0082     1.0032     1.0032    -0.0000
+  8 H      0.9922     1.0000     0.0078     1.0005     1.0005    -0.0000
+  9 O      8.4893     8.0000    -0.4893     1.8934     1.8934     0.0000
+ 10 H      0.7021     1.0000     0.2979     0.9566     0.9566    -0.0000
+ 11 H      0.9963     1.0000     0.0037     1.0000     1.0000     0.0000
+ 12 H      0.9439     1.0000     0.0561     0.9969     0.9969     0.0000
+ 13 H      0.8208     1.0000     0.1792     1.0300     1.0300     0.0000
+ 14 N      7.1782     7.0000    -0.1782     1.0319     1.0319     0.0000
+ 15 H      0.9141     1.0000     0.0859     0.9934     0.9934    -0.0000
+ 16 H      0.6429     1.0000     0.3571     0.9011     0.9011     0.0000
+ 17 O      8.7462     8.0000    -0.7462     1.7754     1.7754    -0.0000
+ 18 H      0.6335     1.0000     0.3665     0.8830     0.8830    -0.0000
+
+  Mayer bond orders larger than 0.100000
+B(  0-H ,  1-O ) :   0.8407 B(  1-O ,  2-H ) :   0.8849 B(  4-H , 11-H ) :   0.9931 
+B(  5-H , 12-H ) :   0.8766 B(  7-H ,  8-H ) :   0.9993 B(  9-O , 10-H ) :   0.9367 
+B(  9-O , 15-H ) :   0.8383 B( 13-H , 14-N ) :   1.0299 B( 16-H , 17-O ) :   0.8882 
+B( 17-O , 18-H ) :   0.8673 
+
+-------
+TIMINGS
+-------
+
+Total SCF time: 0 days 0 hours 5 min 19 sec 
+
+Total time                  ....     319.313 sec
+Sum of individual times     ....     271.380 sec  ( 85.0%)
+
+SCF preparation             ....       0.889 sec  (  0.3%)
+Fock matrix formation       ....     255.849 sec  ( 80.1%)
+  Startup                   ....       0.360 sec  (  0.1% of F)
+  Split-RI-J                ....      32.239 sec  ( 12.6% of F)
+  Chain of spheres X        ....     184.113 sec  ( 72.0% of F)
+  XC integration            ....      34.873 sec  ( 13.6% of F)
+    XC Preparation          ....       0.000 sec  (  0.0% of XC)
+    Basis function eval.    ....       2.795 sec  (  8.0% of XC)
+    Density eval.           ....       3.993 sec  ( 11.4% of XC)
+    XC-Functional eval.     ....       1.026 sec  (  2.9% of XC)
+    XC-Potential eval.      ....       4.562 sec  ( 13.1% of XC)
+Diagonalization             ....       0.000 sec  (  0.0%)
+Density matrix formation    ....       2.596 sec  (  0.8%)
+Total Energy calculation    ....       0.388 sec  (  0.1%)
+Population analysis         ....       0.073 sec  (  0.0%)
+Orbital Transformation      ....       7.627 sec  (  2.4%)
+Orbital Orthonormalization  ....       0.000 sec  (  0.0%)
+DIIS solution               ....       3.943 sec  (  1.2%)
+SOSCF solution              ....       0.000 sec  (  0.0%)
+NR solution                 ....       0.013 sec  (  0.0%)
+Finished LeanSCF after 319.3 sec
+
+Maximum memory used throughout the entire LEANSCF-calculation: 22.6 MB
+
+
+-------------------------------------------------------------------------------
+                          DFT DISPERSION CORRECTION                            
+                                                                               
+                                DFTD4 V3.4.0                                   
+-------------------------------------------------------------------------------
+The WB97M-D4rev functional is recognized
+Active option DFTDOPT                   ...         5   
+
+-------------------------   ----------------
+Dispersion correction           -0.002079710
+-------------------------   ----------------
+
+
+-------------------------   --------------------
+FINAL SINGLE POINT ENERGY      -436.993527858636
+-------------------------   --------------------
+
+[1793269706.881549] [bhc0184:8844 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269706.881513] [bhc0184:8845 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269706.881558] [bhc0184:8846 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269706.881499] [bhc0184:8847 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269706.881544] [bhc0184:8848 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269706.881511] [bhc0184:8849 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269706.881686] [bhc0184:8850 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269706.881641] [bhc0184:8851 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269706.881646] [bhc0184:8852 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269706.881497] [bhc0184:8853 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269706.881521] [bhc0184:8854 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269706.881513] [bhc0184:8855 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269706.881637] [bhc0184:8856 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269706.881735] [bhc0184:8857 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269706.881629] [bhc0184:8858 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269706.881680] [bhc0184:8859 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269706.881761] [bhc0184:8860 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269706.881728] [bhc0184:8861 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269706.881524] [bhc0184:8863 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269706.881458] [bhc0184:8864 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269706.881820] [bhc0184:8865 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269706.881737] [bhc0184:8867 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269706.881623] [bhc0184:8868 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269706.881729] [bhc0184:8869 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+
+
+           ************************************************************
+           *        Program running with 24 parallel MPI-processes    *
+           *              working on a common directory               *
+           ************************************************************
+------------------------------------------------------------------------------
+                         ORCA SCF GRADIENT CALCULATION
+------------------------------------------------------------------------------
+
+Nuc. rep. gradient        (SHARK) ... done (  0.0 sec)
+HCore & Overlap gradient  (SHARK) ... done (  0.1 sec)
+Split-RIJ-J gradient      (SHARK) ... done (  0.2 sec)
+COSX-gradient                     ... done (  1.4 sec)
+XC gradient                       ... done (  0.4 sec)
+Dispersion correction             ... done (  0.0 sec)
+
+-------------------
+DISPERSION GRADIENT
+-------------------
+
+   1   H   :   -0.000013488    0.000027033   -0.000015658
+   2   O   :    0.000034048    0.000117023    0.000075502
+   3   H   :   -0.000019150    0.000059336   -0.000032059
+   4   O   :   -0.000010748    0.000126284   -0.000017117
+   5   H   :   -0.000001089    0.000018837    0.000001056
+   6   H   :    0.000000758   -0.000001058    0.000000089
+   7   O   :   -0.000012091   -0.000006452   -0.000008844
+   8   H   :   -0.000007481    0.000000552    0.000007591
+   9   H   :   -0.000006503   -0.000005870    0.000005403
+  10   O   :    0.000019979   -0.000103423    0.000036328
+  11   H   :    0.000003131   -0.000015943   -0.000019280
+  12   H   :   -0.000002864   -0.000017436   -0.000001898
+  13   H   :   -0.000000749    0.000000142    0.000001354
+  14   H   :    0.000024529   -0.000022535    0.000001484
+  15   N   :   -0.000011517    0.000027569   -0.000007142
+  16   H   :    0.000014274    0.000002403    0.000004721
+  17   H   :   -0.000015563   -0.000039330    0.000008498
+  18   O   :    0.000020388   -0.000122452   -0.000052079
+  19   H   :   -0.000015864   -0.000044681    0.000012051
+
+Difference to translation invariance:
+           :    0.0000000000   -0.0000000000    0.0000000000
+
+Difference to rotation invariance:
+           :   -0.0000000000    0.0000000000   -0.0000000000
+
+Norm of the Dispersion gradient    ...    0.0002861144
+RMS gradient                       ...    0.0000378968
+MAX gradient                       ...    0.0001262839
+
+------------------
+CARTESIAN GRADIENT
+------------------
+
+   1   H   :    0.033025311    0.074033150    0.012091311
+   2   O   :   -0.065286365   -0.056251807   -0.077485782
+   3   H   :    0.035355269   -0.030161347    0.064060590
+   4   O   :   -0.000153305    0.002046575   -0.000217939
+   5   H   :   -0.000039604    0.001599258    0.000111928
+   6   H   :    0.000322700   -0.000412000   -0.000228107
+   7   O   :   -0.000138478   -0.000017613   -0.000050679
+   8   H   :    0.063160908    0.052012315    0.040512819
+   9   H   :   -0.063228088   -0.052042329   -0.040460872
+  10   O   :   -0.001972332   -0.007305721   -0.056369549
+  11   H   :    0.002711146    0.006357192    0.052577674
+  12   H   :    0.000023726   -0.001593887   -0.000157374
+  13   H   :   -0.000441219    0.000229023    0.000256459
+  14   H   :   -0.004318453    0.004132348   -0.000820206
+  15   N   :    0.004445002   -0.004053964    0.000735811
+  16   H   :   -0.000380949   -0.000789320    0.004000863
+  17   H   :    0.009973615    0.001101671   -0.033926723
+  18   O   :   -0.047563805    0.000771708    0.063966505
+  19   H   :    0.034504922    0.010344747   -0.028596730
+
+Difference to translation invariance:
+           :   -0.0000000000    0.0000000000   -0.0000000000
+
+Difference to rotation invariance:
+           :   -0.0000114089   -0.0000383913   -0.0000092966
+
+Norm of the Cartesian gradient     ...    0.2428160809
+RMS gradient                       ...    0.0321617756
+MAX gradient                       ...    0.0774857816
+
+-------
+TIMINGS
+-------
+
+Total SCF gradient time     ....        2.084 sec
+
+Densities                   ....       0.026 sec  (  1.3%)
+One electron gradient       ....       0.068 sec  (  3.3%)
+RI-J Coulomb gradient       ....       0.192 sec  (  9.2%)
+COSX gradient               ....       1.384 sec  ( 66.4%)
+XC gradient                 ....       0.357 sec  ( 17.1%)
+
+Maximum memory used throughout the entire SCFGRAD-calculation: 34.4 MB
+[1793269710.010174] [bhc0184:8923 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.010194] [bhc0184:8924 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.010302] [bhc0184:8925 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.010193] [bhc0184:8926 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.010308] [bhc0184:8927 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.010245] [bhc0184:8928 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.010317] [bhc0184:8929 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.010245] [bhc0184:8930 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.010174] [bhc0184:8931 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.010309] [bhc0184:8932 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.010219] [bhc0184:8933 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.010193] [bhc0184:8934 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.010275] [bhc0184:8935 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.010273] [bhc0184:8936 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.010210] [bhc0184:8937 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.010282] [bhc0184:8938 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.010277] [bhc0184:8939 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.010297] [bhc0184:8940 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.010276] [bhc0184:8941 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.010303] [bhc0184:8942 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.010251] [bhc0184:8943 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.010174] [bhc0184:8944 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.010309] [bhc0184:8945 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.010318] [bhc0184:8946 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+
+
+           ************************************************************
+           *        Program running with 24 parallel MPI-processes    *
+           *              working on a common directory               *
+           ************************************************************
+
+------------------------------------------------------------------------------
+                              ORCA PROPERTY CALCULATIONS
+------------------------------------------------------------------------------
+
+GBWName                                 ... /gpfs/fs2/scratch/kshao4/mlip/codes/X_semiactivelearning/dft_launches/p10_2gpu_6h/P10p0000GPa/acquisition/inputs/cluster_962.gbw
+Number of atoms                         ...     19
+Number of basis functions               ...    354
+Max core memory                         ...   4096 MB
+
+Electric properties:
+Dipole moment                           ... YES
+Quadrupole moment                       ...  NO
+Static polarizability (Dipole/Dipole)   ...  NO
+Static polarizability (Dipole/Quad.)    ...  NO
+Static polarizability (Quad./Quad.)     ...  NO
+Static polarizability (Velocity)        ...  NO
+Static hyperpolarizability              ...  NO
+
+Atomic electric properties:
+Dipole moment                           ...  NO
+Quadrupole moment                       ...  NO
+Static polarizability                   ...  NO
+
+Choice of electric origin               ... Center of mass
+Position of electric origin             ...     5.078335     2.126765    -3.113782
+
+General magnetic properties:
+Magnetizability                         ...  NO
+
+EPR properties:
+g-Tensor (aka g-matrix)                 ...  NO
+Zero-Field splitting spin-orbit         ...  NO
+Zero-field splitting spin-spin          ...  NO
+Hyperfine couplings                     ...  NO (   0 nuclei)
+Quadrupole couplings                    ...  NO (   0 nuclei)
+Contact density                         ...  NO (   0 nuclei)
+
+NMR properties:
+Chemical shifts                         ...  NO (   0 nuclei)
+Spin-rotation constants                 ...  NO (   0 nuclei)
+Spin-spin couplings                     ...  NO (   0 nuclei,    0 pairs)
+
+Choice of magnetic origin               ... GIAO
+Position of magnetic origin             ...     0.000000     0.000000     0.000000
+
+Properties with geometric perturbations:
+SCF Hessian                             ...  NO
+IR spectrum                             ...  NO
+VCD spectrum                            ...  NO
+X-ray spectroscopy properties:
+SCF XES/XAS/RIXS spectra                ...  NO
+
+SCF SOC stabilization energy            ...  NO
+Diagonal Born-Oppenheimer correction    ...  NO
+
+-------------
+DIPOLE MOMENT
+-------------
+
+Method             : SCF
+Type of density    : Electron Density
+Multiplicity       :   1
+Irrep              :   0
+Energy             :  -436.9914481489378204 Eh
+Basis              : AO
+                                X                 Y                 Z
+Electronic contribution:     25.876929276       8.827677322     -35.227586119
+Nuclear contribution   :    -27.248736073     -10.242982967      37.017525878
+                        -----------------------------------------
+Total Dipole Moment    :     -1.371806797      -1.415305646       1.789939760
+                        -----------------------------------------
+Magnitude (a.u.)       :      2.662485362
+Magnitude (Debye)      :      6.767499968
+
+
+
+--------------------
+Rotational spectrum 
+--------------------
+ 
+Rotational constants in cm-1:             0.011061             0.009858             0.006493 
+Rotational constants in MHz :           331.602181           295.536035           194.658663 
+
+Dipole components along the rotational axes: 
+x,y,z [a.u.] :    -1.960397     1.568974     0.885434 
+x,y,z [Debye]:    -4.982932     3.988016     2.250594 
+
+ 
+
+Dipole moment calculation done in   0.0 sec 
+
+Maximum memory used throughout the entire PROP-calculation: 13.8 MB
+[1793269710.968665] [bhc0184:9001 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.968750] [bhc0184:9002 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.968592] [bhc0184:9003 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.968555] [bhc0184:9004 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.968584] [bhc0184:9005 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.968556] [bhc0184:9006 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.968729] [bhc0184:9007 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.968772] [bhc0184:9008 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.968697] [bhc0184:9009 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.968695] [bhc0184:9010 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.968756] [bhc0184:9011 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.969227] [bhc0184:9012 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.968579] [bhc0184:9013 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.968741] [bhc0184:9014 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.968595] [bhc0184:9015 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.968769] [bhc0184:9016 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.968792] [bhc0184:9017 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.968710] [bhc0184:9018 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.968708] [bhc0184:9019 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.968720] [bhc0184:9021 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.968551] [bhc0184:9022 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.968713] [bhc0184:9024 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.968724] [bhc0184:9025 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793269710.968602] [bhc0184:9026 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+
+--------------------------------
+SUGGESTED CITATIONS FOR THIS RUN
+--------------------------------
+
+Below you find a list of papers that are relevant to this ORCA run
+We neither can nor want to force you to cite these papers, but we appreciate if you do
+You receive ORCA, which is the product of decades of hard work by many enthusiastic individuals, for free
+The only thing we kindly ask in return is that you cite our papers,
+We deeply appreciate it, if you show your appreciation for ORCA by not just citing the generic ORCA reference.
+
+Please note that relegating all ORCA citations to the supporting information does *not* help us.
+SI sections are not indexed - citations you put there will not count into any citation statistics
+But we need these citations in order to attract the funding resources that allow us to do what we are doing
+
+Therefore, if you are a happy ORCA user, please consider citing a few of the papers listed below in the main body of your paper
+
+In addition to the list printed below, the program has created the file /gpfs/fs2/scratch/kshao4/mlip/codes/X_semiactivelearning/dft_launches/p10_2gpu_6h/P10p0000GPa/acquisition/inputs/cluster_962.bibtex that contains the list in bibtex format
+You can import this file easily into all common literature databanks and citation aid programs
+
+It goes without saying that in many instances, there are alternative algorithms to achieve similar
+results as the ones you have gotten from ORCA. It is, of course, also the case that in some instances
+ORCA just re-implements algorithms worked out by others. We are fully aware of that and we are also
+fully appreciative of our colleagues work. Hence this citation list should not be read as indicating
+that the listed papers, which are focused on our own work, are the only ones worth citing. It simply
+meant to make it easier for users to cite ORCA specific papers. It is not a substitute for doing your
+own literature research and citing the relevant literature in a scientifically appropriate manner.
+
+List of essential papers. We consider these as the minimum necessary citations
+
+  1. Neese, F.
+     Software update: the ORCA program system, version 6.0
+     WIRES Comput. Molec. Sci. 2025 15(1), e70019
+     doi.org/10.1002/wcms.70019
+
+List of papers to cite with high priority. The work reported in these papers was absolutely
+necessary for this run to complete.
+Our perspective: the developers of density functionals and basis sets usually get cited in chemistry papers
+Good! But without the algorithms to do something with them, the functionals or basis sets would not do anything.
+Hence, in our opinion, the algorithm design and method developments papers are equally worthy of getting cited
+
+  1. Neese, F.
+     An improvement of the resolution of the identity approximation for the formation of the Coulomb matrix
+     J. Comp. Chem. 2003 24(14), 1740-1747
+     doi.org/10.1002/jcc.10318
+  2. Neese, F.; Wennmohs, F.; Hansen, A.; Becker, U.
+     Efficient, approximate and parallel Hartree-Fock and hybrid DFT calculations. A 'chain-of-spheres' algorithm for the Hartree-Fock exchange
+     Chem. Phys. 2009 356(1-3), 98-109
+     doi.org/10.1016/j.chemphys.2008.10.036
+  3. Caldeweyher, E.; Bannwarth, C.; Grimme, S.
+     Extension of the D3 dispersion coefficient model
+     J. Chem. Phys. 2017 147 , 034112
+     doi.org/10.1063/1.4993215
+  4. Lehtola, S.; Steigemann, C.; Oliveira, M.; Marques, M.
+     Recent developments in Libxc - A comprehensive library of functionals for density functional theory
+     Software X 2018 7 , 
+     doi.org/10.1016/j.softx.2017.11.002
+  5. Caldeweyher, E.; Ehlert, S.; Hansen, A.; Neugebauer, H.; Spicher, S.; Bannwarth, C.; Grimme, S.
+     A generally applicable atomic-charge dependent London dispersion correction
+     J. Chem. Phys. 2019 150 , 154122
+     doi.org/10.1063/1.5090222
+  6. Helmich-Paris, B.; de Souza, B.; Neese, F.; Izsák, R.
+     An improved chain of spheres for exchange algorithm
+     J. Chem. Phys. 2021 155(10), 104109
+     doi.org/10.1063/5.0058766
+  7. Helmich-Paris, B.
+     A trust-region augmented Hessian implementation for restricted and unrestricted Hartree–Fock and Kohn–Sham methods
+     J. Chem. Phys. 2021 154 , 164104
+     doi.org/10.1063/5.0040798
+  8. Neese, F.
+     The SHARK Integral Generation and Digestion System
+     J. Comp. Chem. 2022 44(3), 381
+     doi.org/10.1002/jcc.26942
+  9. Friede, M.; Ehlert, S.; Grimme, S.; Mewes, J.
+     Do Optimally Tuned Range-Separated Hybrid Functionals Require a Reparametrization of the Dispersion Correction? It Depends
+     J. Chem. Theory Comput. 2023 19(22), 8097-8107
+     doi.org/10.1021/acs.jctc.3c00717
+
+List of suggested additional citations. These are papers that are important in the 'surrounding' of 
+of this run, or papers that preceded the highly important papers. If you like your results we are grateful for a citation.
+
+  1. Izsak, R.; Neese, F.
+     An overlap fitted chain of spheres exchange method
+     J. Chem. Phys. 2011 135 , 144105
+     doi.org/10.1063/1.3646921
+  2. Izsak, R.; Hansen, A.; Neese, F.
+     The resolution of identity and chain of spheres approximations for the LPNO-CCSD singles Fock term
+     Molec. Phys. 2012 110 , 2413-2417
+     doi.org/10.1080/00268976.2012.687466
+  3. Neese, F.
+     The ORCA program system
+     WIRES Comput. Molec. Sci. 2012 2(1), 73-78
+     doi.org/10.1002/wcms.81
+  4. Izsak, R.; Neese, F.; Klopper, W.
+     Robust fitting techniques in the chain of spheres approximation to the Fock exchange: The role of the complementary space
+     J. Chem. Phys. 2013 139 , 
+     doi.org/10.1063/1.4819264
+  5. Neese, F.
+     Software update: the ORCA program system, version 4.0
+     WIRES Comput. Molec. Sci. 2018 8(1), 1-6
+     doi.org/10.1002/wcms.1327
+  6. Neese, F.; Wennmohs, F.; Becker, U.; Riplinger, C.
+     The ORCA quantum chemistry program package
+     J. Chem. Phys. 2020 152(22), 224108
+     doi.org/10.1063/5.0004608
+  7. Neese, F.
+     Software update: The ORCA program system—Version 5.0
+     WIRES Comput. Molec. Sci. 2022 12(1), e1606
+     doi.org/10.1002/wcms.1606
+
+List of optional additional citations
+
+  1. Neese, F.
+     Approximate second-order SCF convergence for spin unrestricted wavefunctions
+     Chem. Phys. Lett. 2000 325(1-3), 93-98
+     doi.org/10.1016/s0009-2614(00)00662-x
+
+Timings for individual modules:
+
+Sum of individual times          ...      327.241 sec (=   5.454 min)
+Startup calculation              ...        2.227 sec (=   0.037 min)   0.7 %
+SCF iterations                   ...      320.919 sec (=   5.349 min)  98.1 %
+Property calculations            ...        1.002 sec (=   0.017 min)   0.3 %
+SCF Gradient evaluation          ...        3.093 sec (=   0.052 min)   0.9 %
+                             ****ORCA TERMINATED NORMALLY****
+TOTAL RUN TIME: 0 days 0 hours 5 minutes 29 seconds 100 msec

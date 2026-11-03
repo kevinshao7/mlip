@@ -1,0 +1,2409 @@
+
+                                 *****************
+                                 * O   R   C   A *
+                                 *****************
+
+                                            #,                                       
+                                            ###                                      
+                                            ####                                     
+                                            #####                                    
+                                            ######                                   
+                                           ########,                                 
+                                     ,,################,,,,,                         
+                               ,,#################################,,                 
+                          ,,##########################################,,             
+                       ,#########################################, ''#####,          
+                    ,#############################################,,   '####,        
+                  ,##################################################,,,,####,       
+                ,###########''''           ''''###############################       
+              ,#####''   ,,,,##########,,,,          '''####'''          '####       
+            ,##' ,,,,###########################,,,                        '##       
+           ' ,,###''''                  '''############,,,                           
+         ,,##''                                '''############,,,,        ,,,,,,###''
+      ,#''                                            '''#######################'''  
+     '                                                          ''''####''''         
+             ,#######,   #######,   ,#######,      ##                                
+            ,#'     '#,  ##    ##  ,#'     '#,    #''#        ,####,    ,#,          
+            ##       ##  ##   ,#'  ##            #'  '#       #'       ,# #          
+            ##       ##  #######   ##           ,######,      #####,      #          
+            '#,     ,#'  ##    ##  '#,     ,#' ,#      #,     #,   #      #          
+             '#######'   ##     ##  '#######'  #'      '#     '####' #    #          
+
+
+
+                #########################################################
+                #                        -***-                          #
+                #          Department of theory and spectroscopy        #
+                #                                                       #
+                #                      Frank Neese                      #
+                #                                                       #
+                #     Directorship, Architecture, Infrastructure        #
+                #                    SHARK, DRIVERS                     #
+                #        Core code/Algorithms in most modules           #
+                #                                                       #
+                #        Max Planck Institute fuer Kohlenforschung      #
+                #                Kaiser Wilhelm Platz 1                 #
+                #                 D-45470 Muelheim/Ruhr                 #
+                #                      Germany                          #
+                #                                                       #
+                #                  All rights reserved                  #
+                #                        -***-                          #
+                #########################################################
+
+
+                         Program Version 6.1.1  -  RELEASE   -
+                                (GIT: $487d211c$)
+                          ($2025-11-21 10:33:24 +0100$)
+
+
+ With contributions from (in alphabetic order):
+[Max-Planck-Institut fuer Kohlenforschung]                               
+  Daniel Aravena         : Magnetic Suceptibility                        
+  Michael Atanasov       : Ab Initio Ligand Field Theory (pilot matlab implementation)
+  Alexander A. Auer      : GIAO ZORA, VPT2 properties, NMR spectrum      
+  Ute Becker             : All parallelization in ORCA, NUMFREQ, NUMCALC 
+  Giovanni Bistoni       : ED, misc. LED, open-shell LED, HFLD           
+  Dmytro Bykov           : pre 5.0 version of the SCF Hessian            
+  Marcos Casanova-Páez   : Triplet and SCS-CIS(D). UHF-(DLPNO)-IP/EA/STEOM-CCSD. UHF-CVS-IP/STEOM-CCSD   
+  Vijay G. Chilkuri      : MRCI spin determinant printing, contributions to CSF-ICE 
+  Pauline Colinet        : FMM embedding                                 
+  Dipayan Datta          : RHF DLPNO-CCSD density                        
+  Achintya Kumar Dutta   : EOM-CC, STEOM-CC                              
+  Nicolas Foglia         : Exact transition moments, OPA infrastructure, MCD improvements    
+  Dmitry Ganyushin       : Spin-Orbit,Spin-Spin,Magnetic field MRCI      
+  Miquel Garcia-Rates    : C-PCM and meta-GGA Hessian, CCSD/C-PCM, Gaussian charge scheme 
+  Tiago L. C. Gouveia    : GS-ROHF, GS-ROCIS                             
+  Yang Guo               : DLPNO-NEVPT2, F12-NEVPT2, CIM, IAO-localization        
+  Andreas Hansen         : Spin unrestricted coupled pair/coupled cluster methods 
+  Ingolf Harden          : AUTO-CI MPn and infrastructure                
+  Benjamin Helmich-Paris : MC-RPA, TRAH-(SCF,CASSCF), AVAS, COSX integrals, SCF dyn. polar., MC-PDFT, srDFT 
+  Lee Huntington         : MR-EOM, pCC                                   
+  Robert Izsak           : Overlap fitted RIJCOSX, COSX-SCS-MP3, EOM     
+  Riya Kayal             : Wick's Theorem for AUTO-CI, AUTO-CI UHF-CCSDT 
+  Emily Kempfer          : AUTO-CI RHF CISDT and CCSDT, approximate NEVPT4
+  Christian Kollmar      : KDIIS, OOCD, Brueckner-CCSD(T), CCSD density, CASPT2, CASPT2-K, improved NEVPT2 
+  Axel Koslowski         : Symmetry handling                             
+  Simone Kossmann        : meta-GGA functionals, TD-DFT gradient, OOMP2, (MP2 Hessian; deprecated post 5.0) 
+  Lucas Lang             : DCDCAS, Hyperfine gauge corrections, ICE-SOC+SSC
+  Marvin Lechner         : AUTO-CI (C++ implementation), FIC-MRCC        
+  Spencer Leger          : CASSCF response                               
+  Dagmar Lenk            : GEPOL surface, SMD, ORCA-2-JSON               
+  Dimitrios Liakos       : Extrapolation schemes; Compound Job, Property file
+  Dimitrios Manganas     : Further ROCIS development; embedding schemes. LFT, Crystal Embedding 
+  Dimitrios Pantazis     : SARC Basis sets                               
+  Anastasios Papadopoulos: AUTO-CI, single reference methods and gradients 
+  Taras Petrenko         : pre 6.0 DFT Hessian and TD-DFT gradient,  ECA, NRVS 
+  Petra Pikulova         : Analytic Raman intensities                    
+  Peter Pinski           : DLPNO-MP2, DLPNO-MP2 Gradient                 
+  Shashank Vittal Rao    : ES-AILFT, MagRelax                            
+  Christoph Reimann      : Effective Core Potentials                     
+  Marius Retegan         : Local ZFS, SOC                                
+  Christoph Riplinger    : Optimizer, TS searches, QM/MM, DLPNO-CCSD(T), (RO)-DLPNO pert. Triples 
+  Michael Roemelt        : Original ROCIS implementation, recursive CI coupling coefficients
+  Masaaki Saitow         : Open-shell DLPNO-CCSD energy and density      
+  Barbara Sandhoefer     : DKH picture change effects                    
+  Yorick L. A. Schmerwitz: GMF and freeze-and-release deltaSCF, NEB S-IDPP initial path                    
+  Kantharuban Sivalingam : CASSCF convergence/infrastructure, NEVPT2, NEVPT3, NEVPT4(SD), FIC-MRCI and CEPA variants
+  Bernardo de Souza      : ESD, SOC TD-DFT                               
+  Georgi L. Stoychev     : AutoAux, RI-MP2 NMR, DLPNO-MP2 response, X2C  
+  Van Anh Tran           : RI-MP2 g-tensors                              
+  Willem Van den Heuvel  : Paramagnetic NMR                              
+  Zikuan Wang            : NOTCH, Electric field optimization            
+  Frank Wennmohs         : Technical directorship and infrastructure     
+  Hang Xu                : AUTO-CI-Response properties                   
+                                                                         
+[FACCTs GmbH]                                                            
+  Markus Bursch, Nicolas Foglia, Miquel Garcia-Rates, Ingolf Harden, Hagen Neugebauer, Anastasios Papadopoulos, 
+  Christoph Riplinger, Bernardo de Souza, Georgi L. Stoychev                                                    
+                                                                 
+  APM, various basis sets, CI-OPT, improved COSX, DLPNO-Multilevel,           
+  DOCKER, DRACO, updates on ESD, Fragmentator, GOAT, IRC, LR-CPCM, L-BFGS, MBIS, meta-GGA TD-DFT gradient, ML-optimized integration grids, 
+  MM, NACMEs, nearIR, NEB, NEB-TS, NL-DFT gradient (VV10), 2- and 3-layer-ONIOM, interface openCOSMO-RS, QMMM,   
+  Crystal-QMMM, RESP, rigid body optimization, SF, symmetry and pop. for TD-DFT, various functionals, SOLVATOR                                   
+                                                                         
+[Other institutions]                                                     
+  V. Asgeirsson          : NEB                                           
+  Christoph Bannwarth    : sTDA-DFT, sTD-DFT, PBEh-3c, B97-3c, D3        
+  Giovanni Bistoni       : ETS/NOCV, ADLD/ADEX, COVALED                  
+  Martin Brehm           : Molecular dynamics                            
+  Ronald Cardenas        : ETS/NOCV                                      
+  Martina Colucci        : COVALED                                       
+  Sebastian Ehlert       : rSCAN, r2SCAN, r2SCAN-3c, D4, dhf basis sets  
+  Marvin Friede          : D4 for Fr, Ra, Ac-Lr                          
+  Lars Goerigk           : TD-DFT with DH, B97 family of functionals     
+  Stefan Grimme          : VdW corrections, initial TS optimization, DFT functionals, gCP, sTDA/sTD-DF 
+  Waldemar Hujo          : DFT-NL                                        
+  H. Jonsson             : NEB                                           
+  Holger Kruse           : gCP                                           
+  Marcel Mueller         : wB97X-3c, vDZP basis set                      
+  Hagen Neugebauer       : wr2SCAN, Native XTB                           
+  Gianluca Regni         : ADLD/ADEX                                     
+  Tobias Risthaus        : pre 6.0 range-separated hybrid DFT and stability analysis
+  Lukas Wittmann         : regularized MP2, r2SCAN double-hybrids, wr2SCAN        
+                                                                         
+We gratefully acknowledge several colleagues who have allowed us to      
+interface, adapt or use parts of their codes:                            
+  Ed Valeev, F. Pavosevic, A. Kumar             : LibInt (2-el integral package), F12 methods 
+  Garnet Chan, S. Sharma, J. Yang, R. Olivares  : DMRG                   
+  Ulf Ekstrom                                   : XCFun DFT Library      
+  Mihaly Kallay                                 : mrcc  (arbitrary order and MRCC methods)
+  Frank Weinhold                                : gennbo (NPA and NBO analysis)           
+  Simon Mueller                                 : openCOSMO-RS                            
+  Christopher J. Cramer and Donald G. Truhlar   : smd solvation model                     
+  S Lehtola, MJT Oliveira, MAL Marques          : LibXC Library                           
+  Liviu Ungur et al                             : ANISO software                          
+
+
+ Your calculation uses the libint2 library for the computation of 2-el integrals
+ For citations please refer to: http://libint.valeyev.net
+
+ Your ORCA version has been built with support for libXC version: 7.0.0
+ For citations please refer to: https://libxc.gitlab.io
+
+ This ORCA versions uses:
+   CBLAS   interface :  Fast vector & matrix operations
+   LAPACKE interface :  Fast linear algebra routines
+   SCALAPACK package :  Parallel linear algebra routines
+   Shared memory     :  Shared parallel matrices
+   BLAS/LAPACK       :  OpenBLAS 0.3.29  USE64BITINT DYNAMIC_ARCH NO_AFFINITY Haswell SINGLE_THREADED
+        Core in use  :  Haswell
+   Copyright (c) 2011-2014, The OpenBLAS Project
+
+
+  ***********************************
+  * Starting time: Thu Oct 29 01:59:37 2026
+  * Host name:     bhc0185.bluehive.circ.private
+  * Process ID:    2338
+  * Working dir.:  /gpfs/fs2/scratch/kshao4/mlip/outputsfull/X_semiactivelearning/p10_2gpu_6h/cycles/P10p0000GPa/dft/acquisition
+  ***********************************
+
+Your calculation utilizes the atom-pairwise dispersion correction
+based on EEQ partial charges (D4)
+
+
+Warning: RI is on but no J-basis has been assigned. Assigning Def2/J (nothing to worry about!)
+================================================================================
+
+----- Orbital basis set information -----
+Your calculation utilizes the basis: def2-TZVPD
+   F. Weigend and R. Ahlrichs, Phys. Chem. Chem. Phys. 7, 3297 (2005).
+   D. Rappoport and F. Furche, J. Chem. Phys. 133, 134105 (2010)
+   D. Rappoport, J. Chem. Phys. 155, 124102 (2021).
+
+----- AuxJ basis set information -----
+Your calculation utilizes the auxiliary basis: def2/J
+   H-Rn: F. Weigend, Phys. Chem. Chem. Phys. 8, 1057 (2006).
+   Fr-Lr: K. Eichkorn, F. Weigend, O. Treutler, R. Ahlrichs; Theor. Chem. Acc. 97, 119 (1997).
+
+================================================================================
+                                        WARNINGS
+                       Please study these warnings very carefully!
+================================================================================
+
+
+WARNING: B97M-V or wB97M-V functional requested.
+  ===> : libXC variant has now been activated.
+         Any manually given DFX/HFX/RangeSep scaling parameters are IGNORED!
+
+
+================================================================================
+                                       INPUT FILE
+================================================================================
+NAME = /gpfs/fs2/scratch/kshao4/mlip/codes/X_semiactivelearning/dft_launches/p10_2gpu_6h/P10p0000GPa/acquisition/inputs/cluster_479.inp
+|  1> ! wB97M-D4rev def2-TZVPD EnGrad RIJCOSX
+|  2> %pal nprocs 24 end
+|  3> * xyz 0 1
+|  4> H 0.000000000000 0.000000000000 0.000000000000
+|  5> H -0.781140360000 -1.474495840000 -0.506082290000
+|  6> H -1.365340120000 0.186237250000 -0.518652050000
+|  7> N -0.778484590000 -0.486798710000 -0.017015540000
+|  8> O 0.638817290000 -0.371400780000 -5.946479330000
+|  9> H 0.946154640000 -0.631009960000 6.164282430000
+| 10> H 0.698291560000 -1.122967520000 -5.285216560000
+| 11> N -1.586139050000 1.431193110000 6.471776870000
+| 12> H -0.936499600000 1.826089760000 5.820164990000
+| 13> H -1.127489860000 0.914895170000 -5.975654780000
+| 14> H -2.352694900000 1.922127570000 -6.398575380000
+| 15> H 0.279744880000 -0.294667800000 -1.456320570000
+| 16> H 1.375420150000 0.728501000000 -1.882026200000
+| 17> N 1.186489410000 -0.213627570000 -1.646412230000
+| 18> H 1.768746140000 -0.387715280000 -0.844977670000
+| 19> H -6.200753780000 5.230256670000 -0.392874590000
+| 20> O -6.381012960000 6.032188840000 -0.930104230000
+| 21> H 6.377714460000 -6.400266550000 -0.525056530000
+| 22> O -2.348493720000 0.407415800000 2.057891830000
+| 23> H -1.790181170000 0.793177500000 1.377709990000
+| 24> H -1.917570550000 -0.541594580000 2.325983190000
+| 25> *
+| 26> 
+| 27>                          ****END OF INPUT****
+================================================================================
+
+                     *******************************
+                     * Energy+Gradient Calculation *
+                     *******************************
+
+---------------------------------
+CARTESIAN COORDINATES (ANGSTROEM)
+---------------------------------
+  H      0.000000    0.000000    0.000000
+  H     -0.781140   -1.474496   -0.506082
+  H     -1.365340    0.186237   -0.518652
+  N     -0.778485   -0.486799   -0.017016
+  O      0.638817   -0.371401   -5.946479
+  H      0.946155   -0.631010    6.164282
+  H      0.698292   -1.122968   -5.285217
+  N     -1.586139    1.431193    6.471777
+  H     -0.936500    1.826090    5.820165
+  H     -1.127490    0.914895   -5.975655
+  H     -2.352695    1.922128   -6.398575
+  H      0.279745   -0.294668   -1.456321
+  H      1.375420    0.728501   -1.882026
+  N      1.186489   -0.213628   -1.646412
+  H      1.768746   -0.387715   -0.844978
+  H     -6.200754    5.230257   -0.392875
+  O     -6.381013    6.032189   -0.930104
+  H      6.377714   -6.400267   -0.525057
+  O     -2.348494    0.407416    2.057892
+  H     -1.790181    0.793177    1.377710
+  H     -1.917571   -0.541595    2.325983
+
+----------------------------
+CARTESIAN COORDINATES (A.U.)
+----------------------------
+  NO LB      ZA    FRAG     MASS         X           Y           Z
+   0 H     1.0000    0     1.008    0.000000    0.000000    0.000000
+   1 H     1.0000    0     1.008   -1.476141   -2.786393   -0.956357
+   2 H     1.0000    0     1.008   -2.580119    0.351937   -0.980110
+   3 N     7.0000    0    14.007   -1.471123   -0.919916   -0.032155
+   4 O     8.0000    0    15.999    1.207190   -0.701846  -11.237217
+   5 H     1.0000    0     1.008    1.787973   -1.192436   11.648806
+   6 H     1.0000    0     1.008    1.319580   -2.122101   -9.987612
+   7 N     7.0000    0    14.007   -2.997368    2.704563   12.229886
+   8 H     1.0000    0     1.008   -1.769728    3.450810   10.998518
+   9 H     1.0000    0     1.008   -2.130647    1.728901  -11.292351
+  10 H     1.0000    0     1.008   -4.445949    3.632295  -12.091555
+  11 H     1.0000    0     1.008    0.528641   -0.556841   -2.752047
+  12 H     1.0000    0     1.008    2.599167    1.376667   -3.556514
+  13 N     7.0000    0    14.007    2.242140   -0.403698   -3.111268
+  14 H     1.0000    0     1.008    3.342446   -0.732676   -1.596776
+  15 H     1.0000    0     1.008  -11.717726    9.883753   -0.742425
+  16 O     8.0000    0    15.999  -12.058367   11.399185   -1.757642
+  17 H     1.0000    0     1.008   12.052134  -12.094751   -0.992213
+  18 O     8.0000    0    15.999   -4.438010    0.769904    3.888852
+  19 H     1.0000    0     1.008   -3.382952    1.498888    2.603495
+  20 H     1.0000    0     1.008   -3.623683   -1.023465    4.395471
+
+--------------------------------
+INTERNAL COORDINATES (ANGSTROEM)
+--------------------------------
+ H      0   0   0     0.000000000000     0.00000000     0.00000000
+ H      1   0   0     1.743685042790     0.00000000     0.00000000
+ H      1   2   0     1.472357940699    65.75130667     0.00000000
+ N      1   2   3     0.918314090890    33.54926823    40.47440548
+ O      2   1   3     5.729835808470    90.10089266    81.91152738
+ H      1   2   3     6.268313971812   105.54018325   116.29087871
+ H      5   2   1     1.002825111599    40.91554636   129.56052134
+ N      6   1   2     3.280205125440    84.97289631   255.73594148
+ H      8   6   1     1.001285584304    71.70360011   310.10361659
+ H      5   2   1     2.185234409854    85.73837402   277.58615762
+ H     10   5   2     1.641495151243   165.45100049   184.57112051
+ H      1   2   3     1.511937800588    68.80890543   269.63705166
+ H     12   1   2     1.558397886933   105.38171466   189.45930959
+ N     12   1   2     0.929993548776   111.11846813   228.05278314
+ H     14  12   1     1.005796591944   112.73542747    27.09883738
+ H      3   1   2     6.988503211854   136.59989417   164.60768047
+ O     16   3   1     0.981939032400   134.96045931    84.43442094
+ H     15  14  12     7.582592649283   121.51630813   113.45027873
+ O      4   1   2     2.751324926696   107.30660860   157.08956938
+ H     19   4   1     0.960818571917    42.69514281    42.97468182
+ H     19   4   1     1.076191645153    70.89937260   255.83719936
+
+---------------------------
+INTERNAL COORDINATES (A.U.)
+---------------------------
+ H      0   0   0     0.000000000000     0.00000000     0.00000000
+ H      1   0   0     3.295087194688     0.00000000     0.00000000
+ H      1   2   0     2.782353279025    65.75130667     0.00000000
+ N      1   2   3     1.735362136702    33.54926823    40.47440548
+ O      2   1   3    10.827820470344    90.10089266    81.91152738
+ H      1   2   3    11.845396728158   105.54018325   116.29087871
+ H      5   2   1     1.895064821142    40.91554636   129.56052134
+ N      6   1   2     6.198689350166    84.97289631   255.73594148
+ H      8   6   1     1.892155536178    71.70360011   310.10361659
+ H      5   2   1     4.129494573045    85.73837402   277.58615762
+ H     10   5   2     3.101976286010   165.45100049   184.57112051
+ H      1   2   3     2.857148374635    68.80890543   269.63705166
+ H     12   1   2     2.944945213985   105.38171466   189.45930959
+ N     12   1   2     1.757433113500   111.11846813   228.05278314
+ H     14  12   1     1.900680105205   112.73542747    27.09883738
+ H      3   1   2    13.206357156433   136.59989417   164.60768047
+ O     16   3   1     1.855595851443   134.96045931    84.43442094
+ H     15  14  12    14.329023492229   121.51630813   113.45027873
+ O      4   1   2     5.199250616886   107.30660860   157.08956938
+ H     19   4   1     1.815683965308    42.69514281    42.97468182
+ H     19   4   1     2.033707476953    70.89937260   255.83719936
+
+---------------------
+BASIS SET INFORMATION
+---------------------
+There are 3 groups of distinct atoms
+
+ Group   1 Type H   : 5s2p contracted to 3s2p pattern {311/11}
+ Group   2 Type N   : 12s6p3d1f contracted to 6s3p3d1f pattern {621111/411/111/1}
+ Group   3 Type O   : 12s7p3d1f contracted to 6s4p3d1f pattern {621111/4111/111/1}
+
+Atom   0H    basis set group =>   1
+Atom   1H    basis set group =>   1
+Atom   2H    basis set group =>   1
+Atom   3N    basis set group =>   2
+Atom   4O    basis set group =>   3
+Atom   5H    basis set group =>   1
+Atom   6H    basis set group =>   1
+Atom   7N    basis set group =>   2
+Atom   8H    basis set group =>   1
+Atom   9H    basis set group =>   1
+Atom  10H    basis set group =>   1
+Atom  11H    basis set group =>   1
+Atom  12H    basis set group =>   1
+Atom  13N    basis set group =>   2
+Atom  14H    basis set group =>   1
+Atom  15H    basis set group =>   1
+Atom  16O    basis set group =>   3
+Atom  17H    basis set group =>   1
+Atom  18O    basis set group =>   3
+Atom  19H    basis set group =>   1
+Atom  20H    basis set group =>   1
+---------------------------------
+AUXILIARY/J BASIS SET INFORMATION
+---------------------------------
+There are 3 groups of distinct atoms
+
+ Group   1 Type H   : 5s2p1d contracted to 3s1p1d pattern {311/2/1}
+ Group   2 Type N   : 12s5p4d2f1g contracted to 6s4p3d1f1g pattern {711111/2111/211/2/1}
+ Group   3 Type O   : 12s5p4d2f1g contracted to 6s4p3d1f1g pattern {711111/2111/211/2/1}
+
+Atom   0H    basis set group =>   1
+Atom   1H    basis set group =>   1
+Atom   2H    basis set group =>   1
+Atom   3N    basis set group =>   2
+Atom   4O    basis set group =>   3
+Atom   5H    basis set group =>   1
+Atom   6H    basis set group =>   1
+Atom   7N    basis set group =>   2
+Atom   8H    basis set group =>   1
+Atom   9H    basis set group =>   1
+Atom  10H    basis set group =>   1
+Atom  11H    basis set group =>   1
+Atom  12H    basis set group =>   1
+Atom  13N    basis set group =>   2
+Atom  14H    basis set group =>   1
+Atom  15H    basis set group =>   1
+Atom  16O    basis set group =>   3
+Atom  17H    basis set group =>   1
+Atom  18O    basis set group =>   3
+Atom  19H    basis set group =>   1
+Atom  20H    basis set group =>   1
+[1793253578.064076] [bhc0185:2343 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253578.064187] [bhc0185:2344 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253578.064144] [bhc0185:2345 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253578.064224] [bhc0185:2346 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253578.064214] [bhc0185:2347 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253578.064181] [bhc0185:2348 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253578.064197] [bhc0185:2349 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253578.064169] [bhc0185:2350 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253578.064189] [bhc0185:2351 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253578.064140] [bhc0185:2352 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253578.064027] [bhc0185:2353 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253578.064140] [bhc0185:2354 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253578.064223] [bhc0185:2355 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253578.064217] [bhc0185:2356 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253578.064022] [bhc0185:2357 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253578.064245] [bhc0185:2358 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253578.064189] [bhc0185:2359 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253578.064009] [bhc0185:2360 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253578.063939] [bhc0185:2361 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253578.064128] [bhc0185:2362 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253578.064013] [bhc0185:2364 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253578.064247] [bhc0185:2365 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253578.064176] [bhc0185:2366 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253578.063958] [bhc0185:2367 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+
+
+           ************************************************************
+           *        Program running with 24 parallel MPI-processes    *
+           *              working on a common directory               *
+           ************************************************************
+------------------------------------------------------------------------------
+                             ORCA STARTUP CALCULATIONS
+                           -- RI-GTO INTEGRALS CHOSEN --
+------------------------------------------------------------------------------
+------------------------------------------------------------------------------
+                   ___                                                        
+                  /   \      - P O W E R E D   B Y -                         
+                 /     \                                                     
+                 |  |  |   _    _      __       _____    __    __             
+                 |  |  |  | |  | |    /  \     |  _  \  |  |  /  |          
+                  \  \/   | |  | |   /    \    | | | |  |  | /  /          
+                 / \  \   | |__| |  /  /\  \   | |_| |  |  |/  /          
+                |  |  |   |  __  | /  /__\  \  |    /   |      \           
+                |  |  |   | |  | | |   __   |  |    \   |  |\   \          
+                \     /   | |  | | |  |  |  |  | |\  \  |  | \   \       
+                 \___/    |_|  |_| |__|  |__|  |_| \__\ |__|  \__/        
+                                                                              
+                      - O R C A' S   B I G   F R I E N D -                    
+                                      &                                       
+                       - I N T E G R A L  F E E D E R -                       
+                                                                              
+ v1 FN, 2020, v2 2021, v3 2022-2024                                           
+------------------------------------------------------------------------------
+
+
+----------------------
+SHARK INTEGRAL PACKAGE
+----------------------
+
+Number of atoms                             ...     21
+Number of basis functions                   ...    366
+Number of shells                            ...    156
+Maximum angular momentum                    ...      3
+Integral batch strategy                     ... SHARK/LIBINT Hybrid
+RI-J (if used) integral strategy            ... SPLIT-RIJ (Revised 2003 algorithm where possible)
+Printlevel                                  ...      1
+Contraction scheme used                     ... SEGMENTED contraction
+Prescreening option                         ... SCHWARTZ
+   Thresh                                   ... 2.500e-11
+   Tcut                                     ... 2.500e-12
+   Tpresel                                  ... 2.500e-12 
+Coulomb Range Separation                    ... NOT USED
+Exchange Range Separation                   ... Long Range
+   Mu parameter                             ... 3.000e-01
+   Scaling (regular/separated)              ... 1.500e-01 8.500e-01
+Robust (split-)RI terms used:
+  metric    (central integrals)             ... YES
+  density   (r.h.s.  integrals)             ... YES
+  potential (l.h.s.  integrals)             ... YES
+Multipole approximations                    ... NOT USED
+Finite Nucleus Model                        ... NOT USED
+CABS basis                                  ... NOT available
+Auxiliary Coulomb fitting basis             ... AVAILABLE
+   # of basis functions in Aux-J            ...    459
+   # of shells in Aux-J                     ...    165
+   Maximum angular momentum in Aux-J        ...      4
+Auxiliary J/K fitting basis                 ... NOT available
+Auxiliary Correlation fitting basis         ... NOT available
+Auxiliary 'external' fitting basis          ... NOT available
+
+Checking pre-screening integrals            ... done (  0.0 sec) Dimension = 156
+   => SHARK Basis and OBASIS are compatible. Storing Pre-screening
+Shell pair information
+Shell pair cut-off parameter TPreSel        ...   2.5e-12
+Total number of shell pairs                 ...     12246
+Shell pairs after pre-screening             ...      7716
+Total number of primitive shell pairs       ...     29097
+Primitive shell pairs kept                  ...     13641
+          la=0 lb=0:   2015 shell pairs
+          la=1 lb=0:   2737 shell pairs
+          la=1 lb=1:    956 shell pairs
+          la=2 lb=0:    853 shell pairs
+          la=2 lb=1:    598 shell pairs
+          la=2 lb=2:    102 shell pairs
+          la=3 lb=0:    231 shell pairs
+          la=3 lb=1:    166 shell pairs
+          la=3 lb=2:     50 shell pairs
+          la=3 lb=3:      8 shell pairs
+
+Checking whether 4 symmetric matrices of dimension 366 fit in memory
+:Max Core in MB      =   4096.00
+ MB in use           =     12.20
+ MB left             =   4083.80
+ MB needed           =      2.05
+ Data fit in memory  = YES
+Calculating RI/J V-Matrix + Cholesky decomp.... done (  0.0 sec)
+Calculating Nuclear repulsion               ... done (  0.0 sec) ENN=    186.888776404624 Eh
+
+Diagonalization of the overlap matrix:
+Smallest eigenvalue                        ... 8.727e-05
+Time for diagonalization                   ...    0.023 sec
+Threshold for overlap eigenvalues          ... 1.000e-07
+Number of eigenvalues below threshold      ... 0
+Time for construction of square roots      ...    0.023 sec
+Total time needed                          ...    0.049 sec
+
+-------------------
+DFT GRID GENERATION
+-------------------
+
+General Integration Accuracy     IntAcc      ... 4.388
+Radial Grid Type                 RadialGrid  ... OptM3 with GC (2021)
+Angular Grid (max. ang.)         AngularGrid ... 4 (Lebedev-302)
+Angular grid pruning method      GridPruning ... 4 (adaptive)
+Weight generation scheme         WeightScheme... mBecke (2022)
+Basis function cutoff            BFCut       ... 1.0000e-11
+Integration weight cutoff        WCut        ... 1.0000e-14
+Partially contracted basis set               ... off
+Rotationally invariant grid construction     ... off
+Angular grids for H and He will be reduced by one unit
+Diffuse basis detected: some atoms will have their outermost
+                        angular grid increased by 1.
+
+Total number of grid points                  ...    91260
+Total number of batches                      ...     1436
+Average number of points per batch           ...       63
+Average number of grid points per atom       ...     4346
+
+--------------------
+COSX GRID GENERATION
+--------------------
+
+GRIDX 1
+-------
+General Integration Accuracy     IntAcc      ... 3.816
+Radial Grid Type                 RadialGrid  ... OptM3 with GC (2021)
+Angular Grid (max. ang.)         AngularGrid ... 1 (Lebedev-50)
+Angular grid pruning method      GridPruning ... 4 (adaptive)
+Weight generation scheme         WeightScheme... mBecke (2022)
+Basis function cutoff            BFCut       ... 1.0000e-11
+Integration weight cutoff        WCut        ... 1.0000e-14
+Partially contracted basis set               ... on
+Rotationally invariant grid construction     ... off
+Angular grids for H and He will be reduced by one unit
+Diffuse basis detected: some atoms will have their outermost
+                        angular grid increased by 1.
+
+Total number of grid points                  ...    11464
+Total number of batches                      ...      100
+Average number of points per batch           ...      114
+Average number of grid points per atom       ...      546
+UseSFitting                                  ... on
+
+GRIDX 2
+-------
+General Integration Accuracy     IntAcc      ... 4.020
+Radial Grid Type                 RadialGrid  ... OptM3 with GC (2021)
+Angular Grid (max. ang.)         AngularGrid ... 2 (Lebedev-110)
+Angular grid pruning method      GridPruning ... 4 (adaptive)
+Weight generation scheme         WeightScheme... mBecke (2022)
+Basis function cutoff            BFCut       ... 1.0000e-11
+Integration weight cutoff        WCut        ... 1.0000e-14
+Partially contracted basis set               ... on
+Rotationally invariant grid construction     ... off
+Angular grids for H and He will be reduced by one unit
+Diffuse basis detected: some atoms will have their outermost
+                        angular grid increased by 1.
+
+Total number of grid points                  ...    26786
+Total number of batches                      ...      221
+Average number of points per batch           ...      121
+Average number of grid points per atom       ...     1276
+UseSFitting                                  ... on
+
+GRIDX 3
+-------
+General Integration Accuracy     IntAcc      ... 4.338
+Radial Grid Type                 RadialGrid  ... OptM3 with GC (2021)
+Angular Grid (max. ang.)         AngularGrid ... 3 (Lebedev-194)
+Angular grid pruning method      GridPruning ... 4 (adaptive)
+Weight generation scheme         WeightScheme... mBecke (2022)
+Basis function cutoff            BFCut       ... 1.0000e-11
+Integration weight cutoff        WCut        ... 1.0000e-14
+Partially contracted basis set               ... on
+Rotationally invariant grid construction     ... off
+Angular grids for H and He will be reduced by one unit
+Diffuse basis detected: some atoms will have their outermost
+                        angular grid increased by 1.
+
+Total number of grid points                  ...    60985
+Total number of batches                      ...      486
+Average number of points per batch           ...      125
+Average number of grid points per atom       ...     2904
+UseSFitting                                  ... on
+Grids setup in   1.3 sec
+Initializing property integral containers    ... done (  0.0 sec)
+
+SHARK setup successfully completed in   1.6 seconds
+
+Maximum memory used throughout the entire STARTUP-calculation: 28.2 MB
+[1793253580.530556] [bhc0185:2424 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253580.530579] [bhc0185:2425 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253580.530545] [bhc0185:2426 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253580.530559] [bhc0185:2427 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253580.530514] [bhc0185:2430 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253580.530550] [bhc0185:2431 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253580.530461] [bhc0185:2434 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253580.530576] [bhc0185:2435 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253580.530329] [bhc0185:2447 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253580.532968] [bhc0185:2423 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253580.532964] [bhc0185:2428 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253580.532954] [bhc0185:2429 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253580.532961] [bhc0185:2432 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253580.532922] [bhc0185:2433 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253580.532929] [bhc0185:2436 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253580.532916] [bhc0185:2437 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253580.532951] [bhc0185:2438 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253580.532930] [bhc0185:2439 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253580.532900] [bhc0185:2440 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253580.532923] [bhc0185:2441 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253580.532958] [bhc0185:2443 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253580.532957] [bhc0185:2444 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253580.532971] [bhc0185:2445 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253580.532993] [bhc0185:2446 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+
+
+           ************************************************************
+           *        Program running with 24 parallel MPI-processes    *
+           *              working on a common directory               *
+           ************************************************************
+-------------------------------------------------------------------------------
+                                 ORCA GUESS
+                   Start orbitals & Density for SCF / CASSCF
+-------------------------------------------------------------------------------
+
+------------
+SCF SETTINGS
+------------
+Hamiltonian:
+ Density Functional     Method          .... DFT(GTOs)
+  Functional kind                       .... Exchange-Correlation
+  Functional name                       .... wB97M-V exchange-correlation functional
+  Functional family                     .... Hybrid MGGA
+  Functional refs                              
+    [ 0] N. Mardirossian and M. Head-Gordon.,  J. Chem. Phys. 144, 214110 (2016), doi: 10.1063/1.4952647
+  Fraction of HF Exchange (short range) .... 0.1500
+  Fraction of HF Exchange ( int64 range )  .... 1.0000
+  Range separation parameter mu         .... 0.3000
+  Functional external parameters        .... 17
+    Parameter  0 _cx00      =  8.500000e-01 : u^00 coefficient for exchange
+    Parameter  1 _cx01      =  1.007000e+00 : u^01 coefficient for exchange
+    Parameter  2 _cx10      =  2.590000e-01 : u^10 coefficient for exchange
+    Parameter  3 _css00     =  4.430000e-01 : u^00 coefficient for same-spin correlation
+    Parameter  4 _css04     = -1.437000e+00 : u^04 coefficient for same-spin correlation
+    Parameter  5 _css10     = -4.535000e+00 : u^10 coefficient for same-spin correlation
+    Parameter  6 _css20     = -3.390000e+00 : u^20 coefficient for same-spin correlation
+    Parameter  7 _css43     =  4.278000e+00 : u^43 coefficient for same-spin correlation
+    Parameter  8 _cos00     =  1.000000e+00 : u^00 coefficient for opposite-spin correlation
+    Parameter  9 _cos10     =  1.358000e+00 : u^10 coefficient for opposite-spin correlation
+    Parameter 10 _cos20     =  2.924000e+00 : u^20 coefficient for opposite-spin correlation
+    Parameter 11 _cos21     = -8.812000e+00 : u^21 coefficient for opposite-spin correlation
+    Parameter 12 _cos60     = -1.390000e+00 : u^60 coefficient for opposite-spin correlation
+    Parameter 13 _cos61     =  9.142000e+00 : u^61 coefficient for opposite-spin correlation
+    Parameter 14 _alpha     =  1.000000e+00 : fraction of HF exchange
+    Parameter 15 _beta      = -8.500000e-01 : fraction of short-range exchange
+    Parameter 16 _omega     =  3.000000e-01 : range-separation constant
+ Long-range corrected/Screened/Range-Separated Hybrid DFT is turned on
+   Amount of maximum screened exact exchange              ....  0.850000
+   Range separation parameter mu (erf(mu*r12)/r12)        ....  0.300000
+ RI-approximation to the Coulomb term is turned on
+   Number of AuxJ basis functions       .... 459
+   RIJ-COSX (HFX calculated with COS-X)).... on
+
+
+General Settings:
+ Integral files         IntName         .... /gpfs/fs2/scratch/kshao4/mlip/codes/X_semiactivelearning/dft_launches/p10_2gpu_6h/P10p0000GPa/acquisition/inputs/cluster_479
+ Hartree-Fock type      HFTyp           .... RHF
+ Total Charge           Charge          ....    0
+ Multiplicity           Mult            ....    1
+ Number of Electrons    NEL             ....   60
+ Basis Dimension        Dim             ....  366
+ Nuclear Repulsion      ENuc            ....    186.8887764046 Eh
+
+Convergence Acceleration:
+ AO-DIIS                CNVDIIS         .... on
+   Start iteration      DIISMaxIt       ....    12
+   Startup error        DIISStart       ....  0.200000
+   # of expansion vecs  DIISMaxEq       ....     5
+   Bias factor          DIISBfac        ....   1.050
+   Max. coefficient     DIISMaxC        ....  10.000
+ MO-DIIS                CNVKDIIS        .... off
+ Trust-Rad. Augm. Hess. CNVTRAH         .... auto
+   Auto Start mean grad. ratio tolernc. ....  1.125000
+   Auto Start start iteration           ....    50
+   Auto Start num. interpolation iter.  ....    10
+   Max. Number of Micro iterations      ....    24
+   Max. Number of Macro iterations      .... Maxiter - #DIIS iter
+   Number of Davidson start vectors     ....     2
+   Converg. threshold    (grad. norm)   ....   1.000e-05
+   Grad. Scal. Fac. for Micro threshold ....   0.100
+   Minimum threshold for Micro iter.    ....   1.000e-02
+   NR start threshold (gradient norm)   ....   1.000e-04
+   Initial trust radius                 ....   0.400
+   Minimum AH scaling param. (alpha)    ....   1.000
+   Maximum AH scaling param. (alpha)    .... 1000.000
+   Quad. conv. algorithm                .... NR
+   White noise on init. David. guess    .... on
+   Maximum white noise                  ....   0.010
+   Pseudo random numbers                .... off
+   Inactive MOs                         .... canonical
+   Orbital update algorithm             .... Taylor
+   Preconditioner                       .... Diag
+   Full preconditioner red. dimension   ....   250
+ SOSCF                 CNVSOSCF           .... on
+   Start iteration     SOSCFMaxIt         ....   150
+   Startup grad/error  SOSCFStart         ....  0.003300
+   Hessian update      SOSCFHessUp        .... L-BFGS
+   Autom. constraints  SOSCFAutoConstrain .... off
+ Level Shifting         CNVShift        .... on
+   Level shift para.    LevelShift      ....    0.2500
+   Turn off err/grad.   ShiftErr        ....    0.0010
+ Zerner damping         CNVZerner       .... off
+ Static damping         CNVDamp         .... on
+   Fraction old density DampFac         ....    0.7000
+   Max. Damping (<1)    DampMax         ....    0.9800
+   Min. Damping (>=0)   DampMin         ....    0.0000
+   Turn off err/grad.   DampErr         ....    0.1000
+
+SCF Procedure:
+ Maximum # iterations   MaxIter         ....   125
+ SCF integral mode      SCFMode         .... Direct
+   Integral package                     .... SHARK and LIBINT hybrid scheme
+ Reset frequency        DirectResetFreq ....    20
+ Integral Threshold     Thresh          ....  2.500e-11 Eh
+ Primitive CutOff       TCut            ....  2.500e-12 Eh
+
+Convergence Tolerance:
+ Convergence Check Mode ConvCheckMode   .... Total+1el-Energy
+ Convergence forced     ConvForced      .... 0
+ Energy Change          TolE            ....  1.000e-08 Eh
+ 1-El. energy change                    ....  1.000e-05 Eh
+ Orbital Gradient       TolG            ....  1.000e-05
+ Orbital Rotation angle TolX            ....  1.000e-05
+ DIIS Error             TolErr          ....  5.000e-07
+
+------------------------------
+INITIAL GUESS: MODEL POTENTIAL
+------------------------------
+Loading Hartree-Fock densities                     ... done
+Calculating cut-offs                               ... done
+Initializing the effective Hamiltonian             ... done
+Setting up the integral package (SHARK)            ... done
+Starting the Coulomb interaction                   ... done (   0.0 sec)
+Making the grid                                    ... done (   0.1 sec)
+Mapping shells                                     ... done
+Starting the XC term evaluation                    ... done (   0.0 sec)
+  promolecular density results
+     # of electrons  =     59.989480350
+     EX              =    -48.046471059
+     EC              =     -1.812789922
+     EX+EC           =    -49.859260981
+Transforming the Hamiltonian                       ... done (   0.0 sec)
+Diagonalizing the Hamiltonian                      ... done (   0.0 sec)
+Back transforming the eigenvectors                 ... done (   0.0 sec)
+Now organizing SCF variables                       ... done
+                      ------------------
+                      INITIAL GUESS DONE (   0.3 sec)
+                      ------------------
+             **** ENERGY FILE WAS UPDATED (/gpfs/fs2/scratch/kshao4/mlip/codes/X_semiactivelearning/dft_launches/p10_2gpu_6h/P10p0000GPa/acquisition/inputs/cluster_479.en.tmp) ****
+Finished Guess after   1.2 sec
+Maximum memory used throughout the entire GUESS-calculation: 17.6 MB
+[1793253581.817975] [bhc0185:2502 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253581.818031] [bhc0185:2503 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253581.818041] [bhc0185:2504 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253581.818047] [bhc0185:2505 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253581.818070] [bhc0185:2506 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253581.818066] [bhc0185:2507 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253581.818064] [bhc0185:2508 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253581.818003] [bhc0185:2509 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253581.817970] [bhc0185:2510 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253581.818050] [bhc0185:2511 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253581.817937] [bhc0185:2512 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253581.818004] [bhc0185:2513 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253581.818056] [bhc0185:2514 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253581.817932] [bhc0185:2517 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253581.817965] [bhc0185:2519 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253581.818090] [bhc0185:2522 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253581.817938] [bhc0185:2524 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253581.818077] [bhc0185:2527 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253581.818069] [bhc0185:2528 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253581.817863] [bhc0185:2529 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253581.818128] [bhc0185:2530 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253581.817972] [bhc0185:2531 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253581.818004] [bhc0185:2533 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793253581.818097] [bhc0185:2534 :0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+
+
+           ************************************************************
+           *        Program running with 24 parallel MPI-processes    *
+           *              working on a common directory               *
+           ************************************************************
+
+-------------------------------------------------------------------------------------------
+                                      ORCA LEAN-SCF
+                              memory conserving SCF solver
+-------------------------------------------------------------------------------------------
+
+----------------------------------------D-I-I-S--------------------------------------------
+Iteration    Energy (Eh)           Delta-E    RMSDP     MaxDP     DIISErr   Damp  Time(sec)
+-------------------------------------------------------------------------------------------
+               ***  Starting incremental Fock matrix formation  ***
+    1    -395.4659635061298673     0.00e+00  2.09e-02  2.08e-01  6.89e-01  0.700   1.4
+Warning: op=0 Small HOMO/LUMO gap (  -0.628) - skipping pre-diagonalization
+         LevelShift set to 0.728 Eh
+         Will do a full diagonalization
+    2    -396.7140475897145393    -1.25e+00  2.27e-02  2.24e-01  2.22e-01  0.700   0.9
+    3    -395.6400432091309654     1.07e+00  1.40e-02  1.18e-01  2.82e-01  0.700   0.9
+    4    -396.4978867595341967    -8.58e-01  9.53e-03  9.81e-02  2.87e-01  0.700   0.8
+    5    -395.9651591496181595     5.33e-01  9.70e-03  1.56e-01  4.14e-01  0.700   0.8
+    6    -396.6073513789952472    -6.42e-01  6.81e-03  1.15e-01  2.24e-01  0.700   0.8
+                               ***Turning on AO-DIIS***
+    7    -396.7298047344556267    -1.22e-01  4.51e-03  8.60e-02  1.94e-01  0.700   0.9
+    8    -396.7426815958660313    -1.29e-02  3.37e-03  6.55e-02  2.68e-01  0.700   0.9
+    9    -396.7812605106793740    -3.86e-02  3.02e-03  6.39e-02  3.13e-01  0.700   0.8
+   10    -396.8447239739608108    -6.35e-02  2.70e-03  5.62e-02  3.58e-01  0.700   0.8
+   11    -396.9156631333570999    -7.09e-02  2.56e-03  6.32e-02  3.85e-01  0.700   1.1
+   12    -397.0046165514580139    -8.90e-02  3.26e-03  6.88e-02  3.79e-01  0.700   0.8
+   13    -397.1492923359482461    -1.45e-01  3.50e-03  5.75e-02  2.88e-01  0.700   0.8
+   14    -397.2984342759089600    -1.49e-01  3.39e-03  4.75e-02  2.38e-01  0.700   0.9
+   15    -397.4360885447518399    -1.38e-01  3.43e-03  5.95e-02  1.79e-01  0.700   0.8
+   16    -397.5726058638547897    -1.37e-01  3.35e-03  8.41e-02  1.25e-01  0.700   0.8
+   17    -397.6847354974499353    -1.12e-01  2.93e-03  9.78e-02  1.13e-01  0.700   0.9
+   18    -397.7585994228491586    -7.39e-02  2.48e-03  9.17e-02  7.79e-02  0.700   0.8
+   19    -397.8047470572651605    -4.61e-02  6.88e-03  2.60e-01  4.87e-02  0.000   0.8
+   20    -397.8794810629410108    -7.47e-02  1.37e-03  2.91e-02  7.86e-02  0.000   1.5
+               *** Restarting incremental Fock matrix formation ***
+                             ****Resetting DIIS****
+Warning: op=0 Small HOMO/LUMO gap (  -0.198) - skipping pre-diagonalization
+         LevelShift set to 0.298 Eh
+         Will do a full diagonalization
+   21    -397.8875963408763141    -8.12e-03  5.77e-03  9.74e-02  6.79e-02  0.000   1.3
+   22    -397.8916315003871773    -4.04e-03  1.36e-03  2.44e-02  6.16e-02  0.000   0.8
+   23    -397.9038535801776675    -1.22e-02  9.74e-04  1.80e-02  4.50e-02  0.000   0.8
+   24    -397.9103761163738113    -6.52e-03  1.02e-03  1.34e-02  2.53e-02  0.000   0.8
+   25    -397.9141479758749824    -3.77e-03  1.93e-03  3.41e-02  1.77e-02  0.000   0.8
+   26    -397.9254399140131113    -1.13e-02  4.17e-03  6.62e-02  3.58e-02  0.000   0.8
+   27    -397.9611178230839528    -3.57e-02  6.22e-03  1.09e-01  6.04e-02  0.000   0.8
+   28    -397.9402943286427785     2.08e-02  5.47e-03  1.01e-01  1.61e-01  0.000   0.8
+   29    -397.7869567425350965     1.53e-01  1.19e-03  1.95e-02  2.43e-01  0.700   1.0
+   30    -397.7429642164809707     4.40e-02  1.55e-03  2.30e-02  2.57e-01  0.700   0.8
+   31    -397.6882412326131657     5.47e-02  1.33e-03  2.16e-02  2.72e-01  0.700   0.8
+   32    -397.6684241847515864     1.98e-02  1.23e-03  1.32e-02  2.57e-01  0.700   0.7
+   33    -397.6710643268179979    -2.64e-03  4.54e-03  9.49e-02  2.62e-01  0.700   0.8
+   34    -397.8742889882863096    -2.03e-01  3.86e-03  8.23e-02  1.40e-01  0.700   0.8
+   35    -397.9585676710714210    -8.43e-02  2.66e-03  5.66e-02  5.76e-02  0.700   0.8
+   36    -397.9744770889564620    -1.59e-02  6.00e-03  1.25e-01  7.05e-02  0.000   0.9
+   37    -397.9144124006855350     6.01e-02  9.21e-04  1.15e-02  1.33e-01  0.000   0.9
+   38    -397.9321579265961759    -1.77e-02  2.39e-04  3.08e-03  1.26e-01  0.700   0.8
+   39    -397.9369951533935250    -4.84e-03  3.73e-04  5.02e-03  1.26e-01  0.700   0.7
+   40    -397.9446262226163640    -7.63e-03  6.10e-04  8.30e-03  1.26e-01  0.700   0.8
+               *** Restarting incremental Fock matrix formation ***
+                             ****Resetting DIIS****
+Warning: op=0 Small HOMO/LUMO gap (  -0.086) - skipping pre-diagonalization
+         Will do a full diagonalization
+   41    -397.9567046309101102    -1.21e-02  4.59e-03  1.06e-01  1.22e-01  0.700   1.0
+   42    -397.9886104209033988    -3.19e-02  3.13e-03  5.95e-02  7.36e-02  0.700   0.9
+   43    -397.9577272697150079     3.09e-02  7.13e-03  1.76e-01  1.06e-01  0.000   0.8
+   44    -397.7800815959221268     1.78e-01  5.76e-04  1.32e-02  2.15e-01  0.700   0.8
+   45    -397.7998438844079487    -1.98e-02  8.24e-04  1.72e-02  2.18e-01  0.700   0.8
+   46    -397.8294032829556386    -2.96e-02  9.84e-04  1.43e-02  2.21e-01  0.700   0.7
+   47    -397.8568524732584706    -2.74e-02  1.30e-03  1.98e-02  2.24e-01  0.700   0.7
+   48    -397.8800288174850834    -2.32e-02  4.32e-03  8.94e-02  2.24e-01  0.700   0.7
+   49    -397.9734987939905864    -9.35e-02  3.06e-03  6.52e-02  7.48e-02  0.700   0.8
+   50    -397.9880377914301448    -1.45e-02  6.87e-03  1.58e-01  3.86e-02  0.000   0.8
+
+       ******************************************************************************
+       ***                                                                        ***
+       ***                               Auto-TRAH                                ***
+       ***                               ---------                                ***
+       *** the maximum gradient error decreased on average only by a factor   1.0 ***
+       *** during the last  10 iterations                                         ***
+       ***                                                                        ***
+       ***               Leaving SCF to start the TRAH-SCF procedure              ***
+       ***                                                                        ***
+       ******************************************************************************
+
+ --------------------------------------------------------------------------------------------
+   Iter.        energy            ||Error||_2        Shift      TRadius  Mac/Mic        Rej.
+ --------------------------------------------------------------------------------------------
+    0       -397.941285604871     5.142896e-01                     0.400 (TRAH MAcro)   No
+WARNING: 4 diagonal Hessian elements are negative!
+WARNING : negative HOMO - LUMO gap : -0.133037
+WARNING : negative HOMO - LUMO gap : -0.133037
+    0     dE    -1.196029e-01     4.725444e-01    -4.2876e-01      0.400 (TRAH MIcro)
+    0     dE    -3.995376e-02     2.605943e-01    -3.4753e+00      0.100 (TRAH MIcro)
+    0     dE    -4.658779e-01     2.802352e+00    -2.3286e+01      0.198 (TRAH MIcro)
+    0     dE    -1.355120e-01     2.460578e-01    -3.0547e+01      0.093 (TRAH MIcro)
+    0     dE    -2.613815e-02     6.851620e-02    -3.0819e+01      0.038 (TRAH MIcro)
+    0     dE    -1.359371e-02     1.603832e-02    -3.0925e+01      0.025 (TRAH MIcro)
+    0     dE    -1.354293e-02     1.533197e-02    -3.0925e+01      0.025 (TRAH MIcro)
+    0     dE    -1.354288e-02     1.533549e-02    -3.0925e+01      0.025 (TRAH MIcro)
+    0     dE    -1.354332e-02     1.533264e-02    -3.0925e+01      0.025 (TRAH MIcro)
+    0     dE    -1.354332e-02     1.533265e-02    -3.0925e+01      0.025 (TRAH MIcro)
+    0     dE    -1.354325e-02     1.533279e-02    -3.0925e+01      0.025 (TRAH MIcro)
+    0     dE    -1.354320e-02     1.533273e-02    -3.0925e+01      0.025 (TRAH MIcro)
+    0     dE    -1.354323e-02     1.533262e-02    -3.0925e+01      0.025 (TRAH MIcro)
+    0     dE    -1.354340e-02     1.533255e-02    -3.0925e+01      0.025 (TRAH MIcro)
+    0     dE    -1.354330e-02     1.533621e-02    -3.0925e+01      0.025 (TRAH MIcro)
+    0     dE    -1.350159e-02     1.659551e-02    -3.0926e+01      0.025 (TRAH MIcro)
+    0     dE    -7.997104e-03     1.464593e-01    -3.1608e+01      0.016 (TRAH MIcro)
+    0     dE    -2.593021e+00     1.745780e+00    -3.1051e+01      0.408 (TRAH MIcro)
+    0     dE    -2.595946e+00     1.737878e+00    -3.1061e+01      0.408 (TRAH MIcro)
+    0     dE    -2.595962e+00     1.737942e+00    -3.1061e+01      0.408 (TRAH MIcro)
+    0     dE    -2.595968e+00     1.737894e+00    -3.1061e+01      0.408 (TRAH MIcro)
+    0     dE    -2.595967e+00     1.737883e+00    -3.1061e+01      0.408 (TRAH MIcro)
+    0     dE    -2.595976e+00     1.737884e+00    -3.1061e+01      0.408 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -2.595976318510e+00
+  actual energy  change   =     1.474933773439e-01
+  energy change ratio     = -0.056816
+  old trust radius        = 0.400000
+  new trust radius        = 0.268000
+  reject step?            = YES
+    1       -397.793792227527     5.142896e-01                     0.268 (TRAH MAcro)  Yes
+    2       -397.793792227527     1.185535e+00                     0.268 (TRAH MAcro)   No
+WARNING: 3 diagonal Hessian elements are negative!
+WARNING : negative HOMO - LUMO gap : -0.123279
+WARNING : negative HOMO - LUMO gap : -0.123279
+    2     dE    -1.956676e-01     1.524833e-01    -1.8182e+00      0.268 (TRAH MIcro)
+    2     dE    -1.970448e-01     5.145720e-02    -1.8930e+00      0.268 (TRAH MIcro)
+    2     dE    -1.891626e-01     4.859353e-02    -2.1177e+00      0.253 (TRAH MIcro)
+    2     dE    -1.876393e-01     1.128470e-02    -2.1187e+00      0.250 (TRAH MIcro)
+    2     dE    -1.874535e-01     3.326253e-03    -2.1188e+00      0.249 (TRAH MIcro)
+    3       -397.968475694966     3.907696e-01                     0.322 (TRAH MAcro)   No
+WARNING : small    HOMO - LUMO gap : 0.002875
+WARNING : small    HOMO - LUMO gap : 0.002875
+    3     dE    -3.003174e-02     3.723147e-01    -5.7464e-02      0.213 (TRAH MIcro)
+    3     dE    -4.772349e-02     1.662424e-01    -8.9321e-02      0.262 (TRAH MIcro)
+    3     dE    -4.944409e-02     9.895085e-02    -9.2359e-02      0.266 (TRAH MIcro)
+    3     dE    -5.030572e-02     7.349465e-02    -9.3734e-02      0.271 (TRAH MIcro)
+    3     dE    -5.203139e-02     2.742168e-02    -9.5768e-02      0.294 (TRAH MIcro)
+    3     dE    -5.335540e-02     6.291872e-02    -1.0777e-01      0.322 (TRAH MIcro)
+    3     dE    -5.375185e-02     1.269461e-02    -1.4835e-01      0.322 (TRAH MIcro)
+    3     dE    -5.377801e-02     6.623530e-03    -1.5118e-01      0.322 (TRAH MIcro)
+    4       -398.010265009795     1.221317e-01                     0.386 (TRAH MAcro)   No
+    4     dE    -2.220995e-03     6.082665e-02    -4.4335e-03      0.044 (TRAH MIcro)
+    4     dE    -2.342236e-03     4.187846e-02    -4.6746e-03      0.046 (TRAH MIcro)
+    4     dE    -2.629611e-03     3.396757e-02    -5.2448e-03      0.052 (TRAH MIcro)
+    4     dE    -2.733647e-03     1.463454e-02    -5.4461e-03      0.062 (TRAH MIcro)
+    4     dE    -2.799319e-03     1.189649e-02    -5.5658e-03      0.077 (TRAH MIcro)
+    4     dE    -2.831509e-03     5.664832e-03    -5.6171e-03      0.090 (TRAH MIcro)
+    5       -398.013082686153     1.471611e-02                     0.463 (TRAH MAcro)   No
+    5     dE    -4.556404e-05     1.337703e-02    -9.1118e-05      0.011 (TRAH MIcro)
+    5     dE    -5.265363e-05     8.374108e-03    -1.0529e-04      0.013 (TRAH MIcro)
+    5     dE    -6.212179e-05     3.997569e-03    -1.2421e-04      0.017 (TRAH MIcro)
+    5     dE    -6.431157e-05     4.434171e-03    -1.2858e-04      0.018 (TRAH MIcro)
+    5     dE    -7.146444e-05     3.056515e-03    -1.4285e-04      0.024 (TRAH MIcro)
+    5     dE    -7.375653e-05     2.020927e-03    -1.4740e-04      0.028 (TRAH MIcro)
+    5     dE    -7.440426e-05     1.686291e-03    -1.4868e-04      0.029 (TRAH MIcro)
+    5     dE    -7.554708e-05     3.499618e-03    -1.5096e-04      0.030 (TRAH MIcro)
+    5     dE    -8.136008e-05     7.282559e-03    -1.6246e-04      0.040 (TRAH MIcro)
+    5     dE    -9.759160e-05     9.614414e-03    -1.9376e-04      0.086 (TRAH MIcro)
+    5     dE    -1.093578e-04     3.804987e-03    -2.1553e-04      0.122 (TRAH MIcro)
+    5     dE    -1.115564e-04     2.167040e-03    -2.1951e-04      0.128 (TRAH MIcro)
+    5     dE    -1.119713e-04     8.420456e-04    -2.2025e-04      0.129 (TRAH MIcro)
+    6       -398.013174156461     8.057834e-03                     0.556 (TRAH MAcro)   No
+    6     dE    -1.774891e-06     5.864416e-03    -3.5498e-06      0.002 (TRAH MIcro)
+    6     dE    -2.831659e-06     4.035039e-03    -5.6633e-06      0.003 (TRAH MIcro)
+    6     dE    -3.512765e-06     1.536900e-03    -7.0255e-06      0.003 (TRAH MIcro)
+    6     dE    -3.710182e-06     1.255635e-03    -7.4203e-06      0.003 (TRAH MIcro)
+    6     dE    -3.936831e-06     1.080984e-03    -7.8736e-06      0.003 (TRAH MIcro)
+    6     dE    -4.337899e-06     9.590235e-04    -8.6755e-06      0.006 (TRAH MIcro)
+    6     dE    -4.560866e-06     1.064240e-03    -9.1212e-06      0.007 (TRAH MIcro)
+    6     dE    -4.783850e-06     1.226005e-03    -9.5670e-06      0.009 (TRAH MIcro)
+    6     dE    -5.262567e-06     2.100579e-03    -1.0524e-05      0.011 (TRAH MIcro)
+    6     dE    -6.249885e-06     1.647744e-03    -1.2496e-05      0.018 (TRAH MIcro)
+    6     dE    -6.576308e-06     1.259651e-03    -1.3147e-05      0.021 (TRAH MIcro)
+    6     dE    -6.855330e-06     1.008638e-03    -1.3704e-05      0.023 (TRAH MIcro)
+    6     dE    -7.144372e-06     1.264379e-03    -1.4280e-05      0.025 (TRAH MIcro)
+    6     dE    -7.617439e-06     1.384505e-03    -1.5222e-05      0.029 (TRAH MIcro)
+    6     dE    -7.927307e-06     9.145805e-04    -1.5838e-05      0.032 (TRAH MIcro)
+    6     dE    -8.010466e-06     4.522239e-04    -1.6004e-05      0.033 (TRAH MIcro)
+    7       -398.013182817000     9.853700e-04                     0.667 (TRAH MAcro)   No
+    7     dE    -1.347613e-08     8.464419e-04    -2.6952e-08      0.000 (TRAH MIcro)
+    7     dE    -5.155485e-08     3.109049e-04    -1.0311e-07      0.000 (TRAH MIcro)
+    7     dE    -5.823278e-08     2.082811e-04    -1.1647e-07      0.000 (TRAH MIcro)
+    7     dE    -6.280402e-08     1.750291e-04    -1.2561e-07      0.000 (TRAH MIcro)
+    7     dE    -6.448914e-08     2.000636e-04    -1.2898e-07      0.000 (TRAH MIcro)
+    7     dE    -7.395648e-08     1.924871e-04    -1.4791e-07      0.001 (TRAH MIcro)
+    7     dE    -9.394935e-08     4.877566e-04    -1.8790e-07      0.001 (TRAH MIcro)
+    7     dE    -1.601874e-07     7.335017e-04    -3.2037e-07      0.004 (TRAH MIcro)
+    7     dE    -3.014209e-07     9.868391e-04    -6.0277e-07      0.011 (TRAH MIcro)
+    7     dE    -4.753196e-07     6.467985e-04    -9.5028e-07      0.019 (TRAH MIcro)
+    7     dE    -5.256186e-07     5.002174e-04    -1.0507e-06      0.022 (TRAH MIcro)
+    7     dE    -5.585389e-07     3.481615e-04    -1.1165e-06      0.024 (TRAH MIcro)
+    7     dE    -5.819054e-07     3.469847e-04    -1.1631e-06      0.025 (TRAH MIcro)
+    7     dE    -6.078141e-07     3.232726e-04    -1.2148e-06      0.026 (TRAH MIcro)
+    7     dE    -6.257381e-07     2.856092e-04    -1.2506e-06      0.027 (TRAH MIcro)
+    7     dE    -6.641591e-07     5.023374e-04    -1.3272e-06      0.029 (TRAH MIcro)
+    7     dE    -7.160630e-07     4.842292e-04    -1.4307e-06      0.032 (TRAH MIcro)
+    7     dE    -7.554122e-07     3.786772e-04    -1.5090e-06      0.034 (TRAH MIcro)
+    7     dE    -7.848943e-07     3.396141e-04    -1.5677e-06      0.036 (TRAH MIcro)
+    7     dE    -8.592924e-07     8.139345e-04    -1.7157e-06      0.041 (TRAH MIcro)
+    7     dE    -1.316261e-06     2.118883e-03    -2.6196e-06      0.070 (TRAH MIcro)
+    7     dE    -2.230027e-06     1.647965e-03    -4.3862e-06      0.130 (TRAH MIcro)
+    7     dE    -2.460138e-06     5.054812e-04    -4.8197e-06      0.144 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -2.460137592030e-06
+  actual energy  change   =     1.800712661293e-04
+  energy change ratio     = -73.195608
+  old trust radius        = 0.666870
+  new trust radius        = 0.446803
+  reject step?            = YES
+    8       -398.013002745734     9.853700e-04                     0.447 (TRAH MAcro)  Yes
+    9       -398.013002745734     4.814223e-02                     0.447 (TRAH MAcro)   No
+    9     dE    -1.735689e-04     1.215424e-02    -3.4710e-04      0.011 (TRAH MIcro)
+    9     dE    -1.769275e-04     8.684089e-03    -3.5381e-04      0.011 (TRAH MIcro)
+    9     dE    -1.785356e-04     6.189796e-03    -3.5702e-04      0.012 (TRAH MIcro)
+    9     dE    -1.803798e-04     1.274781e-03    -3.6071e-04      0.012 (TRAH MIcro)
+   10       -398.013183323077     1.234188e-03                     0.536 (TRAH MAcro)   No
+   10     dE    -7.198584e-08     8.637924e-04    -1.4397e-07      0.000 (TRAH MIcro)
+   10     dE    -1.272576e-07     4.964404e-04    -2.5452e-07      0.001 (TRAH MIcro)
+   10     dE    -1.547270e-07     3.386900e-04    -3.0945e-07      0.000 (TRAH MIcro)
+   10     dE    -1.700847e-07     1.687987e-04    -3.4017e-07      0.001 (TRAH MIcro)
+   10     dE    -1.712764e-07     1.043192e-04    -3.4255e-07      0.001 (TRAH MIcro)
+   11       -398.013183492730     1.043045e-04                     0.643 (TRAH MAcro)   No
+   11     dE    -7.413049e-10     8.298590e-05    -1.4826e-09      0.000 (TRAH MIcro)
+   11     dE    -3.006167e-09     1.471424e-04    -6.0123e-09      0.000 (TRAH MIcro)
+   11     dE    -4.741063e-09     1.808312e-04    -9.4821e-09      0.000 (TRAH MIcro)
+   11     dE    -6.748668e-09     2.220939e-04    -1.3497e-08      0.000 (TRAH MIcro)
+   11     dE    -1.114356e-08     1.816102e-04    -2.2287e-08      0.001 (TRAH MIcro)
+   11     dE    -2.751161e-08     4.317911e-04    -5.5023e-08      0.002 (TRAH MIcro)
+   11     dE    -8.200288e-08     6.116549e-04    -1.6400e-07      0.006 (TRAH MIcro)
+   11     dE    -2.085648e-07     1.140711e-03    -4.1703e-07      0.016 (TRAH MIcro)
+   11     dE    -5.587104e-07     2.183011e-03    -1.1154e-06      0.043 (TRAH MIcro)
+   11     dE    -2.579158e-06     4.529695e-03    -4.9748e-06      0.192 (TRAH MIcro)
+   11     dE    -8.580574e-06     7.230828e-03    -1.3488e-05      0.522 (TRAH MIcro)
+   11     dE    -1.462697e-05     2.392276e-03    -3.0520e-05      0.643 (TRAH MIcro)
+   11     dE    -1.544360e-05     2.161292e-03    -3.4469e-05      0.643 (TRAH MIcro)
+   11     dE    -1.634477e-05     2.639082e-03    -3.8829e-05      0.643 (TRAH MIcro)
+   11     dE    -1.772058e-05     2.666048e-03    -4.5489e-05      0.643 (TRAH MIcro)
+   11     dE    -1.858040e-05     1.309071e-03    -4.9760e-05      0.643 (TRAH MIcro)
+   11     dE    -1.890301e-05     8.762826e-04    -5.1218e-05      0.643 (TRAH MIcro)
+   11     dE    -1.900592e-05     6.614512e-04    -5.1717e-05      0.643 (TRAH MIcro)
+   11     dE    -1.919781e-05     1.517360e-03    -5.2650e-05      0.643 (TRAH MIcro)
+   11     dE    -1.961849e-05     1.902416e-03    -5.4698e-05      0.643 (TRAH MIcro)
+   11     dE    -1.960926e-05     2.682557e-03    -6.1825e-05      0.615 (TRAH MIcro)
+   11     dE    -2.136173e-05     1.489964e-03    -6.4226e-05      0.640 (TRAH MIcro)
+   11     dE    -2.171102e-05     5.830917e-04    -6.4914e-05      0.643 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -2.171101640643e-05
+  actual energy  change   =     5.470314484768e-02
+  energy change ratio     = -2519.603128
+  old trust radius        = 0.643396
+  new trust radius        = 0.431075
+  reject step?            = YES
+   12       -397.958480347882     1.043045e-04                     0.431 (TRAH MAcro)  Yes
+   13       -397.958480347882     8.142863e-01                     0.431 (TRAH MAcro)   No
+WARNING: 3 diagonal Hessian elements are negative!
+WARNING : negative HOMO - LUMO gap : -0.094152
+WARNING : negative HOMO - LUMO gap : -0.094152
+   13     dE    -5.473317e-02     3.016304e-01    -1.0649e-01      0.167 (TRAH MIcro)
+   13     dE    -6.128833e-02     2.053779e-01    -1.1678e-01      0.223 (TRAH MIcro)
+   13     dE    -6.434496e-02     1.362665e-01    -1.2129e-01      0.247 (TRAH MIcro)
+   13     dE    -7.129498e-02     2.126651e-01    -1.8489e-01      0.353 (TRAH MIcro)
+   13     dE    -7.566025e-02     1.872271e-01    -2.6390e-01      0.349 (TRAH MIcro)
+   13     dE    -6.691247e-02     6.163965e-02    -4.2426e-01      0.243 (TRAH MIcro)
+   13     dE    -6.914192e-02     7.419225e-02    -4.2798e-01      0.259 (TRAH MIcro)
+   13     dE    -7.113189e-02     7.214559e-02    -4.3192e-01      0.270 (TRAH MIcro)
+   13     dE    -5.902794e-02     3.729419e-02    -8.2170e-01      0.170 (TRAH MIcro)
+   13     dE    -5.896815e-02     5.318772e-03    -8.2276e-01      0.169 (TRAH MIcro)
+   14       -398.011234810521     7.136571e-02                     0.517 (TRAH MAcro)   No
+   14     dE    -7.649204e-04     1.120558e-01    -1.5283e-03      0.031 (TRAH MIcro)
+   14     dE    -1.442991e-03     7.802723e-02    -2.8718e-03      0.070 (TRAH MIcro)
+   14     dE    -1.959214e-03     2.908340e-02    -3.8932e-03      0.080 (TRAH MIcro)
+   14     dE    -1.986219e-03     2.569010e-02    -3.9459e-03      0.082 (TRAH MIcro)
+   14     dE    -2.062756e-03     9.459549e-03    -4.0916e-03      0.091 (TRAH MIcro)
+   14     dE    -2.077828e-03     4.876871e-03    -4.1168e-03      0.097 (TRAH MIcro)
+   15       -398.013032551648     1.481644e-02                     0.621 (TRAH MAcro)   No
+   15     dE    -8.131809e-05     1.404840e-02    -1.6261e-04      0.014 (TRAH MIcro)
+   15     dE    -9.133987e-05     1.005019e-02    -1.8263e-04      0.016 (TRAH MIcro)
+   15     dE    -9.840560e-05     5.034700e-03    -1.9675e-04      0.018 (TRAH MIcro)
+   15     dE    -9.998832e-05     4.596956e-03    -1.9991e-04      0.019 (TRAH MIcro)
+   15     dE    -1.029245e-04     1.561800e-03    -2.0577e-04      0.020 (TRAH MIcro)
+   15     dE    -1.043090e-04     2.412997e-03    -2.0852e-04      0.022 (TRAH MIcro)
+   15     dE    -1.055992e-04     1.798289e-03    -2.1105e-04      0.026 (TRAH MIcro)
+   15     dE    -1.060585e-04     1.281133e-03    -2.1195e-04      0.028 (TRAH MIcro)
+   16       -398.013142684198     1.773696e-03                     0.745 (TRAH MAcro)   No
+   16     dE    -5.736772e-07     1.587485e-03    -1.1474e-06      0.001 (TRAH MIcro)
+   16     dE    -7.625512e-07     1.315194e-03    -1.5251e-06      0.002 (TRAH MIcro)
+   16     dE    -9.516481e-07     7.676354e-04    -1.9033e-06      0.002 (TRAH MIcro)
+   16     dE    -1.023573e-06     7.628327e-04    -2.0471e-06      0.002 (TRAH MIcro)
+   16     dE    -1.141383e-06     4.434390e-04    -2.2828e-06      0.003 (TRAH MIcro)
+   16     dE    -1.239522e-06     8.082309e-04    -2.4790e-06      0.003 (TRAH MIcro)
+   16     dE    -1.334252e-06     5.546869e-04    -2.6684e-06      0.005 (TRAH MIcro)
+   16     dE    -1.594711e-06     1.427650e-03    -3.1892e-06      0.008 (TRAH MIcro)
+   16     dE    -2.158438e-06     1.991508e-03    -4.3157e-06      0.016 (TRAH MIcro)
+   16     dE    -4.283521e-06     5.252427e-03    -8.5462e-06      0.049 (TRAH MIcro)
+   16     dE    -1.907286e-04     4.124989e-02    -5.1661e-04      0.745 (TRAH MIcro)
+   16     dE    -3.250991e-04     1.469846e-02    -1.0024e-03      0.745 (TRAH MIcro)
+   16     dE    -3.393564e-04     5.686082e-03    -1.0539e-03      0.745 (TRAH MIcro)
+   16     dE    -3.430368e-04     3.135220e-03    -1.0672e-03      0.745 (TRAH MIcro)
+   16     dE    -3.462624e-04     4.626030e-03    -1.0789e-03      0.745 (TRAH MIcro)
+   16     dE    -3.426245e-04     3.406017e-03    -1.0957e-03      0.735 (TRAH MIcro)
+   16     dE    -3.468030e-04     1.253597e-03    -1.1003e-03      0.739 (TRAH MIcro)
+   16     dE    -3.472163e-04     5.087109e-04    -1.1008e-03      0.739 (TRAH MIcro)
+   16     dE    -3.472725e-04     1.850004e-04    -1.1008e-03      0.739 (TRAH MIcro)
+   16     dE    -3.472808e-04     7.838056e-05    -1.1008e-03      0.739 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -3.472808483166e-04
+  actual energy  change   =     8.693902732330e-02
+  energy change ratio     = -250.342130
+  old trust radius        = 0.744898
+  new trust radius        = 0.499082
+  reject step?            = YES
+   17       -397.926203656874     1.773696e-03                     0.499 (TRAH MAcro)  Yes
+   18       -397.926203656874     1.008647e+00                     0.499 (TRAH MAcro)   No
+WARNING: 7 diagonal Hessian elements are negative!
+WARNING : negative HOMO - LUMO gap : -0.165590
+WARNING : negative HOMO - LUMO gap : -0.165590
+   18     dE    -9.319055e-02     4.374554e-01    -1.7728e-01      0.227 (TRAH MIcro)
+   18     dE    -1.354072e-01     2.468353e-01    -4.0539e-01      0.465 (TRAH MIcro)
+   18     dE    -1.479865e-01     1.422496e-01    -4.5828e-01      0.499 (TRAH MIcro)
+   18     dE    -1.523672e-01     1.930777e-01    -4.6517e-01      0.499 (TRAH MIcro)
+   18     dE    -1.283087e-01     1.819661e-01    -6.7751e-01      0.350 (TRAH MIcro)
+   18     dE    -9.401426e-02     1.718735e-01    -1.2162e+00      0.199 (TRAH MIcro)
+   18     dE    -9.658621e-02     2.383297e-02    -1.2355e+00      0.204 (TRAH MIcro)
+   18     dE    -9.654537e-02     4.781664e-03    -1.2360e+00      0.203 (TRAH MIcro)
+   19       -398.008994258977     1.108677e-01                     0.599 (TRAH MAcro)   No
+WARNING : small    HOMO - LUMO gap : 0.017552
+WARNING : small    HOMO - LUMO gap : 0.017552
+   19     dE    -1.734459e-03     1.682360e-01    -3.4621e-03      0.044 (TRAH MIcro)
+   19     dE    -3.252028e-03     1.226665e-01    -6.4276e-03      0.109 (TRAH MIcro)
+   19     dE    -4.447827e-03     4.317989e-02    -8.7648e-03      0.122 (TRAH MIcro)
+   19     dE    -4.512052e-03     3.757882e-02    -8.8839e-03      0.126 (TRAH MIcro)
+   19     dE    -4.707602e-03     1.557261e-02    -9.2230e-03      0.144 (TRAH MIcro)
+   19     dE    -4.764439e-03     7.947425e-03    -9.2961e-03      0.158 (TRAH MIcro)
+   20       -398.012458313584     4.107398e-02                     0.599 (TRAH MAcro)   No
+   20     dE    -5.180348e-04     3.258588e-02    -1.0350e-03      0.031 (TRAH MIcro)
+   20     dE    -5.524764e-04     2.831452e-02    -1.1036e-03      0.035 (TRAH MIcro)
+   20     dE    -6.146457e-04     1.032577e-02    -1.2272e-03      0.041 (TRAH MIcro)
+   20     dE    -6.219237e-04     8.638660e-03    -1.2416e-03      0.042 (TRAH MIcro)
+   20     dE    -6.346290e-04     3.243661e-03    -1.2669e-03      0.044 (TRAH MIcro)
+   21       -398.013120048576     5.014784e-03                     0.719 (TRAH MAcro)   No
+   21     dE    -7.424435e-06     6.215896e-03    -1.4849e-05      0.005 (TRAH MIcro)
+   21     dE    -1.479251e-05     7.586544e-03    -2.9582e-05      0.010 (TRAH MIcro)
+   21     dE    -3.840925e-05     8.387450e-03    -7.6753e-05      0.029 (TRAH MIcro)
+   21     dE    -5.100047e-05     9.750175e-03    -1.0183e-04      0.041 (TRAH MIcro)
+   21     dE    -6.891540e-05     3.795044e-03    -1.3735e-04      0.059 (TRAH MIcro)
+   21     dE    -7.137392e-05     2.084736e-03    -1.4219e-04      0.063 (TRAH MIcro)
+   21     dE    -7.188822e-05     7.664138e-04    -1.4320e-04      0.063 (TRAH MIcro)
+   21     dE    -7.195823e-05     4.152949e-04    -1.4334e-04      0.063 (TRAH MIcro)
+   22       -398.013174447545     4.546753e-03                     0.862 (TRAH MAcro)   No
+   22     dE    -2.233177e-06     2.623600e-03    -4.4663e-06      0.002 (TRAH MIcro)
+   22     dE    -2.980563e-06     1.346858e-03    -5.9611e-06      0.003 (TRAH MIcro)
+   22     dE    -5.308523e-06     2.423776e-03    -1.0616e-05      0.009 (TRAH MIcro)
+   22     dE    -5.703060e-06     1.938728e-03    -1.1405e-05      0.010 (TRAH MIcro)
+   22     dE    -6.229010e-06     4.375919e-04    -1.2456e-05      0.012 (TRAH MIcro)
+   23       -398.013180908744     4.456516e-04                     1.035 (TRAH MAcro)   No
+   23     dE    -2.099669e-08     4.333984e-04    -4.1993e-08      0.000 (TRAH MIcro)
+   23     dE    -4.603220e-08     4.423886e-04    -9.2064e-08      0.000 (TRAH MIcro)
+   23     dE    -6.546819e-08     3.480080e-04    -1.3094e-07      0.001 (TRAH MIcro)
+   23     dE    -7.280078e-08     3.067929e-04    -1.4560e-07      0.001 (TRAH MIcro)
+   23     dE    -8.860007e-08     2.861274e-04    -1.7720e-07      0.001 (TRAH MIcro)
+   23     dE    -1.072842e-07     2.737042e-04    -2.1457e-07      0.002 (TRAH MIcro)
+   23     dE    -1.222535e-07     2.460224e-04    -2.4451e-07      0.002 (TRAH MIcro)
+   23     dE    -1.516072e-07     5.004279e-04    -3.0321e-07      0.003 (TRAH MIcro)
+   23     dE    -2.410027e-07     7.225802e-04    -4.8199e-07      0.006 (TRAH MIcro)
+   23     dE    -5.387248e-07     1.452562e-03    -1.0771e-06      0.017 (TRAH MIcro)
+   23     dE    -9.234174e-07     1.375372e-03    -1.8450e-06      0.032 (TRAH MIcro)
+   23     dE    -1.234631e-06     1.047958e-03    -2.4646e-06      0.043 (TRAH MIcro)
+   23     dE    -1.584741e-06     1.584505e-03    -3.1592e-06      0.057 (TRAH MIcro)
+   23     dE    -3.358970e-06     3.408145e-03    -6.6156e-06      0.124 (TRAH MIcro)
+   23     dE    -9.415898e-06     5.583185e-03    -1.7001e-05      0.328 (TRAH MIcro)
+   23     dE    -1.780080e-05     3.525549e-03    -2.7630e-05      0.537 (TRAH MIcro)
+   23     dE    -1.976738e-05     1.318165e-03    -2.9658e-05      0.577 (TRAH MIcro)
+   23     dE    -2.037944e-05     1.120443e-03    -3.0261e-05      0.589 (TRAH MIcro)
+   23     dE    -2.096708e-05     1.858781e-03    -3.0826e-05      0.600 (TRAH MIcro)
+   23     dE    -2.296613e-05     4.165977e-03    -3.2670e-05      0.637 (TRAH MIcro)
+   23     dE    -3.264369e-05     6.293586e-03    -4.0228e-05      0.789 (TRAH MIcro)
+   23     dE    -4.522717e-05     3.602376e-03    -4.7834e-05      0.944 (TRAH MIcro)
+   23     dE    -4.692904e-05     8.305062e-04    -4.8732e-05      0.962 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -4.692904368197e-05
+  actual energy  change   =     1.913423455428e-01
+  energy change ratio     = -4077.269225
+  old trust radius        = 1.034896
+  new trust radius        = 0.693380
+  reject step?            = YES
+   24       -397.821838563201     4.456516e-04                     0.693 (TRAH MAcro)  Yes
+   25       -397.821838563201     1.398227e+00                     0.693 (TRAH MAcro)   No
+WARNING: 13 diagonal Hessian elements are negative!
+WARNING : negative HOMO - LUMO gap : -0.389223
+WARNING : negative HOMO - LUMO gap : -0.389223
+   25     dE    -3.002514e-01     1.208554e+00    -4.8687e-01      0.483 (TRAH MIcro)
+   25     dE    -5.362791e-01     4.271972e-01    -1.2389e+00      0.693 (TRAH MIcro)
+   25     dE    -4.955350e-01     1.463089e-01    -1.5408e+00      0.622 (TRAH MIcro)
+   25     dE    -5.158200e-01     4.190568e-02    -1.5464e+00      0.641 (TRAH MIcro)
+   25     dE    -5.187355e-01     1.951773e-02    -1.5469e+00      0.644 (TRAH MIcro)
+   25     dE    -5.181307e-01     2.108256e-02    -1.5471e+00      0.643 (TRAH MIcro)
+   25     dE    -2.313021e-01     1.830340e-01    -2.3151e+00      0.292 (TRAH MIcro)
+   25     dE    -2.302720e-01     1.001359e-02    -2.3261e+00      0.288 (TRAH MIcro)
+   25     dE    -2.302244e-01     1.963559e-03    -2.3262e+00      0.288 (TRAH MIcro)
+   26       -397.997873019939     2.309258e-01                     0.832 (TRAH MAcro)   No
+WARNING: 1 diagonal Hessian elements are negative!
+WARNING : negative HOMO - LUMO gap : -0.008469
+WARNING : negative HOMO - LUMO gap : -0.008469
+   26     dE    -6.724474e-03     3.454108e-01    -1.3354e-02      0.084 (TRAH MIcro)
+   26     dE    -1.557261e-02     1.733578e-01    -2.9935e-02      0.201 (TRAH MIcro)
+   26     dE    -1.809357e-02     9.665784e-02    -3.4310e-02      0.234 (TRAH MIcro)
+   26     dE    -2.435271e-02     1.444938e-01    -3.8856e-02      0.503 (TRAH MIcro)
+   26     dE    -3.458291e-02     1.882435e-01    -4.3670e-02      0.764 (TRAH MIcro)
+   26     dE    -4.592891e-02     5.620279e-02    -7.2527e-02      0.832 (TRAH MIcro)
+   26     dE    -4.631386e-02     2.375365e-02    -7.4525e-02      0.832 (TRAH MIcro)
+   26     dE    -4.638181e-02     1.372113e-02    -7.4974e-02      0.832 (TRAH MIcro)
+   26     dE    -4.640044e-02     6.417044e-03    -7.5080e-02      0.832 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -4.640044217483e-02
+  actual energy  change   =     1.319138399340e-01
+  energy change ratio     = -2.842944
+  old trust radius        = 0.832056
+  new trust radius        = 0.557478
+  reject step?            = YES
+   27       -397.865959180005     2.309258e-01                     0.557 (TRAH MAcro)  Yes
+   28       -397.865959180005     8.905967e-01                     0.557 (TRAH MAcro)   No
+WARNING: 16 diagonal Hessian elements are negative!
+WARNING : negative HOMO - LUMO gap : -0.236750
+WARNING : negative HOMO - LUMO gap : -0.236750
+   28     dE    -1.619299e-01     8.046231e-01    -2.8393e-01      0.375 (TRAH MIcro)
+   28     dE    -2.360676e-01     3.411154e-01    -5.6495e-01      0.557 (TRAH MIcro)
+   28     dE    -2.404065e-01     3.152642e-01    -5.6171e-01      0.557 (TRAH MIcro)
+   28     dE    -2.752860e-01     1.627967e-01    -8.5653e-01      0.557 (TRAH MIcro)
+   28     dE    -2.919372e-01     1.340112e-01    -1.0621e+00      0.557 (TRAH MIcro)
+   28     dE    -2.933330e-01     4.283447e-02    -1.0757e+00      0.557 (TRAH MIcro)
+   28     dE    -2.934424e-01     7.145421e-03    -1.0765e+00      0.557 (TRAH MIcro)
+   29       -397.991802108963     4.667594e-01                     0.557 (TRAH MAcro)   No
+   29     dE    -1.515277e-02     1.060958e-01    -3.0070e-02      0.089 (TRAH MIcro)
+   29     dE    -1.636036e-02     1.001304e-01    -3.2456e-02      0.090 (TRAH MIcro)
+   29     dE    -1.781578e-02     3.731608e-02    -3.5254e-02      0.103 (TRAH MIcro)
+   29     dE    -1.801781e-02     1.565881e-02    -3.5634e-02      0.106 (TRAH MIcro)
+   29     dE    -1.809914e-02     9.277172e-03    -3.5743e-02      0.113 (TRAH MIcro)
+   30       -398.009965661261     2.143589e-02                     0.669 (TRAH MAcro)   No
+   30     dE    -2.495487e-05     2.250856e-02    -4.9909e-05      0.005 (TRAH MIcro)
+   30     dE    -9.490733e-05     1.748084e-02    -1.8977e-04      0.015 (TRAH MIcro)
+   30     dE    -1.227161e-04     1.481910e-02    -2.4532e-04      0.021 (TRAH MIcro)
+   30     dE    -1.886820e-04     1.890427e-02    -3.7621e-04      0.055 (TRAH MIcro)
+   30     dE    -1.116813e-03     1.045894e-01    -1.6982e-03      0.562 (TRAH MIcro)
+   30     dE    -4.184949e-03     6.250213e-02    -1.5021e-02      0.669 (TRAH MIcro)
+   30     dE    -4.753709e-03     2.523424e-02    -1.7754e-02      0.669 (TRAH MIcro)
+   30     dE    -4.810159e-03     8.040822e-03    -1.8033e-02      0.669 (TRAH MIcro)
+   30     dE    -4.710575e-03     2.682756e-03    -1.8111e-02      0.660 (TRAH MIcro)
+   30     dE    -4.712915e-03     1.576508e-03    -1.8114e-02      0.660 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -4.712915327977e-03
+  actual energy  change   =     9.893869455482e-04
+  energy change ratio     = -0.209931
+  old trust radius        = 0.668973
+  new trust radius        = 0.448212
+  reject step?            = YES
+   31       -398.008976274315     2.143589e-02                     0.448 (TRAH MAcro)  Yes
+   32       -398.008976274315     1.749616e-01                     0.448 (TRAH MAcro)   No
+WARNING : small    HOMO - LUMO gap : 0.007798
+WARNING : small    HOMO - LUMO gap : 0.007798
+   32     dE    -3.456438e-03     8.718857e-02    -6.8903e-03      0.057 (TRAH MIcro)
+   32     dE    -3.988143e-03     4.195245e-02    -7.9196e-03      0.085 (TRAH MIcro)
+   32     dE    -4.145176e-03     2.173222e-02    -8.2207e-03      0.092 (TRAH MIcro)
+   32     dE    -4.243223e-03     1.750432e-02    -8.3977e-03      0.103 (TRAH MIcro)
+   32     dE    -4.286564e-03     7.223508e-03    -8.4769e-03      0.107 (TRAH MIcro)
+   33       -398.012663206208     2.778664e-02                     0.538 (TRAH MAcro)   No
+   33     dE    -2.174483e-04     2.091572e-02    -4.3473e-04      0.020 (TRAH MIcro)
+   33     dE    -2.525604e-04     1.608019e-02    -5.0481e-04      0.025 (TRAH MIcro)
+   33     dE    -3.155044e-04     1.970424e-02    -6.3011e-04      0.038 (TRAH MIcro)
+   33     dE    -3.362417e-04     1.970190e-02    -6.7116e-04      0.044 (TRAH MIcro)
+   33     dE    -4.718245e-04     2.327830e-02    -9.3299e-04      0.107 (TRAH MIcro)
+   33     dE    -1.540818e-03     5.551956e-02    -3.1063e-03      0.538 (TRAH MIcro)
+   33     dE    -1.832927e-03     1.860745e-02    -5.3462e-03      0.538 (TRAH MIcro)
+   33     dE    -1.880165e-03     1.022591e-02    -5.7279e-03      0.538 (TRAH MIcro)
+   33     dE    -1.889231e-03     3.289919e-03    -5.8064e-03      0.538 (TRAH MIcro)
+   33     dE    -1.890455e-03     1.315839e-03    -5.8176e-03      0.538 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -1.890454589147e-03
+  actual energy  change   =     2.309535987376e-02
+  energy change ratio     = -12.216829
+  old trust radius        = 0.537854
+  new trust radius        = 0.360363
+  reject step?            = YES
+   34       -397.989567846334     2.778664e-02                     0.360 (TRAH MAcro)  Yes
+   35       -397.989567846334     3.465488e-01                     0.360 (TRAH MAcro)   No
+WARNING: 1 diagonal Hessian elements are negative!
+WARNING : negative HOMO - LUMO gap : -0.069356
+WARNING : negative HOMO - LUMO gap : -0.069356
+   35     dE    -1.825867e-02     3.265672e-01    -3.5353e-02      0.181 (TRAH MIcro)
+   35     dE    -2.289973e-02     3.857070e-01    -4.3231e-02      0.244 (TRAH MIcro)
+   35     dE    -3.397039e-02     1.321031e-01    -3.3236e-01      0.299 (TRAH MIcro)
+   35     dE    -4.564784e-02     6.288416e-02    -4.3160e-01      0.360 (TRAH MIcro)
+   35     dE    -1.959533e-02     2.822782e-02    -6.1492e-01      0.149 (TRAH MIcro)
+   35     dE    -1.953874e-02     4.697824e-03    -6.1670e-01      0.147 (TRAH MIcro)
+   36       -398.007226862842     6.418884e-02                     0.432 (TRAH MAcro)   No
+WARNING : small    HOMO - LUMO gap : 0.012471
+WARNING : small    HOMO - LUMO gap : 0.012471
+   36     dE    -2.117549e-03     1.142592e-01    -4.2030e-03      0.087 (TRAH MIcro)
+   36     dE    -2.596824e-03     9.578684e-02    -5.1395e-03      0.103 (TRAH MIcro)
+   36     dE    -3.424741e-03     3.831780e-02    -6.7470e-03      0.123 (TRAH MIcro)
+   36     dE    -3.530395e-03     3.566395e-02    -6.9546e-03      0.124 (TRAH MIcro)
+   36     dE    -3.699130e-03     1.136683e-02    -7.2813e-03      0.127 (TRAH MIcro)
+   36     dE    -3.719361e-03     5.674324e-03    -7.3207e-03      0.127 (TRAH MIcro)
+   37       -398.011036459857     1.809440e-02                     0.519 (TRAH MAcro)   No
+   37     dE    -1.568011e-03     9.209840e-02    -3.0389e-03      0.179 (TRAH MIcro)
+   37     dE    -2.539259e-03     3.386333e-02    -4.7136e-03      0.278 (TRAH MIcro)
+   37     dE    -2.849295e-03     3.195441e-02    -5.2052e-03      0.308 (TRAH MIcro)
+   37     dE    -2.904136e-03     2.440187e-02    -5.2880e-03      0.314 (TRAH MIcro)
+   37     dE    -2.966276e-03     8.375536e-03    -5.3791e-03      0.321 (TRAH MIcro)
+   37     dE    -2.985549e-03     2.065846e-03    -5.4054e-03      0.324 (TRAH MIcro)
+   37     dE    -2.986760e-03     1.762493e-03    -5.4071e-03      0.324 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -2.986760401555e-03
+  actual energy  change   =     1.981740115525e-03
+  energy change ratio     = -0.663508
+  old trust radius        = 0.518922
+  new trust radius        = 0.347678
+  reject step?            = YES
+   38       -398.009054719742     1.809440e-02                     0.348 (TRAH MAcro)  Yes
+   39       -398.009054719741     1.496822e-01                     0.348 (TRAH MAcro)   No
+WARNING: 1 diagonal Hessian elements are negative!
+WARNING : negative HOMO - LUMO gap : -0.001948
+WARNING : negative HOMO - LUMO gap : -0.001948
+   39     dE    -4.070929e-03     1.247647e-01    -8.0468e-03      0.109 (TRAH MIcro)
+   39     dE    -1.030917e-02     1.193360e-01    -4.4909e-02      0.348 (TRAH MIcro)
+   39     dE    -1.166483e-02     5.383819e-02    -8.3582e-02      0.348 (TRAH MIcro)
+   39     dE    -1.080416e-02     1.014377e-02    -1.0240e-01      0.310 (TRAH MIcro)
+   39     dE    -1.087839e-02     7.213285e-03    -1.0252e-01      0.312 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -1.087839312885e-02
+  actual energy  change   =     4.627368441788e-03
+  energy change ratio     = -0.425372
+  old trust radius        = 0.347678
+  new trust radius        = 0.232944
+  reject step?            = YES
+   40       -398.004427351299     1.496822e-01                     0.233 (TRAH MAcro)  Yes
+   41       -398.004427351300     1.964466e-01                     0.233 (TRAH MAcro)   No
+WARNING: 1 diagonal Hessian elements are negative!
+WARNING : negative HOMO - LUMO gap : -0.014020
+WARNING : negative HOMO - LUMO gap : -0.014020
+   41     dE    -6.590964e-03     1.252024e-01    -1.3091e-02      0.084 (TRAH MIcro)
+   41     dE    -7.037060e-03     1.135954e-01    -1.3956e-02      0.092 (TRAH MIcro)
+   41     dE    -7.973617e-03     5.484382e-02    -1.5725e-02      0.119 (TRAH MIcro)
+   41     dE    -8.292731e-03     6.675307e-02    -1.6313e-02      0.129 (TRAH MIcro)
+   41     dE    -1.267314e-02     8.526081e-02    -1.6113e-01      0.233 (TRAH MIcro)
+   41     dE    -8.648456e-03     4.174491e-03    -3.1277e-01      0.117 (TRAH MIcro)
+   42       -398.011995529467     2.294297e-02                     0.280 (TRAH MAcro)   No
+   42     dE    -1.063393e-04     3.328963e-02    -2.1264e-04      0.014 (TRAH MIcro)
+   42     dE    -3.216981e-04     3.282156e-02    -6.4203e-04      0.046 (TRAH MIcro)
+   42     dE    -4.731949e-04     4.162308e-02    -9.4009e-04      0.082 (TRAH MIcro)
+   42     dE    -1.028367e-03     6.237391e-02    -1.9489e-03      0.235 (TRAH MIcro)
+   42     dE    -1.266865e-03     5.680696e-02    -4.3987e-03      0.280 (TRAH MIcro)
+   42     dE    -1.771732e-03     1.450947e-02    -2.0835e-02      0.280 (TRAH MIcro)
+   42     dE    -1.790917e-03     4.902702e-03    -2.1504e-02      0.280 (TRAH MIcro)
+   42     dE    -1.794252e-03     2.729702e-03    -2.1608e-02      0.280 (TRAH MIcro)
+   42     dE    -1.794958e-03     1.046575e-03    -2.1625e-02      0.280 (TRAH MIcro)
+   43       -398.012918198172     4.424189e-02                     0.280 (TRAH MAcro)   No
+   43     dE    -1.991701e-04     1.890084e-02    -3.9819e-04      0.020 (TRAH MIcro)
+   43     dE    -2.304872e-04     6.827164e-03    -4.6072e-04      0.024 (TRAH MIcro)
+   43     dE    -2.336407e-04     4.970503e-03    -4.6700e-04      0.025 (TRAH MIcro)
+   43     dE    -2.387683e-04     2.997564e-03    -4.7719e-04      0.027 (TRAH MIcro)
+   44       -398.013142821949     3.036903e-03                     0.335 (TRAH MAcro)   No
+   44     dE    -3.378568e-06     4.274526e-03    -6.7571e-06      0.003 (TRAH MIcro)
+   44     dE    -4.234241e-06     3.260999e-03    -8.4683e-06      0.004 (TRAH MIcro)
+   44     dE    -5.258889e-06     1.650123e-03    -1.0518e-05      0.005 (TRAH MIcro)
+   44     dE    -5.550447e-06     1.777732e-03    -1.1101e-05      0.005 (TRAH MIcro)
+   44     dE    -6.584199e-06     9.369607e-04    -1.3168e-05      0.008 (TRAH MIcro)
+   44     dE    -7.005386e-06     1.042523e-03    -1.4009e-05      0.010 (TRAH MIcro)
+   44     dE    -7.153345e-06     5.733176e-04    -1.4305e-05      0.011 (TRAH MIcro)
+   44     dE    -7.288461e-06     8.642458e-04    -1.4575e-05      0.012 (TRAH MIcro)
+   44     dE    -7.570885e-06     1.263492e-03    -1.5139e-05      0.013 (TRAH MIcro)
+   44     dE    -9.686048e-06     5.790447e-03    -1.9349e-05      0.034 (TRAH MIcro)
+   44     dE    -5.700319e-05     2.497777e-02    -4.1351e-04      0.333 (TRAH MIcro)
+   44     dE    -1.014919e-04     6.247355e-03    -1.5045e-03      0.305 (TRAH MIcro)
+   44     dE    -1.129243e-04     2.449494e-03    -1.5621e-03      0.321 (TRAH MIcro)
+   44     dE    -1.151154e-04     1.572595e-03    -1.5725e-03      0.324 (TRAH MIcro)
+   44     dE    -1.164204e-04     1.988066e-03    -1.5785e-03      0.325 (TRAH MIcro)
+   44     dE    -1.195571e-04     2.602837e-03    -1.5924e-03      0.329 (TRAH MIcro)
+   44     dE    -1.234716e-04     2.045317e-03    -1.6090e-03      0.334 (TRAH MIcro)
+   44     dE    -1.246229e-04     1.335612e-03    -1.6194e-03      0.335 (TRAH MIcro)
+   44     dE    -1.248867e-04     1.222926e-03    -1.6244e-03      0.335 (TRAH MIcro)
+   44     dE    -1.252775e-04     1.673303e-03    -1.6319e-03      0.335 (TRAH MIcro)
+   44     dE    -1.267058e-04     2.730613e-03    -1.6597e-03      0.335 (TRAH MIcro)
+   44     dE    -1.284037e-04     2.107872e-03    -1.6934e-03      0.335 (TRAH MIcro)
+   44     dE    -1.290615e-04     1.011999e-03    -1.7065e-03      0.335 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -1.290615187839e-04
+  actual energy  change   =     4.899835160700e-03
+  energy change ratio     = -37.965113
+  old trust radius        = 0.335439
+  new trust radius        = 0.224744
+  reject step?            = YES
+   45       -398.008242986789     3.036903e-03                     0.225 (TRAH MAcro)  Yes
+   46       -398.008242986788     2.518884e-01                     0.225 (TRAH MAcro)   No
+WARNING : small    HOMO - LUMO gap : 0.018317
+WARNING : small    HOMO - LUMO gap : 0.018317
+   46     dE    -4.655830e-03     6.738621e-02    -9.2895e-03      0.049 (TRAH MIcro)
+   46     dE    -4.822692e-03     4.811386e-02    -9.6163e-03      0.055 (TRAH MIcro)
+   46     dE    -4.938077e-03     2.297735e-02    -9.8411e-03      0.060 (TRAH MIcro)
+   46     dE    -4.965144e-03     1.507334e-02    -9.8933e-03      0.061 (TRAH MIcro)
+   46     dE    -4.982480e-03     5.003858e-03    -9.9273e-03      0.062 (TRAH MIcro)
+   47       -398.013183397391     6.793866e-03                     0.270 (TRAH MAcro)   No
+   47     dE    -6.118624e-06     6.967003e-03    -1.2237e-05      0.003 (TRAH MIcro)
+   47     dE    -8.748394e-06     5.954288e-03    -1.7496e-05      0.005 (TRAH MIcro)
+   47     dE    -1.230134e-05     3.198421e-03    -2.4602e-05      0.007 (TRAH MIcro)
+   47     dE    -1.409537e-05     2.578990e-03    -2.8189e-05      0.008 (TRAH MIcro)
+   47     dE    -1.500257e-05     1.421142e-03    -3.0003e-05      0.009 (TRAH MIcro)
+   47     dE    -1.534657e-05     7.056254e-04    -3.0690e-05      0.010 (TRAH MIcro)
+   47     dE    -1.545676e-05     4.747976e-04    -3.0910e-05      0.011 (TRAH MIcro)
+   48       -398.013198832755     4.778586e-04                     0.324 (TRAH MAcro)   No
+   48     dE    -2.206332e-08     5.423158e-04    -4.4127e-08      0.000 (TRAH MIcro)
+   48     dE    -5.420998e-08     4.970169e-04    -1.0842e-07      0.000 (TRAH MIcro)
+   48     dE    -8.124900e-08     5.152325e-04    -1.6250e-07      0.001 (TRAH MIcro)
+   48     dE    -1.081403e-07     7.308958e-04    -2.1628e-07      0.001 (TRAH MIcro)
+   48     dE    -1.932047e-07     6.754575e-04    -3.8641e-07      0.002 (TRAH MIcro)
+   48     dE    -3.359802e-07     1.119831e-03    -6.7195e-07      0.004 (TRAH MIcro)
+   48     dE    -8.105800e-07     1.627934e-03    -1.6209e-06      0.012 (TRAH MIcro)
+   48     dE    -1.833849e-06     2.701786e-03    -3.6647e-06      0.029 (TRAH MIcro)
+   48     dE    -4.653531e-06     4.260972e-03    -9.2560e-06      0.074 (TRAH MIcro)
+   48     dE    -2.611745e-05     1.329679e-02    -1.2134e-04      0.324 (TRAH MIcro)
+   48     dE    -3.937378e-05     5.289531e-03    -3.7589e-04      0.324 (TRAH MIcro)
+   48     dE    -4.122297e-05     1.790921e-03    -4.1147e-04      0.324 (TRAH MIcro)
+   48     dE    -4.153393e-05     7.971453e-04    -4.1744e-04      0.324 (TRAH MIcro)
+   48     dE    -4.159423e-05     3.874879e-04    -4.1859e-04      0.324 (TRAH MIcro)
+   48     dE    -4.161614e-05     3.470090e-04    -4.1901e-04      0.324 (TRAH MIcro)
+   48     dE    -4.165085e-05     5.306959e-04    -4.1970e-04      0.324 (TRAH MIcro)
+   48     dE    -4.168444e-05     3.218735e-04    -4.2035e-04      0.324 (TRAH MIcro)
+   48     dE    -4.169342e-05     1.127925e-04    -4.2052e-04      0.324 (TRAH MIcro)
+   48     dE    -4.169423e-05     3.994448e-05    -4.2053e-04      0.324 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -4.169422624721e-05
+  actual energy  change   =     4.294995945372e-03
+  energy change ratio     = -103.011768
+  old trust radius        = 0.323632
+  new trust radius        = 0.216833
+  reject step?            = YES
+   49       -398.008903836809     4.778586e-04                     0.217 (TRAH MAcro)  Yes
+   50       -398.008903836809     2.348629e-01                     0.217 (TRAH MAcro)   No
+   50     dE    -4.052926e-03     6.281139e-02    -8.0889e-03      0.046 (TRAH MIcro)
+   50     dE    -4.197449e-03     4.496392e-02    -8.3727e-03      0.051 (TRAH MIcro)
+   50     dE    -4.291101e-03     2.165146e-02    -8.5558e-03      0.056 (TRAH MIcro)
+   50     dE    -4.316652e-03     1.345976e-02    -8.6054e-03      0.057 (TRAH MIcro)
+   50     dE    -4.330153e-03     4.364539e-03    -8.6320e-03      0.057 (TRAH MIcro)
+   51       -398.013206904977     5.734916e-03                     0.217 (TRAH MAcro)   No
+   51     dE    -4.438238e-06     5.586867e-03    -8.8764e-06      0.003 (TRAH MIcro)
+   51     dE    -6.136747e-06     5.101651e-03    -1.2273e-05      0.004 (TRAH MIcro)
+   51     dE    -8.839929e-06     2.598700e-03    -1.7679e-05      0.006 (TRAH MIcro)
+   51     dE    -9.849632e-06     2.165931e-03    -1.9698e-05      0.006 (TRAH MIcro)
+   51     dE    -1.050186e-05     1.183336e-03    -2.1003e-05      0.008 (TRAH MIcro)
+   51     dE    -1.072352e-05     5.798452e-04    -2.1445e-05      0.009 (TRAH MIcro)
+   51     dE    -1.077533e-05     3.338090e-04    -2.1549e-05      0.009 (TRAH MIcro)
+   52       -398.013217663200     3.369449e-04                     0.260 (TRAH MAcro)   No
+   52     dE    -8.716701e-09     3.493885e-04    -1.7433e-08      0.000 (TRAH MIcro)
+   52     dE    -1.923478e-08     2.859661e-04    -3.8470e-08      0.000 (TRAH MIcro)
+   52     dE    -2.709011e-08     2.525433e-04    -5.4180e-08      0.000 (TRAH MIcro)
+   52     dE    -3.215108e-08     2.872200e-04    -6.4302e-08      0.001 (TRAH MIcro)
+   52     dE    -3.942552e-08     1.677958e-04    -7.8851e-08      0.001 (TRAH MIcro)
+   52     dE    -4.223023e-08     8.608623e-05    -8.4460e-08      0.001 (TRAH MIcro)
+   52     dE    -4.378787e-08     6.931066e-05    -8.7576e-08      0.001 (TRAH MIcro)
+   52     dE    -4.452325e-08     6.004050e-05    -8.9046e-08      0.001 (TRAH MIcro)
+   52     dE    -4.549418e-08     7.919326e-05    -9.0988e-08      0.001 (TRAH MIcro)
+   52     dE    -5.191397e-08     2.803220e-04    -1.0383e-07      0.002 (TRAH MIcro)
+   52     dE    -8.463852e-08     6.126881e-04    -1.6927e-07      0.006 (TRAH MIcro)
+   52     dE    -1.839111e-07     7.658274e-04    -3.6766e-07      0.021 (TRAH MIcro)
+   52     dE    -2.636948e-07     5.161839e-04    -5.2682e-07      0.033 (TRAH MIcro)
+   52     dE    -2.952182e-07     3.084407e-04    -5.8961e-07      0.037 (TRAH MIcro)
+   52     dE    -3.130842e-07     3.515983e-04    -6.2516e-07      0.040 (TRAH MIcro)
+   52     dE    -3.559363e-07     5.923494e-04    -7.1033e-07      0.047 (TRAH MIcro)
+   52     dE    -4.292225e-07     5.805919e-04    -8.5561e-07      0.058 (TRAH MIcro)
+   52     dE    -4.654813e-07     2.757180e-04    -9.2727e-07      0.063 (TRAH MIcro)
+   52     dE    -4.798147e-07     3.344672e-04    -9.5556e-07      0.065 (TRAH MIcro)
+   52     dE    -5.220832e-07     8.110882e-04    -1.0388e-06      0.072 (TRAH MIcro)
+   52     dE    -1.045094e-06     2.791462e-03    -2.0440e-06      0.150 (TRAH MIcro)
+   52     dE    -3.076229e-06     2.298886e-03    -4.0603e-05      0.260 (TRAH MIcro)
+   52     dE    -2.929800e-06     6.397387e-04    -6.7187e-05      0.214 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -2.929799657525e-06
+  actual energy  change   =     8.601497553968e-04
+  energy change ratio     = -293.586544
+  old trust radius        = 0.260200
+  new trust radius        = 0.174334
+  reject step?            = YES
+   53       -398.012357513445     3.369449e-04                     0.174 (TRAH MAcro)  Yes
+   54       -398.012357513445     1.044424e-01                     0.174 (TRAH MAcro)   No
+   54     dE    -8.107337e-04     2.691050e-02    -1.6207e-03      0.022 (TRAH MIcro)
+   54     dE    -8.311363e-04     1.901324e-02    -1.6613e-03      0.024 (TRAH MIcro)
+   54     dE    -8.400737e-04     1.311652e-02    -1.6791e-03      0.025 (TRAH MIcro)
+   54     dE    -8.493134e-04     3.705326e-03    -1.6975e-03      0.025 (TRAH MIcro)
+   55       -398.013208188904     3.545317e-03                     0.209 (TRAH MAcro)   No
+   55     dE    -6.963162e-07     2.488051e-03    -1.3926e-06      0.001 (TRAH MIcro)
+   55     dE    -1.023366e-06     1.747226e-03    -2.0467e-06      0.002 (TRAH MIcro)
+   55     dE    -1.293568e-06     9.868432e-04    -2.5871e-06      0.002 (TRAH MIcro)
+   55     dE    -1.357501e-06     8.320246e-04    -2.7150e-06      0.002 (TRAH MIcro)
+   55     dE    -1.453096e-06     4.262070e-04    -2.9062e-06      0.002 (TRAH MIcro)
+   55     dE    -1.481068e-06     3.763899e-04    -2.9621e-06      0.002 (TRAH MIcro)
+   55     dE    -1.543073e-06     5.058541e-04    -3.0861e-06      0.003 (TRAH MIcro)
+   55     dE    -1.623202e-06     8.492839e-04    -3.2463e-06      0.005 (TRAH MIcro)
+   55     dE    -1.830517e-06     1.326601e-03    -3.6607e-06      0.009 (TRAH MIcro)
+   55     dE    -2.304680e-06     2.012706e-03    -4.6075e-06      0.020 (TRAH MIcro)
+   55     dE    -3.267680e-06     2.866401e-03    -6.5237e-06      0.042 (TRAH MIcro)
+   55     dE    -5.736673e-06     3.791909e-03    -1.1360e-05      0.100 (TRAH MIcro)
+   55     dE    -7.180625e-06     2.294841e-03    -1.4113e-05      0.133 (TRAH MIcro)
+   55     dE    -7.505800e-06     7.721283e-04    -1.4723e-05      0.140 (TRAH MIcro)
+   55     dE    -7.565284e-06     3.742847e-04    -1.4834e-05      0.141 (TRAH MIcro)
+   55     dE    -7.584471e-06     2.630521e-04    -1.4870e-05      0.142 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -7.584470793296e-06
+  actual energy  change   =     1.589887213527e-04
+  energy change ratio     = -20.962401
+  old trust radius        = 0.209201
+  new trust radius        = 0.140165
+  reject step?            = YES
+   56       -398.013049200183     3.545317e-03                     0.140 (TRAH MAcro)  Yes
+   57       -398.013049200183     4.642196e-02                     0.140 (TRAH MAcro)   No
+   57     dE    -1.615196e-04     1.179886e-02    -3.2301e-04      0.010 (TRAH MIcro)
+   57     dE    -1.646157e-04     8.428355e-03    -3.2919e-04      0.011 (TRAH MIcro)
+   57     dE    -1.661260e-04     5.944445e-03    -3.3221e-04      0.011 (TRAH MIcro)
+   57     dE    -1.678358e-04     1.210988e-03    -3.3563e-04      0.011 (TRAH MIcro)
+   58       -398.013217205999     1.172523e-03                     0.168 (TRAH MAcro)   No
+   58     dE    -6.738263e-08     8.173356e-04    -1.3477e-07      0.000 (TRAH MIcro)
+   58     dE    -1.143726e-07     4.740313e-04    -2.2875e-07      0.001 (TRAH MIcro)
+   58     dE    -1.398649e-07     3.357013e-04    -2.7973e-07      0.000 (TRAH MIcro)
+   58     dE    -1.554622e-07     1.839015e-04    -3.1092e-07      0.001 (TRAH MIcro)
+   58     dE    -1.571833e-07     1.377084e-04    -3.1437e-07      0.001 (TRAH MIcro)
+   58     dE    -1.626585e-07     2.279407e-04    -3.2532e-07      0.001 (TRAH MIcro)
+   58     dE    -1.798694e-07     3.260476e-04    -3.5974e-07      0.001 (TRAH MIcro)
+   58     dE    -1.887288e-07     1.677811e-04    -3.7746e-07      0.002 (TRAH MIcro)
+   58     dE    -1.924916e-07     1.696588e-04    -3.8498e-07      0.002 (TRAH MIcro)
+   58     dE    -1.959386e-07     1.146943e-04    -3.9188e-07      0.002 (TRAH MIcro)
+   59       -398.013217401516     1.144180e-04                     0.202 (TRAH MAcro)   No
+   59     dE    -1.433844e-09     8.731225e-05    -2.8677e-09      0.000 (TRAH MIcro)
+   59     dE    -1.800788e-09     1.024965e-04    -3.6016e-09      0.000 (TRAH MIcro)
+   59     dE    -4.945374e-09     1.602653e-04    -9.8907e-09      0.000 (TRAH MIcro)
+   59     dE    -6.477845e-09     1.352264e-04    -1.2956e-08      0.000 (TRAH MIcro)
+   59     dE    -9.054508e-09     1.711881e-04    -1.8109e-08      0.001 (TRAH MIcro)
+   59     dE    -1.394134e-08     2.482294e-04    -2.7883e-08      0.001 (TRAH MIcro)
+   59     dE    -2.479860e-08     2.781079e-04    -4.9597e-08      0.002 (TRAH MIcro)
+   59     dE    -3.406624e-08     1.943889e-04    -6.8132e-08      0.003 (TRAH MIcro)
+   59     dE    -4.412676e-08     2.426561e-04    -8.8252e-08      0.004 (TRAH MIcro)
+   59     dE    -6.333692e-08     4.150454e-04    -1.2667e-07      0.005 (TRAH MIcro)
+   59     dE    -1.011817e-07     5.383815e-04    -2.0235e-07      0.009 (TRAH MIcro)
+   59     dE    -1.603060e-07     6.145451e-04    -3.2054e-07      0.014 (TRAH MIcro)
+   59     dE    -3.222455e-07     1.254694e-03    -6.4391e-07      0.030 (TRAH MIcro)
+   59     dE    -6.337782e-07     1.214795e-03    -1.2630e-06      0.060 (TRAH MIcro)
+   59     dE    -8.311055e-07     7.375950e-04    -1.6518e-06      0.079 (TRAH MIcro)
+   59     dE    -8.867155e-07     3.125468e-04    -1.7608e-06      0.085 (TRAH MIcro)
+   59     dE    -9.012589e-07     2.655490e-04    -1.7893e-06      0.086 (TRAH MIcro)
+   59     dE    -9.230700e-07     3.686046e-04    -1.8319e-06      0.088 (TRAH MIcro)
+   59     dE    -1.083590e-06     1.402504e-03    -2.1441e-06      0.104 (TRAH MIcro)
+   59     dE    -1.464568e-06     1.574754e-03    -2.8720e-06      0.141 (TRAH MIcro)
+   59     dE    -1.795708e-06     8.231872e-04    -3.4873e-06      0.173 (TRAH MIcro)
+   59     dE    -1.874387e-06     3.320163e-04    -3.6309e-06      0.180 (TRAH MIcro)
+   59     dE    -1.883454e-06     1.173938e-04    -3.6474e-06      0.181 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -1.883453747511e-06
+  actual energy  change   =     4.469782418823e-04
+  energy change ratio     = -237.318406
+  old trust radius        = 0.201837
+  new trust radius        = 0.135231
+  reject step?            = YES
+   60       -398.012770423275     1.144180e-04                     0.135 (TRAH MAcro)  Yes
+   61       -398.012770423275     7.530184e-02                     0.135 (TRAH MAcro)   No
+   61     dE    -4.221911e-04     1.934431e-02    -8.4417e-04      0.016 (TRAH MIcro)
+   61     dE    -4.323630e-04     1.359021e-02    -8.6447e-04      0.017 (TRAH MIcro)
+   61     dE    -4.367933e-04     9.508549e-03    -8.7331e-04      0.018 (TRAH MIcro)
+   61     dE    -4.415723e-04     2.553342e-03    -8.8285e-04      0.018 (TRAH MIcro)
+   62       -398.013212729239     2.455941e-03                     0.162 (TRAH MAcro)   No
+   62     dE    -3.028386e-07     1.648820e-03    -6.0568e-07      0.001 (TRAH MIcro)
+   62     dE    -4.676167e-07     1.049378e-03    -9.3523e-07      0.001 (TRAH MIcro)
+   62     dE    -5.776029e-07     6.601483e-04    -1.1552e-06      0.001 (TRAH MIcro)
+   62     dE    -6.134307e-07     4.717020e-04    -1.2269e-06      0.001 (TRAH MIcro)
+   62     dE    -6.436093e-07     2.855632e-04    -1.2872e-06      0.001 (TRAH MIcro)
+   62     dE    -6.568873e-07     2.730232e-04    -1.3138e-06      0.001 (TRAH MIcro)
+   62     dE    -7.079958e-07     5.471136e-04    -1.4160e-06      0.002 (TRAH MIcro)
+   62     dE    -7.879373e-07     8.524664e-04    -1.5758e-06      0.005 (TRAH MIcro)
+   62     dE    -1.015295e-06     1.566310e-03    -2.0303e-06      0.012 (TRAH MIcro)
+   62     dE    -1.519277e-06     1.989088e-03    -3.0364e-06      0.027 (TRAH MIcro)
+   62     dE    -2.469334e-06     3.027010e-03    -4.9232e-06      0.056 (TRAH MIcro)
+   62     dE    -4.741521e-06     3.643173e-03    -9.3385e-06      0.124 (TRAH MIcro)
+   62     dE    -6.206993e-06     2.253069e-03    -2.4383e-05      0.162 (TRAH MIcro)
+   62     dE    -6.480063e-06     7.931914e-04    -4.5318e-05      0.162 (TRAH MIcro)
+   62     dE    -6.530734e-06     3.399584e-04    -4.9210e-05      0.162 (TRAH MIcro)
+   62     dE    -6.549814e-06     3.000553e-04    -5.0670e-05      0.162 (TRAH MIcro)
+   62     dE    -6.571377e-06     3.633288e-04    -5.2327e-05      0.162 (TRAH MIcro)
+   62     dE    -6.591596e-06     2.294468e-04    -5.3900e-05      0.162 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -6.591596449631e-06
+  actual energy  change   =     2.825854531920e-04
+  energy change ratio     = -42.870563
+  old trust radius        = 0.162277
+  new trust radius        = 0.108726
+  reject step?            = YES
+   63       -398.012930143786     2.455941e-03                     0.109 (TRAH MAcro)  Yes
+   64       -398.012930143785     6.069849e-02                     0.109 (TRAH MAcro)   No
+   64     dE    -2.742594e-04     1.559895e-02    -5.4843e-04      0.013 (TRAH MIcro)
+   64     dE    -2.808522e-04     1.103855e-02    -5.6160e-04      0.014 (TRAH MIcro)
+   64     dE    -2.837097e-04     7.748363e-03    -5.6730e-04      0.014 (TRAH MIcro)
+   64     dE    -2.867749e-04     2.034765e-03    -5.7342e-04      0.015 (TRAH MIcro)
+   65       -398.013217319352     1.967142e-03                     0.130 (TRAH MAcro)   No
+   65     dE    -1.974040e-07     1.278627e-03    -3.9481e-07      0.001 (TRAH MIcro)
+   65     dE    -2.929651e-07     7.625419e-04    -5.8593e-07      0.001 (TRAH MIcro)
+   65     dE    -3.526965e-07     5.074816e-04    -7.0539e-07      0.001 (TRAH MIcro)
+   65     dE    -3.745693e-07     3.229328e-04    -7.4914e-07      0.001 (TRAH MIcro)
+   65     dE    -3.870984e-07     1.958880e-04    -7.7420e-07      0.001 (TRAH MIcro)
+   66       -398.013217699390     1.963414e-04                     0.157 (TRAH MAcro)   No
+   66     dE    -2.177209e-09     6.449701e-05    -4.3544e-09      0.000 (TRAH MIcro)
+   66     dE    -2.590747e-09     5.680954e-05    -5.1815e-09      0.000 (TRAH MIcro)
+   66     dE    -3.559699e-09     9.353222e-05    -7.1194e-09      0.000 (TRAH MIcro)
+   66     dE    -4.372504e-09     9.427695e-05    -8.7450e-09      0.000 (TRAH MIcro)
+   66     dE    -4.578717e-09     6.603624e-05    -9.1574e-09      0.000 (TRAH MIcro)
+   66     dE    -5.415238e-09     5.893020e-05    -1.0830e-08      0.000 (TRAH MIcro)
+   66     dE    -7.265136e-09     1.176996e-04    -1.4530e-08      0.001 (TRAH MIcro)
+   66     dE    -9.400330e-09     1.268141e-04    -1.8801e-08      0.001 (TRAH MIcro)
+   66     dE    -1.361275e-08     2.269274e-04    -2.7225e-08      0.001 (TRAH MIcro)
+   66     dE    -2.560851e-08     2.770295e-04    -5.1217e-08      0.003 (TRAH MIcro)
+   66     dE    -3.408509e-08     2.075528e-04    -6.8169e-08      0.004 (TRAH MIcro)
+   66     dE    -3.972823e-08     1.767055e-04    -7.9454e-08      0.005 (TRAH MIcro)
+   66     dE    -5.221798e-08     3.953941e-04    -1.0443e-07      0.007 (TRAH MIcro)
+   66     dE    -8.140830e-08     4.802337e-04    -1.6279e-07      0.012 (TRAH MIcro)
+   66     dE    -1.224732e-07     4.444254e-04    -2.4486e-07      0.018 (TRAH MIcro)
+   66     dE    -1.395006e-07     1.836236e-04    -2.7888e-07      0.021 (TRAH MIcro)
+   66     dE    -1.437167e-07     1.299776e-04    -2.8730e-07      0.022 (TRAH MIcro)
+   66     dE    -1.473495e-07     1.701211e-04    -2.9455e-07      0.022 (TRAH MIcro)
+   66     dE    -1.552378e-07     3.341304e-04    -3.1030e-07      0.024 (TRAH MIcro)
+   66     dE    -2.053673e-07     6.683792e-04    -4.1030e-07      0.032 (TRAH MIcro)
+   66     dE    -4.082708e-07     1.087027e-03    -8.1276e-07      0.068 (TRAH MIcro)
+   66     dE    -6.819218e-07     8.978188e-04    -1.3457e-06      0.116 (TRAH MIcro)
+   66     dE    -7.796255e-07     4.320919e-04    -1.5322e-06      0.133 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -7.796254882864e-07
+  actual energy  change   =     1.327400357241e-04
+  energy change ratio     = -170.261283
+  old trust radius        = 0.156565
+  new trust radius        = 0.104898
+  reject step?            = YES
+   67       -398.013084959355     1.963414e-04                     0.105 (TRAH MAcro)  Yes
+   68       -398.013084959354     4.088101e-02                     0.105 (TRAH MAcro)   No
+   68     dE    -1.247786e-04     1.037795e-02    -2.4954e-04      0.009 (TRAH MIcro)
+   68     dE    -1.273199e-04     7.362014e-03    -2.5462e-04      0.009 (TRAH MIcro)
+   68     dE    -1.285142e-04     5.192422e-03    -2.5700e-04      0.010 (TRAH MIcro)
+   68     dE    -1.298499e-04     1.136344e-03    -2.5967e-04      0.010 (TRAH MIcro)
+   69       -398.013214907392     1.099407e-03                     0.126 (TRAH MAcro)   No
+   69     dE    -6.600491e-08     7.306415e-04    -1.3201e-07      0.000 (TRAH MIcro)
+   69     dE    -1.020058e-07     4.106971e-04    -2.0401e-07      0.000 (TRAH MIcro)
+   69     dE    -1.223634e-07     3.055833e-04    -2.4473e-07      0.000 (TRAH MIcro)
+   69     dE    -1.359490e-07     1.776334e-04    -2.7190e-07      0.001 (TRAH MIcro)
+   69     dE    -1.380540e-07     1.642477e-04    -2.7611e-07      0.001 (TRAH MIcro)
+   69     dE    -1.477796e-07     3.243763e-04    -2.9556e-07      0.001 (TRAH MIcro)
+   69     dE    -2.421364e-07     1.089243e-03    -4.8426e-07      0.004 (TRAH MIcro)
+   69     dE    -4.961871e-07     1.498136e-03    -9.9218e-07      0.014 (TRAH MIcro)
+   69     dE    -1.136813e-06     3.145021e-03    -2.2703e-06      0.038 (TRAH MIcro)
+   69     dE    -2.801743e-06     3.031484e-03    -5.5461e-06      0.102 (TRAH MIcro)
+   69     dE    -4.102277e-06     2.303268e-03    -8.9237e-05      0.126 (TRAH MIcro)
+   69     dE    -4.969288e-06     1.624861e-03    -1.9908e-04      0.126 (TRAH MIcro)
+   69     dE    -5.211699e-06     7.619699e-04    -2.2987e-04      0.126 (TRAH MIcro)
+   69     dE    -5.262449e-06     4.049351e-04    -2.3633e-04      0.126 (TRAH MIcro)
+   69     dE    -5.280170e-06     2.039509e-04    -2.3860e-04      0.126 (TRAH MIcro)
+   69     dE    -5.292685e-06     2.288013e-04    -2.4020e-04      0.126 (TRAH MIcro)
+   69     dE    -5.302336e-06     1.921833e-04    -2.4144e-04      0.126 (TRAH MIcro)
+   69     dE    -5.314284e-06     1.869826e-04    -2.4299e-04      0.126 (TRAH MIcro)
+   69     dE    -5.317787e-06     9.942894e-05    -2.4344e-04      0.126 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -5.317786919942e-06
+  actual energy  change   =     1.019039928565e-04
+  energy change ratio     = -19.162857
+  old trust radius        = 0.125878
+  new trust radius        = 0.084338
+  reject step?            = YES
+   70       -398.013113003399     1.099407e-03                     0.084 (TRAH MAcro)  Yes
+   71       -398.013113003399     3.663499e-02                     0.084 (TRAH MAcro)   No
+   71     dE    -1.003905e-04     9.405743e-03    -2.0077e-04      0.008 (TRAH MIcro)
+   71     dE    -1.025300e-04     6.642084e-03    -2.0505e-04      0.008 (TRAH MIcro)
+   71     dE    -1.035085e-04     4.660343e-03    -2.0700e-04      0.009 (TRAH MIcro)
+   71     dE    -1.045915e-04     1.078921e-03    -2.0917e-04      0.009 (TRAH MIcro)
+   72       -398.013217650940     1.050978e-03                     0.084 (TRAH MAcro)   No
+   72     dE    -6.201456e-08     6.554836e-04    -1.2403e-07      0.000 (TRAH MIcro)
+   72     dE    -8.725517e-08     3.536750e-04    -1.7451e-07      0.000 (TRAH MIcro)
+   72     dE    -1.018505e-07     2.694062e-04    -2.0370e-07      0.000 (TRAH MIcro)
+   72     dE    -1.098948e-07     1.291098e-04    -2.1979e-07      0.000 (TRAH MIcro)
+   72     dE    -1.109799e-07     1.077529e-04    -2.2196e-07      0.000 (TRAH MIcro)
+   72     dE    -1.119044e-07     4.432372e-05    -2.2381e-07      0.000 (TRAH MIcro)
+   73       -398.013217760651     4.443568e-05                           (NR   MAcro)
+   73     dE    -5.758879e-10     6.452936e-05                           (NR   MIcro)
+   73     dE    -1.033184e-09     6.124821e-05                           (NR   MIcro)
+   73     dE    -2.490922e-09     1.103519e-04                           (NR   MIcro)
+   73     dE    -2.978891e-09     8.995896e-05                           (NR   MIcro)
+   73     dE    -5.898592e-09     1.362385e-04                           (NR   MIcro)
+   73     dE    -8.563028e-09     1.715746e-04                           (NR   MIcro)
+   73     dE    -1.566567e-08     1.385472e-04                           (NR   MIcro)
+   73     dE    -2.167377e-08     2.253147e-04                           (NR   MIcro)
+   73     dE    -3.165981e-08     1.420319e-04                           (NR   MIcro)
+   73     dE    -3.506655e-08     1.184357e-04                           (NR   MIcro)
+   73     dE    -3.665075e-08     8.864004e-05                           (NR   MIcro)
+   73     dE    -3.783983e-08     8.015181e-05                           (NR   MIcro)
+   73     dE    -4.024393e-08     1.359163e-04                           (NR   MIcro)
+   73     dE    -4.310192e-08     7.508794e-05                           (NR   MIcro)
+   73     dE    -4.373559e-08     4.466658e-05                           (NR   MIcro)
+   73     dE    -4.440066e-08     8.119430e-05                           (NR   MIcro)
+   73     dE    -4.673171e-08     1.612347e-04                           (NR   MIcro)
+   73     dE    -5.918291e-08     3.512708e-04                           (NR   MIcro)
+   73     dE    -1.088102e-07     7.316223e-04                           (NR   MIcro)
+   73     dE    -2.667517e-07     1.086951e-03                           (NR   MIcro)
+   73     dE    -4.180115e-07     7.330543e-04                           (NR   MIcro)
+   73     dE    -4.808486e-07     3.304789e-04                           (NR   MIcro)
+   73     dE    -4.937761e-07     1.177558e-04                           (NR   MIcro)
+   73     dE    -4.947535e-07     3.658958e-05                           (NR   MIcro)
+   74       -398.013132748070     3.254562e-02                     0.101 (TRAH MAcro)   No
+   74     dE    -7.946032e-05     8.235211e-03    -1.5891e-04      0.007 (TRAH MIcro)
+   74     dE    -8.096030e-05     5.826980e-03    -1.6191e-04      0.008 (TRAH MIcro)
+   74     dE    -8.171711e-05     4.062439e-03    -1.6342e-04      0.008 (TRAH MIcro)
+   74     dE    -8.254696e-05     8.730762e-04    -1.6508e-04      0.008 (TRAH MIcro)
+   75       -398.013215321603     8.501157e-04                     0.121 (TRAH MAcro)   No
+   75     dE    -4.075602e-08     5.630776e-04    -8.1512e-08      0.000 (TRAH MIcro)
+   75     dE    -6.073130e-08     2.993522e-04    -1.2146e-07      0.000 (TRAH MIcro)
+   75     dE    -7.255674e-08     2.515610e-04    -1.4511e-07      0.000 (TRAH MIcro)
+   75     dE    -8.190176e-08     1.564724e-04    -1.6380e-07      0.000 (TRAH MIcro)
+   75     dE    -8.366313e-08     1.350729e-04    -1.6733e-07      0.000 (TRAH MIcro)
+   75     dE    -9.377246e-08     3.813031e-04    -1.8754e-07      0.001 (TRAH MIcro)
+   75     dE    -2.246222e-07     1.538540e-03    -4.4923e-07      0.006 (TRAH MIcro)
+   75     dE    -7.081303e-07     2.032490e-03    -1.4153e-06      0.026 (TRAH MIcro)
+   75     dE    -1.799140e-06     3.891477e-03    -3.5805e-06      0.070 (TRAH MIcro)
+   75     dE    -4.110687e-06     2.515264e-03    -1.4783e-04      0.121 (TRAH MIcro)
+   75     dE    -4.620806e-06     1.092893e-03    -2.1727e-04      0.121 (TRAH MIcro)
+   75     dE    -4.892989e-06     1.007693e-03    -2.5428e-04      0.121 (TRAH MIcro)
+   75     dE    -4.983074e-06     4.883042e-04    -2.6657e-04      0.121 (TRAH MIcro)
+   75     dE    -5.003982e-06     2.483489e-04    -2.6942e-04      0.121 (TRAH MIcro)
+   75     dE    -5.008486e-06     6.105147e-05    -2.7003e-04      0.121 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -5.008486129043e-06
+  actual energy  change   =     8.847351136865e-05
+  energy change ratio     = -17.664721
+  old trust radius        = 0.121447
+  new trust radius        = 0.081370
+  reject step?            = YES
+   76       -398.013126848092     8.501157e-04                     0.081 (TRAH MAcro)  Yes
+   77       -398.013126848092     3.413080e-02                     0.081 (TRAH MAcro)   No
+   77     dE    -8.716358e-05     8.768760e-03    -1.7432e-04      0.007 (TRAH MIcro)
+   77     dE    -8.899102e-05     6.187790e-03    -1.7797e-04      0.008 (TRAH MIcro)
+   77     dE    -8.983846e-05     4.328239e-03    -1.7966e-04      0.008 (TRAH MIcro)
+   77     dE    -9.077480e-05     9.909072e-04    -1.8154e-04      0.008 (TRAH MIcro)
+   78       -398.013217658376     9.665101e-04                     0.098 (TRAH MAcro)   No
+   78     dE    -5.326685e-08     5.945969e-04    -1.0653e-07      0.000 (TRAH MIcro)
+   78     dE    -7.396098e-08     3.199584e-04    -1.4792e-07      0.000 (TRAH MIcro)
+   78     dE    -8.604313e-08     2.503572e-04    -1.7209e-07      0.000 (TRAH MIcro)
+   78     dE    -9.274697e-08     1.188050e-04    -1.8549e-07      0.000 (TRAH MIcro)
+   78     dE    -9.361843e-08     9.881723e-05    -1.8724e-07      0.000 (TRAH MIcro)
+   78     dE    -9.440723e-08     4.116860e-05    -1.8881e-07      0.000 (TRAH MIcro)
+   79       -398.013217750999     4.129651e-05                           (NR   MAcro)
+   79     dE    -4.919509e-10     5.857082e-05                           (NR   MIcro)
+   79     dE    -8.504283e-10     5.459515e-05                           (NR   MIcro)
+   79     dE    -1.950165e-09     9.281237e-05                           (NR   MIcro)
+   79     dE    -2.265681e-09     7.144310e-05                           (NR   MIcro)
+   79     dE    -3.586966e-09     8.042176e-05                           (NR   MIcro)
+   79     dE    -4.507143e-09     9.407183e-05                           (NR   MIcro)
+   79     dE    -6.160368e-09     5.758372e-05                           (NR   MIcro)
+   79     dE    -7.292383e-09     1.034278e-04                           (NR   MIcro)
+   79     dE    -9.997575e-09     9.474611e-05                           (NR   MIcro)
+   79     dE    -1.376201e-08     1.888473e-04                           (NR   MIcro)
+   79     dE    -2.005820e-08     2.322681e-04                           (NR   MIcro)
+   79     dE    -3.255564e-08     3.070977e-04                           (NR   MIcro)
+   79     dE    -6.780948e-08     5.137617e-04                           (NR   MIcro)
+   79     dE    -9.856818e-08     2.265782e-04                           (NR   MIcro)
+   79     dE    -1.026592e-07     9.937284e-05                           (NR   MIcro)
+   79     dE    -1.045164e-07     1.146083e-04                           (NR   MIcro)
+   79     dE    -1.095018e-07     2.421440e-04                           (NR   MIcro)
+   79     dE    -1.397564e-07     5.734992e-04                           (NR   MIcro)
+   79     dE    -2.435241e-07     1.026690e-03                           (NR   MIcro)
+   79     dE    -4.695750e-07     1.104519e-03                           (NR   MIcro)
+   79     dE    -5.793534e-07     5.545775e-04                           (NR   MIcro)
+   79     dE    -6.055889e-07     1.675427e-04                           (NR   MIcro)
+   79     dE    -6.091626e-07     7.521116e-05                           (NR   MIcro)
+   79     dE    -6.096268e-07     2.883202e-05                           (NR   MIcro)
+   80       -398.013100274430     3.834830e-02                     0.117 (TRAH MAcro)   No
+   80     dE    -1.102847e-04     9.723227e-03    -2.2055e-04      0.008 (TRAH MIcro)
+   80     dE    -1.123809e-04     6.872635e-03    -2.2474e-04      0.009 (TRAH MIcro)
+   80     dE    -1.134226e-04     4.812764e-03    -2.2683e-04      0.009 (TRAH MIcro)
+   80     dE    -1.145831e-04     1.025058e-03    -2.2915e-04      0.009 (TRAH MIcro)
+   81       -398.013214930121     9.951544e-04                     0.141 (TRAH MAcro)   No
+   81     dE    -5.170806e-08     6.842533e-04    -1.0342e-07      0.000 (TRAH MIcro)
+   81     dE    -8.235075e-08     3.757653e-04    -1.6470e-07      0.000 (TRAH MIcro)
+   81     dE    -9.929183e-08     2.891061e-04    -1.9858e-07      0.000 (TRAH MIcro)
+   81     dE    -1.115788e-07     1.724908e-04    -2.2316e-07      0.000 (TRAH MIcro)
+   81     dE    -1.148098e-07     1.339377e-04    -2.2962e-07      0.001 (TRAH MIcro)
+   81     dE    -1.239318e-07     3.789897e-04    -2.4786e-07      0.001 (TRAH MIcro)
+   81     dE    -2.385476e-07     1.368843e-03    -4.7708e-07      0.005 (TRAH MIcro)
+   81     dE    -6.142107e-07     1.740497e-03    -1.2280e-06      0.019 (TRAH MIcro)
+   81     dE    -1.411412e-06     3.364416e-03    -2.8158e-06      0.050 (TRAH MIcro)
+   81     dE    -3.661120e-06     3.401976e-03    -7.1919e-06      0.135 (TRAH MIcro)
+   81     dE    -4.830343e-06     1.914424e-03    -1.0954e-04      0.141 (TRAH MIcro)
+   81     dE    -5.609370e-06     1.561044e-03    -1.8860e-04      0.141 (TRAH MIcro)
+   81     dE    -5.802358e-06     6.942833e-04    -2.0822e-04      0.141 (TRAH MIcro)
+   81     dE    -5.841971e-06     3.274149e-04    -2.1228e-04      0.141 (TRAH MIcro)
+   81     dE    -5.849704e-06     8.443370e-05    -2.1306e-04      0.141 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -5.849704287550e-06
+  actual energy  change   =     1.601160387850e-04
+  energy change ratio     = -27.371647
+  old trust radius        = 0.140607
+  new trust radius        = 0.094207
+  reject step?            = YES
+   82       -398.013054814082     9.951544e-04                     0.094 (TRAH MAcro)  Yes
+   83       -398.013054814082     4.566639e-02                     0.094 (TRAH MAcro)   No
+   83     dE    -1.556655e-04     1.173864e-02    -3.1130e-04      0.010 (TRAH MIcro)
+   83     dE    -1.591719e-04     8.307933e-03    -3.1831e-04      0.011 (TRAH MIcro)
+   83     dE    -1.607220e-04     5.899555e-03    -3.2141e-04      0.011 (TRAH MIcro)
+   83     dE    -1.624388e-04     1.419575e-03    -3.2484e-04      0.011 (TRAH MIcro)
+   84       -398.013217405266     1.378980e-03                     0.113 (TRAH MAcro)   No
+   84     dE    -1.014338e-07     8.741875e-04    -2.0287e-07      0.000 (TRAH MIcro)
+   84     dE    -1.472826e-07     4.922524e-04    -2.9457e-07      0.001 (TRAH MIcro)
+   84     dE    -1.741303e-07     3.552845e-04    -3.4826e-07      0.000 (TRAH MIcro)
+   84     dE    -1.872977e-07     1.858009e-04    -3.7460e-07      0.001 (TRAH MIcro)
+   84     dE    -1.906767e-07     1.416780e-04    -3.8135e-07      0.001 (TRAH MIcro)
+   84     dE    -1.925176e-07     6.733250e-05    -3.8504e-07      0.001 (TRAH MIcro)
+   85       -398.013217594127     6.752287e-05                           (NR   MAcro)
+   85     dE    -1.201474e-09     8.748103e-05                           (NR   MIcro)
+   85     dE    -2.525245e-09     8.330062e-05                           (NR   MIcro)
+   85     dE    -4.702396e-09     1.372419e-04                           (NR   MIcro)
+   85     dE    -5.500962e-09     1.043058e-04                           (NR   MIcro)
+   85     dE    -8.986714e-09     1.377848e-04                           (NR   MIcro)
+   85     dE    -1.145664e-08     1.328494e-04                           (NR   MIcro)
+   85     dE    -1.461005e-08     8.989862e-05                           (NR   MIcro)
+   85     dE    -1.755913e-08     1.703552e-04                           (NR   MIcro)
+   85     dE    -2.485488e-08     1.339633e-04                           (NR   MIcro)
+   85     dE    -3.273159e-08     2.676700e-04                           (NR   MIcro)
+   85     dE    -4.809078e-08     3.504796e-04                           (NR   MIcro)
+   85     dE    -8.251846e-08     5.250501e-04                           (NR   MIcro)
+   85     dE    -1.956426e-07     8.064105e-04                           (NR   MIcro)
+   85     dE    -2.987817e-07     4.414946e-04                           (NR   MIcro)
+   85     dE    -3.128924e-07     1.647089e-04                           (NR   MIcro)
+   85     dE    -3.181053e-07     1.866711e-04                           (NR   MIcro)
+   85     dE    -3.320637e-07     4.037315e-04                           (NR   MIcro)
+   85     dE    -4.442298e-07     1.150102e-03                           (NR   MIcro)
+   85     dE    -7.022009e-07     1.520910e-03                           (NR   MIcro)
+   85     dE    -1.156674e-06     1.579344e-03                           (NR   MIcro)
+   85     dE    -1.312728e-06     5.388613e-04                           (NR   MIcro)
+   85     dE    -1.338695e-06     2.036750e-04                           (NR   MIcro)
+   85     dE    -1.342393e-06     8.038471e-05                           (NR   MIcro)
+   85     dE    -1.343037e-06     3.790403e-05                           (NR   MIcro)
+   86       -398.012796928407     7.299134e-02                     0.136 (TRAH MAcro)   No
+   86     dE    -3.967222e-04     1.879233e-02    -7.9325e-04      0.015 (TRAH MIcro)
+   86     dE    -4.060750e-04     1.313506e-02    -8.1192e-04      0.017 (TRAH MIcro)
+   86     dE    -4.101815e-04     9.236781e-03    -8.2012e-04      0.017 (TRAH MIcro)
+   86     dE    -4.146601e-04     2.412703e-03    -8.2906e-04      0.018 (TRAH MIcro)
+   87       -398.013212264404     2.319599e-03                     0.163 (TRAH MAcro)   No
+   87     dE    -2.733193e-07     1.573032e-03    -5.4664e-07      0.001 (TRAH MIcro)
+   87     dE    -4.252910e-07     1.002972e-03    -8.5058e-07      0.001 (TRAH MIcro)
+   87     dE    -5.252633e-07     6.344408e-04    -1.0505e-06      0.001 (TRAH MIcro)
+   87     dE    -5.601690e-07     4.439878e-04    -1.1203e-06      0.001 (TRAH MIcro)
+   87     dE    -5.863903e-07     2.769398e-04    -1.1728e-06      0.001 (TRAH MIcro)
+   87     dE    -6.009403e-07     3.063322e-04    -1.2019e-06      0.001 (TRAH MIcro)
+   87     dE    -6.661317e-07     6.165482e-04    -1.3323e-06      0.003 (TRAH MIcro)
+   87     dE    -7.726505e-07     9.840787e-04    -1.5453e-06      0.006 (TRAH MIcro)
+   87     dE    -1.074082e-06     1.779539e-03    -2.1477e-06      0.014 (TRAH MIcro)
+   87     dE    -1.739974e-06     2.275684e-03    -3.4760e-06      0.034 (TRAH MIcro)
+   87     dE    -2.915965e-06     3.284014e-03    -5.8052e-06      0.068 (TRAH MIcro)
+   87     dE    -5.509431e-06     3.731963e-03    -1.0803e-05      0.141 (TRAH MIcro)
+   87     dE    -6.876585e-06     2.003237e-03    -5.6988e-05      0.163 (TRAH MIcro)
+   87     dE    -7.097829e-06     6.947361e-04    -7.3851e-05      0.163 (TRAH MIcro)
+   87     dE    -7.134361e-06     2.522613e-04    -7.6645e-05      0.163 (TRAH MIcro)
+   87     dE    -7.143486e-06     1.873314e-04    -7.7336e-05      0.163 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -7.143485965725e-06
+  actual energy  change   =     2.856913404230e-04
+  energy change ratio     = -39.993267
+  old trust radius        = 0.162789
+  new trust radius        = 0.109069
+  reject step?            = YES
+   88       -398.012926573064     2.319599e-03                     0.109 (TRAH MAcro)  Yes
+   89       -398.012926573064     6.107079e-02                     0.109 (TRAH MAcro)   No
+   89     dE    -2.776991e-04     1.585050e-02    -5.5531e-04      0.013 (TRAH MIcro)
+   89     dE    -2.843726e-04     1.108630e-02    -5.6863e-04      0.014 (TRAH MIcro)
+   89     dE    -2.872930e-04     7.764669e-03    -5.7447e-04      0.014 (TRAH MIcro)
+   89     dE    -2.903964e-04     2.053946e-03    -5.8066e-04      0.015 (TRAH MIcro)
+   90       -398.013217378072     1.986258e-03                     0.131 (TRAH MAcro)   No
+   90     dE    -2.008465e-07     1.287035e-03    -4.0169e-07      0.001 (TRAH MIcro)
+   90     dE    -2.980339e-07     7.769335e-04    -5.9607e-07      0.001 (TRAH MIcro)
+   90     dE    -3.597040e-07     5.157252e-04    -7.1941e-07      0.001 (TRAH MIcro)
+   90     dE    -3.828420e-07     3.304863e-04    -7.6568e-07      0.001 (TRAH MIcro)
+   90     dE    -3.961417e-07     2.062415e-04    -7.9228e-07      0.001 (TRAH MIcro)
+   90     dE    -4.001874e-07     1.011584e-04    -8.0037e-07      0.001 (TRAH MIcro)
+   91       -398.013217771194     1.013218e-04                     0.157 (TRAH MAcro)   No
+   91     dE    -2.406951e-09     1.159128e-04    -4.8139e-09      0.000 (TRAH MIcro)
+   91     dE    -5.550543e-09     1.116459e-04    -1.1101e-08      0.000 (TRAH MIcro)
+   91     dE    -7.345309e-09     1.397831e-04    -1.4691e-08      0.000 (TRAH MIcro)
+   91     dE    -8.549734e-09     9.538671e-05    -1.7099e-08      0.000 (TRAH MIcro)
+   91     dE    -1.080044e-08     1.100749e-04    -2.1601e-08      0.001 (TRAH MIcro)
+   91     dE    -1.265748e-08     8.281209e-05    -2.5315e-08      0.001 (TRAH MIcro)
+   91     dE    -1.317432e-08     4.622301e-05    -2.6349e-08      0.001 (TRAH MIcro)
+   91     dE    -1.376692e-08     6.927067e-05    -2.7534e-08      0.001 (TRAH MIcro)
+   91     dE    -1.459261e-08     3.807205e-05    -2.9185e-08      0.001 (TRAH MIcro)
+   91     dE    -1.496688e-08     5.174509e-05    -2.9934e-08      0.001 (TRAH MIcro)
+   91     dE    -1.557490e-08     7.208023e-05    -3.1150e-08      0.001 (TRAH MIcro)
+   91     dE    -1.723352e-08     1.276923e-04    -3.4467e-08      0.001 (TRAH MIcro)
+   91     dE    -2.797177e-08     3.333172e-04    -5.5943e-08      0.004 (TRAH MIcro)
+   91     dE    -1.030948e-07     8.071706e-04    -2.0609e-07      0.022 (TRAH MIcro)
+   91     dE    -1.612596e-07     3.465860e-04    -3.2208e-07      0.037 (TRAH MIcro)
+   91     dE    -1.701924e-07     1.600757e-04    -3.3986e-07      0.039 (TRAH MIcro)
+   91     dE    -1.728647e-07     1.049919e-04    -3.4518e-07      0.040 (TRAH MIcro)
+   91     dE    -1.766011e-07     1.835240e-04    -3.5262e-07      0.041 (TRAH MIcro)
+   91     dE    -1.860798e-07     2.698739e-04    -3.7147e-07      0.043 (TRAH MIcro)
+   91     dE    -2.350811e-07     8.132949e-04    -4.6870e-07      0.056 (TRAH MIcro)
+   91     dE    -3.140769e-07     5.598115e-04    -6.2454e-07      0.076 (TRAH MIcro)
+   91     dE    -3.438514e-07     2.378657e-04    -6.8291e-07      0.084 (TRAH MIcro)
+   91     dE    -3.463651e-07     5.375596e-05    -6.8783e-07      0.084 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -3.463650758725e-07
+  actual energy  change   =     2.227680755595e-05
+  energy change ratio     = -64.315975
+  old trust radius        = 0.157059
+  new trust radius        = 0.105229
+  reject step?            = YES
+   92       -398.013195494386     1.013218e-04                     0.105 (TRAH MAcro)  Yes
+   93       -398.013195494386     1.651426e-02                     0.105 (TRAH MAcro)   No
+   93     dE    -2.047500e-05     4.183193e-03    -4.0949e-05      0.004 (TRAH MIcro)
+   93     dE    -2.085817e-05     2.956299e-03    -4.1716e-05      0.004 (TRAH MIcro)
+   93     dE    -2.105887e-05     2.025654e-03    -4.2117e-05      0.004 (TRAH MIcro)
+   93     dE    -2.126894e-05     4.502546e-04    -4.2537e-05      0.004 (TRAH MIcro)
+   94       -398.013216739465     4.422660e-04                     0.126 (TRAH MAcro)   No
+   94     dE    -1.437985e-08     2.479046e-04    -2.8760e-08      0.000 (TRAH MIcro)
+   94     dE    -1.724415e-08     1.307240e-04    -3.4488e-08      0.000 (TRAH MIcro)
+   94     dE    -2.030110e-08     1.458011e-04    -4.0602e-08      0.000 (TRAH MIcro)
+   94     dE    -2.309847e-08     1.015039e-04    -4.6197e-08      0.000 (TRAH MIcro)
+   94     dE    -2.390877e-08     1.044977e-04    -4.7818e-08      0.000 (TRAH MIcro)
+   94     dE    -3.115543e-08     3.255931e-04    -6.2311e-08      0.001 (TRAH MIcro)
+   94     dE    -1.458650e-07     1.546568e-03    -2.9171e-07      0.008 (TRAH MIcro)
+   94     dE    -6.254343e-07     2.000428e-03    -1.2492e-06      0.037 (TRAH MIcro)
+   94     dE    -1.518091e-06     3.188562e-03    -3.0116e-06      0.090 (TRAH MIcro)
+   94     dE    -2.771763e-06     1.755652e-03    -9.7837e-05      0.123 (TRAH MIcro)
+   94     dE    -3.043032e-06     6.763887e-04    -1.1906e-04      0.126 (TRAH MIcro)
+   94     dE    -3.142510e-06     6.878004e-04    -1.3157e-04      0.126 (TRAH MIcro)
+   94     dE    -3.199926e-06     4.487612e-04    -1.3880e-04      0.126 (TRAH MIcro)
+   94     dE    -3.230157e-06     4.129076e-04    -1.4261e-04      0.126 (TRAH MIcro)
+   94     dE    -3.254433e-06     2.526122e-04    -1.4568e-04      0.126 (TRAH MIcro)
+   94     dE    -3.277945e-06     2.939318e-04    -1.4866e-04      0.126 (TRAH MIcro)
+   94     dE    -3.288179e-06     1.432218e-04    -1.4996e-04      0.126 (TRAH MIcro)
+   94     dE    -3.292464e-06     1.036747e-04    -1.5050e-04      0.126 (TRAH MIcro)
+   94     dE    -3.293211e-06     4.603636e-05    -1.5060e-04      0.126 (TRAH MIcro)
+   94     dE    -3.293399e-06     2.596895e-05    -1.5062e-04      0.126 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -3.293399423422e-06
+  actual energy  change   =     1.059562749788e-04
+  energy change ratio     = -32.172312
+  old trust radius        = 0.126275
+  new trust radius        = 0.084604
+  reject step?            = YES
+   95       -398.013110783190     4.422660e-04                     0.085 (TRAH MAcro)  Yes
+   96       -398.013110783190     3.688312e-02                     0.085 (TRAH MAcro)   No
+   96     dE    -1.017711e-04     9.499986e-03    -2.0353e-04      0.008 (TRAH MIcro)
+   96     dE    -1.039502e-04     6.687959e-03    -2.0789e-04      0.009 (TRAH MIcro)
+   96     dE    -1.049464e-04     4.695190e-03    -2.0988e-04      0.009 (TRAH MIcro)
+   96     dE    -1.060484e-04     1.092051e-03    -2.1208e-04      0.009 (TRAH MIcro)
+   97       -398.013216890884     1.064541e-03                     0.102 (TRAH MAcro)   No
+   97     dE    -6.426258e-08     6.625517e-04    -1.2853e-07      0.000 (TRAH MIcro)
+   97     dE    -9.020475e-08     3.614040e-04    -1.8041e-07      0.000 (TRAH MIcro)
+   97     dE    -1.056369e-07     2.810636e-04    -2.1127e-07      0.000 (TRAH MIcro)
+   97     dE    -1.143056e-07     1.424901e-04    -2.2861e-07      0.000 (TRAH MIcro)
+   97     dE    -1.159550e-07     1.175596e-04    -2.3191e-07      0.000 (TRAH MIcro)
+   97     dE    -1.180754e-07     1.065708e-04    -2.3615e-07      0.000 (TRAH MIcro)
+   97     dE    -1.308047e-07     3.888738e-04    -2.6161e-07      0.001 (TRAH MIcro)
+   97     dE    -1.609557e-07     5.174666e-04    -3.2191e-07      0.003 (TRAH MIcro)
+   97     dE    -2.439553e-07     1.118960e-03    -4.8787e-07      0.009 (TRAH MIcro)
+   97     dE    -4.555624e-07     1.174436e-03    -9.1059e-07      0.024 (TRAH MIcro)
+   97     dE    -6.925794e-07     1.242787e-03    -1.3828e-06      0.041 (TRAH MIcro)
+   97     dE    -1.094185e-06     1.503140e-03    -2.1778e-06      0.070 (TRAH MIcro)
+   97     dE    -1.347479e-06     8.956723e-04    -2.6745e-06      0.087 (TRAH MIcro)
+   97     dE    -1.407752e-06     4.479867e-04    -2.7921e-06      0.092 (TRAH MIcro)
+   97     dE    -1.422361e-06     1.327513e-04    -2.8205e-06      0.093 (TRAH MIcro)
+   97     dE    -1.428386e-06     1.847248e-04    -2.8322e-06      0.093 (TRAH MIcro)
+   97     dE    -1.440994e-06     2.968574e-04    -2.8567e-06      0.094 (TRAH MIcro)
+   97     dE    -1.479475e-06     4.570867e-04    -2.9315e-06      0.097 (TRAH MIcro)
+   97     dE    -1.503283e-06     3.202368e-04    -2.9776e-06      0.099 (TRAH MIcro)
+   97     dE    -1.517980e-06     2.246743e-04    -3.0061e-06      0.100 (TRAH MIcro)
+   97     dE    -1.528328e-06     2.762752e-04    -3.0261e-06      0.100 (TRAH MIcro)
+   97     dE    -1.562051e-06     4.572114e-04    -6.9570e-06      0.102 (TRAH MIcro)
+   97     dE    -1.589394e-06     2.229823e-04    -1.2706e-05      0.102 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -1.589394221141e-06
+  actual energy  change   =     4.390517506181e-05
+  energy change ratio     = -27.623842
+  old trust radius        = 0.101525
+  new trust radius        = 0.068022
+  reject step?            = YES
+   98       -398.013172985709     1.064541e-03                     0.068 (TRAH MAcro)  Yes
+   99       -398.013172985709     2.385356e-02                     0.068 (TRAH MAcro)   No
+   99     dE    -4.275696e-05     6.005607e-03    -8.5512e-05      0.005 (TRAH MIcro)
+   99     dE    -4.355664e-05     4.279007e-03    -8.7111e-05      0.006 (TRAH MIcro)
+   99     dE    -4.396324e-05     2.971449e-03    -8.7924e-05      0.006 (TRAH MIcro)
+   99     dE    -4.440223e-05     6.402750e-04    -8.8801e-05      0.006 (TRAH MIcro)
+  100       -398.013217375482     6.263558e-04                     0.068 (TRAH MAcro)   No
+  100     dE    -2.442595e-08     3.802568e-04    -4.8852e-08      0.000 (TRAH MIcro)
+  100     dE    -3.220826e-08     1.940759e-04    -6.4417e-08      0.000 (TRAH MIcro)
+  100     dE    -3.730006e-08     1.671200e-04    -7.4600e-08      0.000 (TRAH MIcro)
+  100     dE    -4.073447e-08     8.717423e-05    -8.1469e-08      0.000 (TRAH MIcro)
+  100     dE    -4.104330e-08     7.255671e-05    -8.2087e-08      0.000 (TRAH MIcro)
+  100     dE    -4.231899e-08     1.046889e-04    -8.4638e-08      0.000 (TRAH MIcro)
+  100     dE    -5.163165e-08     3.859183e-04    -1.0326e-07      0.001 (TRAH MIcro)
+  100     dE    -7.934525e-08     4.486688e-04    -1.5869e-07      0.004 (TRAH MIcro)
+  100     dE    -1.297661e-07     8.426621e-04    -2.5951e-07      0.008 (TRAH MIcro)
+  100     dE    -2.487372e-07     7.342448e-04    -4.9729e-07      0.019 (TRAH MIcro)
+  100     dE    -3.182459e-07     5.986086e-04    -6.3607e-07      0.026 (TRAH MIcro)
+  100     dE    -4.428933e-07     9.185698e-04    -8.8454e-07      0.037 (TRAH MIcro)
+  100     dE    -5.868855e-07     8.730275e-04    -1.1707e-06      0.051 (TRAH MIcro)
+  100     dE    -7.689893e-07     1.193922e-03    -1.5309e-06      0.068 (TRAH MIcro)
+  100     dE    -9.574546e-07     7.442972e-04    -8.3592e-05      0.068 (TRAH MIcro)
+  100     dE    -1.094148e-06     5.874553e-04    -1.4338e-04      0.068 (TRAH MIcro)
+  100     dE    -1.134965e-06     2.999352e-04    -1.6128e-04      0.068 (TRAH MIcro)
+  100     dE    -1.149936e-06     1.655814e-04    -1.6785e-04      0.068 (TRAH MIcro)
+  100     dE    -1.151796e-06     6.697091e-05    -1.6866e-04      0.068 (TRAH MIcro)
+  100     dE    -1.152224e-06     4.081262e-05    -1.6886e-04      0.068 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -1.152223710295e-06
+  actual energy  change   =     8.687050296885e-06
+  energy change ratio     = -7.539378
+  old trust radius        = 0.068022
+  new trust radius        = 0.045575
+  reject step?            = YES
+  101       -398.013208688431     6.263558e-04                     0.046 (TRAH MAcro)  Yes
+  102       -398.013208688431     1.074690e-02                     0.046 (TRAH MAcro)   No
+  102     dE    -8.678057e-06     2.777494e-03    -1.7356e-05      0.002 (TRAH MIcro)
+  102     dE    -8.842794e-06     1.955521e-03    -1.7685e-05      0.003 (TRAH MIcro)
+  102     dE    -8.929005e-06     1.325706e-03    -1.7858e-05      0.003 (TRAH MIcro)
+  102     dE    -9.016246e-06     2.871493e-04    -1.8032e-05      0.003 (TRAH MIcro)
+  103       -398.013217683366     2.836817e-04                     0.055 (TRAH MAcro)   No
+  103     dE    -6.218761e-09     1.305079e-04    -1.2438e-08      0.000 (TRAH MIcro)
+  103     dE    -6.960940e-09     7.157538e-05    -1.3922e-08      0.000 (TRAH MIcro)
+  103     dE    -7.858686e-09     8.020356e-05    -1.5717e-08      0.000 (TRAH MIcro)
+  103     dE    -8.457345e-09     4.736773e-05    -1.6915e-08      0.000 (TRAH MIcro)
+  103     dE    -8.674625e-09     4.297062e-05    -1.7349e-08      0.000 (TRAH MIcro)
+  103     dE    -9.323882e-09     8.429565e-05    -1.8648e-08      0.000 (TRAH MIcro)
+  103     dE    -1.736728e-08     3.990652e-04    -3.4735e-08      0.001 (TRAH MIcro)
+  103     dE    -4.174968e-08     4.239317e-04    -8.3498e-08      0.005 (TRAH MIcro)
+  103     dE    -6.943649e-08     4.679834e-04    -1.3886e-07      0.009 (TRAH MIcro)
+  103     dE    -9.106544e-08     2.540505e-04    -1.8211e-07      0.012 (TRAH MIcro)
+  103     dE    -9.556847e-08     9.315818e-05    -1.9111e-07      0.012 (TRAH MIcro)
+  103     dE    -9.756647e-08     1.180410e-04    -1.9510e-07      0.013 (TRAH MIcro)
+  103     dE    -1.016583e-07     1.826960e-04    -2.0328e-07      0.013 (TRAH MIcro)
+  103     dE    -1.104619e-07     2.902671e-04    -2.2088e-07      0.015 (TRAH MIcro)
+  103     dE    -1.229700e-07     1.571277e-04    -2.4587e-07      0.017 (TRAH MIcro)
+  103     dE    -1.341552e-07     2.635656e-04    -2.6822e-07      0.019 (TRAH MIcro)
+  103     dE    -1.493119e-07     2.450526e-04    -2.9849e-07      0.021 (TRAH MIcro)
+  103     dE    -1.704206e-07     3.984802e-04    -3.4063e-07      0.025 (TRAH MIcro)
+  103     dE    -1.965241e-07     4.016351e-04    -3.9271e-07      0.029 (TRAH MIcro)
+  103     dE    -2.626372e-07     7.251073e-04    -5.2440e-07      0.041 (TRAH MIcro)
+  103     dE    -3.522653e-07     6.637241e-04    -9.1377e-06      0.055 (TRAH MIcro)
+  103     dE    -4.108876e-07     3.712675e-04    -5.1758e-05      0.055 (TRAH MIcro)
+  103     dE    -4.187801e-07     1.120780e-04    -5.6678e-05      0.055 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -4.187800525120e-07
+  actual energy  change   =     3.782627459259e-06
+  energy change ratio     = -9.032492
+  old trust radius        = 0.054690
+  new trust radius        = 0.036642
+  reject step?            = YES
+  104       -398.013213900739     2.836817e-04                     0.037 (TRAH MAcro)  Yes
+  105       -398.013213900739     6.943900e-03                     0.037 (TRAH MAcro)   No
+  105     dE    -3.617536e-06     1.778149e-03    -7.2351e-06      0.002 (TRAH MIcro)
+  105     dE    -3.685834e-06     1.245542e-03    -7.3716e-06      0.002 (TRAH MIcro)
+  105     dE    -3.722499e-06     8.404865e-04    -7.4450e-06      0.002 (TRAH MIcro)
+  105     dE    -3.759615e-06     1.938239e-04    -7.5192e-06      0.002 (TRAH MIcro)
+  106       -398.013217645789     1.913829e-04                     0.044 (TRAH MAcro)   No
+  106     dE    -3.054463e-09     7.912391e-05    -6.1089e-09      0.000 (TRAH MIcro)
+  106     dE    -3.472795e-09     4.722240e-05    -6.9456e-09      0.000 (TRAH MIcro)
+  106     dE    -3.933796e-09     6.878631e-05    -7.8676e-09      0.000 (TRAH MIcro)
+  106     dE    -4.349166e-09     5.070464e-05    -8.6983e-09      0.000 (TRAH MIcro)
+  106     dE    -4.649816e-09     5.051366e-05    -9.2996e-09      0.000 (TRAH MIcro)
+  106     dE    -6.131022e-09     1.380537e-04    -1.2262e-08      0.000 (TRAH MIcro)
+  106     dE    -1.726578e-08     3.541409e-04    -3.4531e-08      0.002 (TRAH MIcro)
+  106     dE    -4.415747e-08     4.811222e-04    -8.8312e-08      0.005 (TRAH MIcro)
+  106     dE    -1.057068e-07     1.084194e-03    -2.1137e-07      0.014 (TRAH MIcro)
+  106     dE    -3.280821e-07     1.031982e-03    -6.5493e-07      0.043 (TRAH MIcro)
+  106     dE    -4.259118e-07     5.725115e-04    -9.8336e-05      0.044 (TRAH MIcro)
+  106     dE    -4.704416e-07     4.098661e-04    -1.7449e-04      0.042 (TRAH MIcro)
+  106     dE    -4.975632e-07     2.039409e-04    -1.8039e-04      0.043 (TRAH MIcro)
+  106     dE    -5.077178e-07     1.795034e-04    -1.8337e-04      0.044 (TRAH MIcro)
+  106     dE    -5.109607e-07     8.442495e-05    -1.8677e-04      0.044 (TRAH MIcro)
+  106     dE    -5.136481e-07     1.141885e-04    -1.8960e-04      0.044 (TRAH MIcro)
+  106     dE    -5.170619e-07     1.259832e-04    -1.9322e-04      0.044 (TRAH MIcro)
+  106     dE    -5.211029e-07     9.219008e-05    -1.9755e-04      0.044 (TRAH MIcro)
+  106     dE    -5.219355e-07     5.874027e-05    -1.9843e-04      0.044 (TRAH MIcro)
+  106     dE    -5.228414e-07     9.867921e-05    -1.9944e-04      0.044 (TRAH MIcro)
+  106     dE    -5.257798e-07     1.871960e-04    -2.0269e-04      0.044 (TRAH MIcro)
+  106     dE    -5.338220e-07     2.221426e-04    -2.1171e-04      0.044 (TRAH MIcro)
+  106     dE    -5.375195e-07     7.483026e-05    -2.1591e-04      0.044 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -5.375195340468e-07
+  actual energy  change   =     1.415451606590e-06
+  energy change ratio     = -2.633303
+  old trust radius        = 0.043970
+  new trust radius        = 0.029460
+  reject step?            = YES
+  107       -398.013216230337     1.913829e-04                     0.029 (TRAH MAcro)  Yes
+  108       -398.013216230337     4.502373e-03                     0.029 (TRAH MAcro)   No
+  108     dE    -1.522230e-06     1.186291e-03    -3.0445e-06      0.001 (TRAH MIcro)
+  108     dE    -1.552147e-06     8.354502e-04    -3.1043e-06      0.001 (TRAH MIcro)
+  108     dE    -1.568068e-06     5.579023e-04    -3.1361e-06      0.001 (TRAH MIcro)
+  108     dE    -1.583724e-06     1.234007e-04    -3.1674e-06      0.001 (TRAH MIcro)
+  109       -398.013217803900     1.225057e-04                     0.035 (TRAH MAcro)   No
+  109     dE    -1.203968e-09     4.233120e-05    -2.4079e-09      0.000 (TRAH MIcro)
+  109     dE    -1.373399e-09     3.115719e-05    -2.7468e-09      0.000 (TRAH MIcro)
+  109     dE    -1.489213e-09     3.474189e-05    -2.9784e-09      0.000 (TRAH MIcro)
+  109     dE    -1.597938e-09     2.254369e-05    -3.1959e-09      0.000 (TRAH MIcro)
+  109     dE    -1.628607e-09     2.080275e-05    -3.2572e-09      0.000 (TRAH MIcro)
+  109     dE    -1.810240e-09     4.620957e-05    -3.6205e-09      0.000 (TRAH MIcro)
+  109     dE    -4.141292e-09     2.114296e-04    -8.2826e-09      0.001 (TRAH MIcro)
+  109     dE    -1.326572e-08     2.719208e-04    -2.6531e-08      0.004 (TRAH MIcro)
+  109     dE    -3.128666e-08     5.023905e-04    -6.2568e-08      0.009 (TRAH MIcro)
+  109     dE    -7.368960e-08     4.563485e-04    -1.4731e-07      0.022 (TRAH MIcro)
+  109     dE    -9.272230e-08     2.422445e-04    -1.8530e-07      0.028 (TRAH MIcro)
+  109     dE    -1.036372e-07     2.170249e-04    -2.0708e-07      0.031 (TRAH MIcro)
+  109     dE    -1.099097e-07     1.574132e-04    -2.1958e-07      0.033 (TRAH MIcro)
+  109     dE    -1.165360e-07     2.463537e-04    -2.3279e-07      0.035 (TRAH MIcro)
+  109     dE    -1.254417e-07     1.538483e-04    -1.1937e-05      0.035 (TRAH MIcro)
+  109     dE    -1.297424e-07     9.712930e-05    -1.8331e-05      0.035 (TRAH MIcro)
+  109     dE    -1.303812e-07     2.361101e-05    -1.9904e-05      0.035 (TRAH MIcro)
+  109     dE    -1.304448e-07     1.271666e-05    -2.0011e-05      0.035 (TRAH MIcro)
+  109     dE    -1.304610e-07     8.258187e-06    -2.0036e-05      0.035 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -1.304609646324e-07
+  actual energy  change   =     7.015711389613e-07
+  energy change ratio     = -5.377633
+  old trust radius        = 0.035352
+  new trust radius        = 0.023686
+  reject step?            = YES
+  110       -398.013217102329     1.225057e-04                     0.024 (TRAH MAcro)  Yes
+  111       -398.013217102329     2.913540e-03                     0.024 (TRAH MAcro)   No
+  111     dE    -6.329000e-07     7.621200e-04    -1.2658e-06      0.001 (TRAH MIcro)
+  111     dE    -6.455516e-07     5.351635e-04    -1.2911e-06      0.001 (TRAH MIcro)
+  111     dE    -6.525024e-07     3.556017e-04    -1.3050e-06      0.001 (TRAH MIcro)
+  111     dE    -6.593131e-07     8.420092e-05    -1.3186e-06      0.001 (TRAH MIcro)
+  112       -398.013217755298     8.339687e-05                           (NR   MAcro)
+  112     dE    -6.478100e-10     2.898840e-05                           (NR   MIcro)
+  112     dE    -7.932266e-10     3.448843e-05                           (NR   MIcro)
+  112     dE    -9.485655e-10     3.646532e-05                           (NR   MIcro)
+  112     dE    -1.249735e-09     4.591527e-05                           (NR   MIcro)
+  112     dE    -1.382558e-09     5.717122e-05                           (NR   MIcro)
+  112     dE    -3.236177e-09     1.695469e-04                           (NR   MIcro)
+  112     dE    -3.059577e-08     7.313981e-04                           (NR   MIcro)
+  112     dE    -1.095145e-07     6.767431e-04                           (NR   MIcro)
+  112     dE    -1.873125e-07     8.399676e-04                           (NR   MIcro)
+  112     dE    -3.021283e-07     6.731543e-04                           (NR   MIcro)
+  112     dE    -3.518626e-07     4.202250e-04                           (NR   MIcro)
+  112     dE    -3.920669e-07     4.086410e-04                           (NR   MIcro)
+  112     dE    -4.041965e-07     1.491927e-04                           (NR   MIcro)
+  112     dE    -4.068415e-07     1.104658e-04                           (NR   MIcro)
+  112     dE    -4.091068e-07     9.987103e-05                           (NR   MIcro)
+  112     dE    -4.156700e-07     2.141574e-04                           (NR   MIcro)
+  112     dE    -4.209399e-07     9.635614e-05                           (NR   MIcro)
+  112     dE    -4.226922e-07     8.995258e-05                           (NR   MIcro)
+  112     dE    -4.244037e-07     1.262547e-04                           (NR   MIcro)
+  112     dE    -4.303455e-07     2.592340e-04                           (NR   MIcro)
+  112     dE    -4.418670e-07     2.598056e-04                           (NR   MIcro)
+  112     dE    -4.501201e-07     1.375811e-04                           (NR   MIcro)
+  112     dE    -4.511518e-07     2.978869e-05                           (NR   MIcro)
+  112     dE    -4.512068e-07     1.241016e-05                           (NR   MIcro)
+  113       -398.013194825959     1.678674e-02                     0.028 (TRAH MAcro)   No
+  113     dE    -2.100132e-05     4.417611e-03    -4.2002e-05      0.004 (TRAH MIcro)
+  113     dE    -2.153285e-05     3.070777e-03    -4.3065e-05      0.004 (TRAH MIcro)
+  113     dE    -2.176343e-05     2.121857e-03    -4.3526e-05      0.004 (TRAH MIcro)
+  113     dE    -2.200057e-05     6.008008e-04    -4.4000e-05      0.004 (TRAH MIcro)
+  114       -398.013216804311     5.923624e-04                     0.034 (TRAH MAcro)   No
+  114     dE    -2.488002e-08     2.316132e-04    -4.9760e-08      0.000 (TRAH MIcro)
+  114     dE    -2.843633e-08     1.307507e-04    -5.6873e-08      0.000 (TRAH MIcro)
+  114     dE    -3.108087e-08     1.767569e-04    -6.2162e-08      0.000 (TRAH MIcro)
+  114     dE    -3.309626e-08     1.203757e-04    -6.6193e-08      0.000 (TRAH MIcro)
+  114     dE    -3.500279e-08     8.756433e-05    -7.0006e-08      0.000 (TRAH MIcro)
+  114     dE    -3.861757e-08     1.973816e-04    -7.7235e-08      0.000 (TRAH MIcro)
+  114     dE    -1.223417e-07     9.866126e-04    -2.4468e-07      0.006 (TRAH MIcro)
+  114     dE    -3.368531e-07     1.411939e-03    -6.7344e-07      0.020 (TRAH MIcro)
+  114     dE    -7.665097e-07     1.518678e-03    -3.6866e-04      0.034 (TRAH MIcro)
+  114     dE    -8.986447e-07     5.709641e-04    -5.9759e-04      0.034 (TRAH MIcro)
+  114     dE    -9.283786e-07     3.410801e-04    -6.5496e-04      0.034 (TRAH MIcro)
+  114     dE    -9.442422e-07     2.235349e-04    -6.7657e-04      0.034 (TRAH MIcro)
+  114     dE    -9.501545e-07     1.435898e-04    -6.8687e-04      0.034 (TRAH MIcro)
+  114     dE    -9.514005e-07     6.924989e-05    -6.8905e-04      0.034 (TRAH MIcro)
+  114     dE    -9.516519e-07     1.674334e-05    -6.8947e-04      0.034 (TRAH MIcro)
+  115       -398.013217069313     2.713045e-03                     0.034 (TRAH MAcro)   No
+  115     dE    -5.474102e-07     7.097114e-04    -1.0948e-06      0.001 (TRAH MIcro)
+  115     dE    -5.583499e-07     5.005249e-04    -1.1167e-06      0.001 (TRAH MIcro)
+  115     dE    -5.643433e-07     3.323553e-04    -1.1287e-06      0.001 (TRAH MIcro)
+  115     dE    -5.702892e-07     7.903952e-05    -1.1406e-06      0.001 (TRAH MIcro)
+  116       -398.013217633832     7.825725e-05                           (NR   MAcro)
+  116     dE    -7.055181e-10     3.380281e-05                           (NR   MIcro)
+  116     dE    -9.283007e-10     5.042047e-05                           (NR   MIcro)
+  116     dE    -1.232543e-09     5.761646e-05                           (NR   MIcro)
+  116     dE    -1.914425e-09     8.120357e-05                           (NR   MIcro)
+  116     dE    -2.266761e-09     9.265834e-05                           (NR   MIcro)
+  116     dE    -8.593884e-09     3.065346e-04                           (NR   MIcro)
+  116     dE    -7.772586e-08     1.044933e-03                           (NR   MIcro)
+  116     dE    -2.018336e-07     7.159791e-04                           (NR   MIcro)
+  116     dE    -2.881589e-07     9.022373e-04                           (NR   MIcro)
+  116     dE    -4.180973e-07     7.103538e-04                           (NR   MIcro)
+  116     dE    -5.101691e-07     8.540562e-04                           (NR   MIcro)
+  116     dE    -7.619856e-07     1.272455e-03                           (NR   MIcro)
+  116     dE    -9.663069e-07     8.650155e-04                           (NR   MIcro)
+  116     dE    -1.159850e-06     1.256782e-03                           (NR   MIcro)
+  116     dE    -1.395983e-06     8.537771e-04                           (NR   MIcro)
+  116     dE    -1.519489e-06     4.481025e-04                           (NR   MIcro)
+  116     dE    -1.535609e-06     1.627905e-04                           (NR   MIcro)
+  116     dE    -1.544833e-06     2.467640e-04                           (NR   MIcro)
+  116     dE    -1.560109e-06     3.575206e-04                           (NR   MIcro)
+  116     dE    -1.595295e-06     6.523541e-04                           (NR   MIcro)
+  116     dE    -1.682119e-06     8.097185e-04                           (NR   MIcro)
+  116     dE    -1.777792e-06     5.502180e-04                           (NR   MIcro)
+  116     dE    -1.798752e-06     1.690071e-04                           (NR   MIcro)
+  116     dE    -1.801071e-06     6.887981e-05                           (NR   MIcro)
+  117       -398.011439338873     1.503856e-01                     0.041 (TRAH MAcro)   No
+  117     dE    -1.498531e-03     5.075926e-02    -2.9955e-03      0.023 (TRAH MIcro)
+  117     dE    -1.732194e-03     2.540025e-02    -3.4601e-03      0.035 (TRAH MIcro)
+  117     dE    -1.746929e-03     1.861567e-02    -3.4894e-03      0.036 (TRAH MIcro)
+  117     dE    -1.755080e-03     1.332763e-02    -3.5056e-03      0.036 (TRAH MIcro)
+  117     dE    -1.764797e-03     2.934046e-03    -3.5249e-03      0.036 (TRAH MIcro)
+  118       -398.013204506891     3.092213e-03                     0.049 (TRAH MAcro)   No
+  118     dE    -6.428238e-07     2.784510e-03    -1.2856e-06      0.001 (TRAH MIcro)
+  118     dE    -9.881909e-07     2.329324e-03    -1.9764e-06      0.002 (TRAH MIcro)
+  118     dE    -1.602645e-06     1.012613e-03    -3.2053e-06      0.002 (TRAH MIcro)
+  118     dE    -1.680339e-06     1.023583e-03    -3.3607e-06      0.002 (TRAH MIcro)
+  118     dE    -1.808659e-06     6.050230e-04    -3.6173e-06      0.003 (TRAH MIcro)
+  118     dE    -1.876588e-06     5.185851e-04    -3.7531e-06      0.004 (TRAH MIcro)
+  118     dE    -1.930571e-06     4.845359e-04    -3.8611e-06      0.004 (TRAH MIcro)
+  118     dE    -2.016748e-06     7.831084e-04    -4.0334e-06      0.006 (TRAH MIcro)
+  118     dE    -2.209878e-06     1.095110e-03    -4.4194e-06      0.009 (TRAH MIcro)
+  118     dE    -2.591566e-06     2.151514e-03    -5.1819e-06      0.015 (TRAH MIcro)
+  118     dE    -4.980193e-06     3.427768e-03    -6.5456e-04      0.048 (TRAH MIcro)
+  118     dE    -5.924728e-06     1.329958e-03    -1.3995e-03      0.049 (TRAH MIcro)
+  118     dE    -6.050486e-06     5.960672e-04    -1.5080e-03      0.049 (TRAH MIcro)
+  118     dE    -5.287267e-06     1.583111e-04    -2.0547e-03      0.039 (TRAH MIcro)
+  119       -398.013208982543     3.545227e-03                     0.059 (TRAH MAcro)   No
+  119     dE    -9.253519e-07     9.508307e-04    -1.8507e-06      0.001 (TRAH MIcro)
+  119     dE    -9.491609e-07     6.582938e-04    -1.8983e-06      0.001 (TRAH MIcro)
+  119     dE    -9.652886e-07     4.317644e-04    -1.9306e-06      0.001 (TRAH MIcro)
+  119     dE    -9.845921e-07     3.108763e-04    -1.9692e-06      0.001 (TRAH MIcro)
+  120       -398.013209958422     3.103130e-04                     0.071 (TRAH MAcro)   No
+  120     dE    -1.270262e-08     2.916841e-04    -2.5405e-08      0.000 (TRAH MIcro)
+  120     dE    -2.272138e-08     4.648548e-04    -4.5443e-08      0.000 (TRAH MIcro)
+  120     dE    -4.234999e-08     7.952563e-04    -8.4700e-08      0.001 (TRAH MIcro)
+  120     dE    -2.053308e-07     2.191248e-03    -4.1065e-07      0.005 (TRAH MIcro)
+  120     dE    -3.645989e-07     2.680970e-03    -7.2915e-07      0.008 (TRAH MIcro)
+  120     dE    -2.135656e-06     4.467056e-03    -4.2605e-06      0.050 (TRAH MIcro)
+  120     dE    -4.162403e-06     2.053184e-03    -4.7185e-04      0.071 (TRAH MIcro)
+  120     dE    -4.926096e-06     2.062810e-03    -7.7755e-04      0.071 (TRAH MIcro)
+  120     dE    -5.464268e-06     1.014910e-03    -9.9406e-04      0.071 (TRAH MIcro)
+  120     dE    -4.649157e-06     7.286563e-04    -1.3383e-03      0.058 (TRAH MIcro)
+  120     dE    -4.761828e-06     5.862390e-04    -1.3543e-03      0.058 (TRAH MIcro)
+  120     dE    -4.864879e-06     4.316880e-04    -1.3686e-03      0.059 (TRAH MIcro)
+  120     dE    -4.958385e-06     5.113809e-04    -1.3813e-03      0.060 (TRAH MIcro)
+  120     dE    -5.020495e-06     2.134770e-04    -1.3895e-03      0.060 (TRAH MIcro)
+  120     dE    -5.028762e-06     7.889749e-05    -1.3905e-03      0.060 (TRAH MIcro)
+  120     dE    -5.029964e-06     2.977557e-05    -1.3907e-03      0.060 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -5.029964081276e-06
+  actual energy  change   =     1.130328826093e-06
+  energy change ratio     = -0.224719
+  old trust radius        = 0.070726
+  new trust radius        = 0.047386
+  reject step?            = YES
+  121       -398.013208828093     3.103130e-04                     0.047 (TRAH MAcro)  Yes
+  122       -398.013208828093     8.391094e-03                     0.047 (TRAH MAcro)   No
+  122     dE    -5.268083e-06     2.188581e-03    -1.0536e-05      0.002 (TRAH MIcro)
+  122     dE    -5.369790e-06     1.537890e-03    -1.0740e-05      0.002 (TRAH MIcro)
+  122     dE    -5.424688e-06     1.029401e-03    -1.0849e-05      0.002 (TRAH MIcro)
+  122     dE    -5.480694e-06     2.467125e-04    -1.0961e-05      0.002 (TRAH MIcro)
+  123       -398.013214291010     2.441411e-04                     0.057 (TRAH MAcro)   No
+  123     dE    -8.565338e-09     1.883300e-04    -1.7131e-08      0.000 (TRAH MIcro)
+  123     dE    -1.139335e-08     1.613606e-04    -2.2787e-08      0.000 (TRAH MIcro)
+  123     dE    -1.734296e-08     3.253100e-04    -3.4686e-08      0.000 (TRAH MIcro)
+  123     dE    -2.958395e-08     3.820447e-04    -5.9168e-08      0.001 (TRAH MIcro)
+  123     dE    -4.841305e-08     5.003884e-04    -9.6826e-08      0.001 (TRAH MIcro)
+  123     dE    -2.665506e-07     1.837883e-03    -5.3306e-07      0.009 (TRAH MIcro)
+  123     dE    -2.409971e-06     3.364411e-03    -7.9341e-04      0.049 (TRAH MIcro)
+  123     dE    -3.202571e-06     8.268919e-04    -9.6167e-04      0.057 (TRAH MIcro)
+  123     dE    -3.252224e-06     3.802980e-04    -9.9267e-04      0.057 (TRAH MIcro)
+  123     dE    -3.268081e-06     2.085127e-04    -1.0025e-03      0.057 (TRAH MIcro)
+  123     dE    -3.270885e-06     6.698718e-05    -1.0042e-03      0.057 (TRAH MIcro)
+  123     dE    -3.271555e-06     5.231005e-05    -1.0047e-03      0.057 (TRAH MIcro)
+  123     dE    -3.271843e-06     3.116768e-05    -1.0049e-03      0.057 (TRAH MIcro)
+  123     dE    -3.271948e-06     1.904668e-05    -1.0049e-03      0.057 (TRAH MIcro)
+ ---------------------------------
+          TRAH Step control 
+ ---------------------------------
+  predicted energy change =    -3.271947867794e-06
+  actual energy  change   =     1.825756669405e-06
+  energy change ratio     = -0.558003
+  old trust radius        = 0.056864
+  new trust radius        = 0.038099
+  reject step?            = YES
+  124       -398.013212465253     2.441411e-04                     0.038 (TRAH MAcro)  Yes
+
+               *****************************************************
+               *                      ERROR                        *
+               *        SCF NOT CONVERGED AFTER 1168 CYCLES         *
+               *****************************************************
+
+[file orca_leanscf/orca_leanscf.cpp, line 306, Process 12]: Error (ORCA_LEANSCF): unfortunately, the SCF has not converged. There may be a way out but we have to stop here 
+[file orca_leanscf/orca_leanscf.cpp, line 306, Process 19]: Error (ORCA_LEANSCF): unfortunately, the SCF has not converged. There may be a way out but we have to stop here 
+[file orca_leanscf/orca_leanscf.cpp, line 306, Process 20]: Error (ORCA_LEANSCF): unfortunately, the SCF has not converged. There may be a way out but we have to stop here 
+[file orca_leanscf/orca_leanscf.cpp, line 306, Process 21]: Error (ORCA_LEANSCF): unfortunately, the SCF has not converged. There may be a way out but we have to stop here 
+[file orca_leanscf/orca_leanscf.cpp, line 306, Process 22]: Error (ORCA_LEANSCF): unfortunately, the SCF has not converged. There may be a way out but we have to stop here 
+[file orca_leanscf/orca_leanscf.cpp, line 306, Process 0]: Error (ORCA_LEANSCF): unfortunately, the SCF has not converged. There may be a way out but we have to stop here 
+[file orca_leanscf/orca_leanscf.cpp, line 306, Process 23]: Error (ORCA_LEANSCF): unfortunately, the SCF has not converged. There may be a way out but we have to stop here 
+[file orca_leanscf/orca_leanscf.cpp, line 306, Process 1]: Error (ORCA_LEANSCF): unfortunately, the SCF has not converged. There may be a way out but we have to stop here 
+[file orca_leanscf/orca_leanscf.cpp, line 306, Process 2]: Error (ORCA_LEANSCF): unfortunately, the SCF has not converged. There may be a way out but we have to stop here 
+[file orca_leanscf/orca_leanscf.cpp, line 306, Process 3]: Error (ORCA_LEANSCF): unfortunately, the SCF has not converged. There may be a way out but we have to stop here 
+[file orca_leanscf/orca_leanscf.cpp, line 306, Process 4]: Error (ORCA_LEANSCF): unfortunately, the SCF has not converged. There may be a way out but we have to stop here 
+[file orca_leanscf/orca_leanscf.cpp, line 306, Process 5]: Error (ORCA_LEANSCF): unfortunately, the SCF has not converged. There may be a way out but we have to stop here 
+[file orca_leanscf/orca_leanscf.cpp, line 306, Process 6]: Error (ORCA_LEANSCF): unfortunately, the SCF has not converged. There may be a way out but we have to stop here 
+[file orca_leanscf/orca_leanscf.cpp, line 306, Process 7]: Error (ORCA_LEANSCF): unfortunately, the SCF has not converged. There may be a way out but we have to stop here 
+[file orca_leanscf/orca_leanscf.cpp, line 306, Process 8]: Error (ORCA_LEANSCF): unfortunately, the SCF has not converged. There may be a way out but we have to stop here 
+[file orca_leanscf/orca_leanscf.cpp, line 306, Process 9]: Error (ORCA_LEANSCF): unfortunately, the SCF has not converged. There may be a way out but we have to stop here 
+[file orca_leanscf/orca_leanscf.cpp, line 306, Process 10]: Error (ORCA_LEANSCF): unfortunately, the SCF has not converged. There may be a way out but we have to stop here 
+[file orca_leanscf/orca_leanscf.cpp, line 306, Process 11]: Error (ORCA_LEANSCF): unfortunately, the SCF has not converged. There may be a way out but we have to stop here 
+[file orca_leanscf/orca_leanscf.cpp, line 306, Process 13]: Error (ORCA_LEANSCF): unfortunately, the SCF has not converged. There may be a way out but we have to stop here 
+[file orca_leanscf/orca_leanscf.cpp, line 306, Process 14]: Error (ORCA_LEANSCF): unfortunately, the SCF has not converged. There may be a way out but we have to stop here 
+[file orca_leanscf/orca_leanscf.cpp, line 306, Process 15]: Error (ORCA_LEANSCF): unfortunately, the SCF has not converged. There may be a way out but we have to stop here 
+[file orca_leanscf/orca_leanscf.cpp, line 306, Process 16]: Error (ORCA_LEANSCF): unfortunately, the SCF has not converged. There may be a way out but we have to stop here 
+[file orca_leanscf/orca_leanscf.cpp, line 306, Process 17]: Error (ORCA_LEANSCF): unfortunately, the SCF has not converged. There may be a way out but we have to stop here 
+[file orca_leanscf/orca_leanscf.cpp, line 306, Process 18]: Error (ORCA_LEANSCF): unfortunately, the SCF has not converged. There may be a way out but we have to stop here 
+
+ORCA finished by error termination in LEANSCF
+Calling Command: mpirun -np 24  /software/orca/6.1.1/orca_leanscf_mpi /gpfs/fs2/scratch/kshao4/mlip/codes/X_semiactivelearning/dft_launches/p10_2gpu_6h/P10p0000GPa/acquisition/inputs/cluster_479.gbw /gpfs/fs2/scratch/kshao4/mlip/codes/X_semiactivelearning/dft_launches/p10_2gpu_6h/P10p0000GPa/acquisition/inputs/cluster_479 
+[file orca_tools/qcmsg.cpp, line 394]: 
+  .... aborting the run
+

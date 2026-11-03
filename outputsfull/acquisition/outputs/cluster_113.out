@@ -1,0 +1,1839 @@
+
+                                 *****************
+                                 * O   R   C   A *
+                                 *****************
+
+                                            #,                                       
+                                            ###                                      
+                                            ####                                     
+                                            #####                                    
+                                            ######                                   
+                                           ########,                                 
+                                     ,,################,,,,,                         
+                               ,,#################################,,                 
+                          ,,##########################################,,             
+                       ,#########################################, ''#####,          
+                    ,#############################################,,   '####,        
+                  ,##################################################,,,,####,       
+                ,###########''''           ''''###############################       
+              ,#####''   ,,,,##########,,,,          '''####'''          '####       
+            ,##' ,,,,###########################,,,                        '##       
+           ' ,,###''''                  '''############,,,                           
+         ,,##''                                '''############,,,,        ,,,,,,###''
+      ,#''                                            '''#######################'''  
+     '                                                          ''''####''''         
+             ,#######,   #######,   ,#######,      ##                                
+            ,#'     '#,  ##    ##  ,#'     '#,    #''#        ,####,    ,#,          
+            ##       ##  ##   ,#'  ##            #'  '#       #'       ,# #          
+            ##       ##  #######   ##           ,######,      #####,      #          
+            '#,     ,#'  ##    ##  '#,     ,#' ,#      #,     #,   #      #          
+             '#######'   ##     ##  '#######'  #'      '#     '####' #    #          
+
+
+
+                #########################################################
+                #                        -***-                          #
+                #          Department of theory and spectroscopy        #
+                #                                                       #
+                #                      Frank Neese                      #
+                #                                                       #
+                #     Directorship, Architecture, Infrastructure        #
+                #                    SHARK, DRIVERS                     #
+                #        Core code/Algorithms in most modules           #
+                #                                                       #
+                #        Max Planck Institute fuer Kohlenforschung      #
+                #                Kaiser Wilhelm Platz 1                 #
+                #                 D-45470 Muelheim/Ruhr                 #
+                #                      Germany                          #
+                #                                                       #
+                #                  All rights reserved                  #
+                #                        -***-                          #
+                #########################################################
+
+
+                         Program Version 6.1.1  -  RELEASE   -
+                                (GIT: $487d211c$)
+                          ($2025-11-21 10:33:24 +0100$)
+
+
+ With contributions from (in alphabetic order):
+[Max-Planck-Institut fuer Kohlenforschung]                               
+  Daniel Aravena         : Magnetic Suceptibility                        
+  Michael Atanasov       : Ab Initio Ligand Field Theory (pilot matlab implementation)
+  Alexander A. Auer      : GIAO ZORA, VPT2 properties, NMR spectrum      
+  Ute Becker             : All parallelization in ORCA, NUMFREQ, NUMCALC 
+  Giovanni Bistoni       : ED, misc. LED, open-shell LED, HFLD           
+  Dmytro Bykov           : pre 5.0 version of the SCF Hessian            
+  Marcos Casanova-Páez   : Triplet and SCS-CIS(D). UHF-(DLPNO)-IP/EA/STEOM-CCSD. UHF-CVS-IP/STEOM-CCSD   
+  Vijay G. Chilkuri      : MRCI spin determinant printing, contributions to CSF-ICE 
+  Pauline Colinet        : FMM embedding                                 
+  Dipayan Datta          : RHF DLPNO-CCSD density                        
+  Achintya Kumar Dutta   : EOM-CC, STEOM-CC                              
+  Nicolas Foglia         : Exact transition moments, OPA infrastructure, MCD improvements    
+  Dmitry Ganyushin       : Spin-Orbit,Spin-Spin,Magnetic field MRCI      
+  Miquel Garcia-Rates    : C-PCM and meta-GGA Hessian, CCSD/C-PCM, Gaussian charge scheme 
+  Tiago L. C. Gouveia    : GS-ROHF, GS-ROCIS                             
+  Yang Guo               : DLPNO-NEVPT2, F12-NEVPT2, CIM, IAO-localization        
+  Andreas Hansen         : Spin unrestricted coupled pair/coupled cluster methods 
+  Ingolf Harden          : AUTO-CI MPn and infrastructure                
+  Benjamin Helmich-Paris : MC-RPA, TRAH-(SCF,CASSCF), AVAS, COSX integrals, SCF dyn. polar., MC-PDFT, srDFT 
+  Lee Huntington         : MR-EOM, pCC                                   
+  Robert Izsak           : Overlap fitted RIJCOSX, COSX-SCS-MP3, EOM     
+  Riya Kayal             : Wick's Theorem for AUTO-CI, AUTO-CI UHF-CCSDT 
+  Emily Kempfer          : AUTO-CI RHF CISDT and CCSDT, approximate NEVPT4
+  Christian Kollmar      : KDIIS, OOCD, Brueckner-CCSD(T), CCSD density, CASPT2, CASPT2-K, improved NEVPT2 
+  Axel Koslowski         : Symmetry handling                             
+  Simone Kossmann        : meta-GGA functionals, TD-DFT gradient, OOMP2, (MP2 Hessian; deprecated post 5.0) 
+  Lucas Lang             : DCDCAS, Hyperfine gauge corrections, ICE-SOC+SSC
+  Marvin Lechner         : AUTO-CI (C++ implementation), FIC-MRCC        
+  Spencer Leger          : CASSCF response                               
+  Dagmar Lenk            : GEPOL surface, SMD, ORCA-2-JSON               
+  Dimitrios Liakos       : Extrapolation schemes; Compound Job, Property file
+  Dimitrios Manganas     : Further ROCIS development; embedding schemes. LFT, Crystal Embedding 
+  Dimitrios Pantazis     : SARC Basis sets                               
+  Anastasios Papadopoulos: AUTO-CI, single reference methods and gradients 
+  Taras Petrenko         : pre 6.0 DFT Hessian and TD-DFT gradient,  ECA, NRVS 
+  Petra Pikulova         : Analytic Raman intensities                    
+  Peter Pinski           : DLPNO-MP2, DLPNO-MP2 Gradient                 
+  Shashank Vittal Rao    : ES-AILFT, MagRelax                            
+  Christoph Reimann      : Effective Core Potentials                     
+  Marius Retegan         : Local ZFS, SOC                                
+  Christoph Riplinger    : Optimizer, TS searches, QM/MM, DLPNO-CCSD(T), (RO)-DLPNO pert. Triples 
+  Michael Roemelt        : Original ROCIS implementation, recursive CI coupling coefficients
+  Masaaki Saitow         : Open-shell DLPNO-CCSD energy and density      
+  Barbara Sandhoefer     : DKH picture change effects                    
+  Yorick L. A. Schmerwitz: GMF and freeze-and-release deltaSCF, NEB S-IDPP initial path                    
+  Kantharuban Sivalingam : CASSCF convergence/infrastructure, NEVPT2, NEVPT3, NEVPT4(SD), FIC-MRCI and CEPA variants
+  Bernardo de Souza      : ESD, SOC TD-DFT                               
+  Georgi L. Stoychev     : AutoAux, RI-MP2 NMR, DLPNO-MP2 response, X2C  
+  Van Anh Tran           : RI-MP2 g-tensors                              
+  Willem Van den Heuvel  : Paramagnetic NMR                              
+  Zikuan Wang            : NOTCH, Electric field optimization            
+  Frank Wennmohs         : Technical directorship and infrastructure     
+  Hang Xu                : AUTO-CI-Response properties                   
+                                                                         
+[FACCTs GmbH]                                                            
+  Markus Bursch, Nicolas Foglia, Miquel Garcia-Rates, Ingolf Harden, Hagen Neugebauer, Anastasios Papadopoulos, 
+  Christoph Riplinger, Bernardo de Souza, Georgi L. Stoychev                                                    
+                                                                 
+  APM, various basis sets, CI-OPT, improved COSX, DLPNO-Multilevel,           
+  DOCKER, DRACO, updates on ESD, Fragmentator, GOAT, IRC, LR-CPCM, L-BFGS, MBIS, meta-GGA TD-DFT gradient, ML-optimized integration grids, 
+  MM, NACMEs, nearIR, NEB, NEB-TS, NL-DFT gradient (VV10), 2- and 3-layer-ONIOM, interface openCOSMO-RS, QMMM,   
+  Crystal-QMMM, RESP, rigid body optimization, SF, symmetry and pop. for TD-DFT, various functionals, SOLVATOR                                   
+                                                                         
+[Other institutions]                                                     
+  V. Asgeirsson          : NEB                                           
+  Christoph Bannwarth    : sTDA-DFT, sTD-DFT, PBEh-3c, B97-3c, D3        
+  Giovanni Bistoni       : ETS/NOCV, ADLD/ADEX, COVALED                  
+  Martin Brehm           : Molecular dynamics                            
+  Ronald Cardenas        : ETS/NOCV                                      
+  Martina Colucci        : COVALED                                       
+  Sebastian Ehlert       : rSCAN, r2SCAN, r2SCAN-3c, D4, dhf basis sets  
+  Marvin Friede          : D4 for Fr, Ra, Ac-Lr                          
+  Lars Goerigk           : TD-DFT with DH, B97 family of functionals     
+  Stefan Grimme          : VdW corrections, initial TS optimization, DFT functionals, gCP, sTDA/sTD-DF 
+  Waldemar Hujo          : DFT-NL                                        
+  H. Jonsson             : NEB                                           
+  Holger Kruse           : gCP                                           
+  Marcel Mueller         : wB97X-3c, vDZP basis set                      
+  Hagen Neugebauer       : wr2SCAN, Native XTB                           
+  Gianluca Regni         : ADLD/ADEX                                     
+  Tobias Risthaus        : pre 6.0 range-separated hybrid DFT and stability analysis
+  Lukas Wittmann         : regularized MP2, r2SCAN double-hybrids, wr2SCAN        
+                                                                         
+We gratefully acknowledge several colleagues who have allowed us to      
+interface, adapt or use parts of their codes:                            
+  Ed Valeev, F. Pavosevic, A. Kumar             : LibInt (2-el integral package), F12 methods 
+  Garnet Chan, S. Sharma, J. Yang, R. Olivares  : DMRG                   
+  Ulf Ekstrom                                   : XCFun DFT Library      
+  Mihaly Kallay                                 : mrcc  (arbitrary order and MRCC methods)
+  Frank Weinhold                                : gennbo (NPA and NBO analysis)           
+  Simon Mueller                                 : openCOSMO-RS                            
+  Christopher J. Cramer and Donald G. Truhlar   : smd solvation model                     
+  S Lehtola, MJT Oliveira, MAL Marques          : LibXC Library                           
+  Liviu Ungur et al                             : ANISO software                          
+
+
+ Your calculation uses the libint2 library for the computation of 2-el integrals
+ For citations please refer to: http://libint.valeyev.net
+
+ Your ORCA version has been built with support for libXC version: 7.0.0
+ For citations please refer to: https://libxc.gitlab.io
+
+ This ORCA versions uses:
+   CBLAS   interface :  Fast vector & matrix operations
+   LAPACKE interface :  Fast linear algebra routines
+   SCALAPACK package :  Parallel linear algebra routines
+   Shared memory     :  Shared parallel matrices
+   BLAS/LAPACK       :  OpenBLAS 0.3.29  USE64BITINT DYNAMIC_ARCH NO_AFFINITY Haswell SINGLE_THREADED
+        Core in use  :  Haswell
+   Copyright (c) 2011-2014, The OpenBLAS Project
+
+
+  ***********************************
+  * Starting time: Wed Oct 28 22:02:32 2026
+  * Host name:     bhc0186.bluehive.circ.private
+  * Process ID:    15075
+  * Working dir.:  /gpfs/fs2/scratch/kshao4/mlip/outputsfull/X_semiactivelearning/p10_2gpu_6h/cycles/P10p0000GPa/dft/acquisition
+  ***********************************
+
+Your calculation utilizes the atom-pairwise dispersion correction
+based on EEQ partial charges (D4)
+
+
+Warning: RI is on but no J-basis has been assigned. Assigning Def2/J (nothing to worry about!)
+================================================================================
+
+----- Orbital basis set information -----
+Your calculation utilizes the basis: def2-TZVPD
+   F. Weigend and R. Ahlrichs, Phys. Chem. Chem. Phys. 7, 3297 (2005).
+   D. Rappoport and F. Furche, J. Chem. Phys. 133, 134105 (2010)
+   D. Rappoport, J. Chem. Phys. 155, 124102 (2021).
+
+----- AuxJ basis set information -----
+Your calculation utilizes the auxiliary basis: def2/J
+   H-Rn: F. Weigend, Phys. Chem. Chem. Phys. 8, 1057 (2006).
+   Fr-Lr: K. Eichkorn, F. Weigend, O. Treutler, R. Ahlrichs; Theor. Chem. Acc. 97, 119 (1997).
+
+================================================================================
+                                        WARNINGS
+                       Please study these warnings very carefully!
+================================================================================
+
+
+WARNING: B97M-V or wB97M-V functional requested.
+  ===> : libXC variant has now been activated.
+         Any manually given DFX/HFX/RangeSep scaling parameters are IGNORED!
+
+
+================================================================================
+                                       INPUT FILE
+================================================================================
+NAME = /gpfs/fs2/scratch/kshao4/mlip/codes/X_semiactivelearning/dft_launches/p10_2gpu_6h/P10p0000GPa/acquisition/inputs/cluster_113.inp
+|  1> ! wB97M-D4rev def2-TZVPD EnGrad RIJCOSX
+|  2> %pal nprocs 24 end
+|  3> * xyz 0 1
+|  4> O 0.000000000000 0.000000000000 0.000000000000
+|  5> H -0.247982760000 -0.803667900000 0.619105420000
+|  6> H -0.737586380000 0.361212840000 0.099291450000
+|  7> N -0.993638820000 1.500777030000 2.114962190000
+|  8> H -0.160245640000 1.207846140000 1.625487260000
+|  9> H -0.958137690000 2.495606850000 2.163612120000
+| 10> H -0.388543880000 1.442765580000 3.039896390000
+| 11> O 1.763838090000 -1.403899180000 -1.549407220000
+| 12> H 1.145430290000 -0.983808100000 -0.982642530000
+| 13> H 2.531235770000 -1.587899710000 -1.088183040000
+| 14> N -2.899078620000 0.752664830000 -1.214594920000
+| 15> H -3.266552540000 -0.126907420000 -0.979845730000
+| 16> H -2.702900370000 1.004867500000 -0.304850070000
+| 17> H -2.062765430000 1.038846100000 -1.816220060000
+| 18> O -2.397254880000 -0.646956400000 1.878056970000
+| 19> H -3.253944440000 -0.531266740000 1.603050950000
+| 20> H -2.300557290000 -1.364586490000 2.468515830000
+| 21> O 0.904543170000 -1.319282170000 2.744021030000
+| 22> H 1.801007300000 -1.820715750000 2.681724020000
+| 23> H 0.893564170000 -0.333737030000 3.005496980000
+| 24> *
+| 25> 
+| 26>                          ****END OF INPUT****
+================================================================================
+
+                     *******************************
+                     * Energy+Gradient Calculation *
+                     *******************************
+
+---------------------------------
+CARTESIAN COORDINATES (ANGSTROEM)
+---------------------------------
+  O      0.000000    0.000000    0.000000
+  H     -0.247983   -0.803668    0.619105
+  H     -0.737586    0.361213    0.099291
+  N     -0.993639    1.500777    2.114962
+  H     -0.160246    1.207846    1.625487
+  H     -0.958138    2.495607    2.163612
+  H     -0.388544    1.442766    3.039896
+  O      1.763838   -1.403899   -1.549407
+  H      1.145430   -0.983808   -0.982643
+  H      2.531236   -1.587900   -1.088183
+  N     -2.899079    0.752665   -1.214595
+  H     -3.266553   -0.126907   -0.979846
+  H     -2.702900    1.004868   -0.304850
+  H     -2.062765    1.038846   -1.816220
+  O     -2.397255   -0.646956    1.878057
+  H     -3.253944   -0.531267    1.603051
+  H     -2.300557   -1.364586    2.468516
+  O      0.904543   -1.319282    2.744021
+  H      1.801007   -1.820716    2.681724
+  H      0.893564   -0.333737    3.005497
+
+----------------------------
+CARTESIAN COORDINATES (A.U.)
+----------------------------
+  NO LB      ZA    FRAG     MASS         X           Y           Z
+   0 O     8.0000    0    15.999    0.000000    0.000000    0.000000
+   1 H     1.0000    0     1.008   -0.468620   -1.518712    1.169940
+   2 H     1.0000    0     1.008   -1.393836    0.682593    0.187634
+   3 N     7.0000    0    14.007   -1.877705    2.836058    3.996699
+   4 H     1.0000    0     1.008   -0.302820    2.282498    3.071726
+   5 H     1.0000    0     1.008   -1.810618    4.716013    4.088634
+   6 H     1.0000    0     1.008   -0.734242    2.726432    5.744572
+   7 O     8.0000    0    15.999    3.333171   -2.652985   -2.927955
+   8 H     1.0000    0     1.008    2.164550   -1.859128   -1.856925
+   9 H     1.0000    0     1.008    4.783342   -3.000696   -2.056368
+  10 N     7.0000    0    14.007   -5.478465    1.422330   -2.295252
+  11 H     1.0000    0     1.008   -6.172890   -0.239820   -1.851640
+  12 H     1.0000    0     1.008   -5.107741    1.898924   -0.576083
+  13 H     1.0000    0     1.008   -3.898062    1.963135   -3.432159
+  14 O     8.0000    0    15.999   -4.530155   -1.222570    3.549013
+  15 H     1.0000    0     1.008   -6.149064   -1.003949    3.029327
+  16 H     1.0000    0     1.008   -4.347423   -2.578695    4.664819
+  17 O     8.0000    0    15.999    1.709339   -2.493082    5.185448
+  18 H     1.0000    0     1.008    3.403411   -3.440654    5.067724
+  19 H     1.0000    0     1.008    1.688592   -0.630672    5.679566
+
+--------------------------------
+INTERNAL COORDINATES (ANGSTROEM)
+--------------------------------
+ O      0   0   0     0.000000000000     0.00000000     0.00000000
+ H      1   0   0     1.044351025193     0.00000000     0.00000000
+ H      1   2   0     0.827264876436    93.04639942     0.00000000
+ N      3   1   2     2.329613257013   114.54656796    78.26962261
+ H      4   3   1     1.009919999745    49.31222852    19.61068481
+ H      4   3   1     0.996651150946   121.77539203   104.31317870
+ H      4   3   1     1.106801016025   129.59346248   344.30087327
+ O      1   2   3     2.735456168307    95.39058661   208.70708067
+ H      8   1   2     0.938150806868     4.40608341     2.65246753
+ H      8   1   2     0.914047667535   111.02991453   288.08042903
+ N      3   1   2     2.559605586282   139.29580765   253.84632978
+ H     11   3   1     0.981728886738    93.22917486    83.69852781
+ H     11   3   1     0.964223928675    51.96637564   177.35744870
+ H     11   3   1     1.069239112709    70.68603977   310.20688548
+ O      2   1   3     2.495774057340   117.07779484   351.76506945
+ H     15   2   1     0.907154568241   131.93950139    57.29685523
+ H     15   2   1     0.934336682004   100.45289900   191.33771011
+ O      2   1   3     2.471728230282   124.01738238   243.14441968
+ H     18   2   1     1.029060002616   117.11681047   279.57880522
+ H     18   2   1     1.019700658942    90.79111089    43.92660364
+
+---------------------------
+INTERNAL COORDINATES (A.U.)
+---------------------------
+ O      0   0   0     0.000000000000     0.00000000     0.00000000
+ H      1   0   0     1.973537425294     0.00000000     0.00000000
+ H      1   2   0     1.563304056677    93.04639942     0.00000000
+ N      3   1   2     4.402331053708   114.54656796    78.26962261
+ H      4   3   1     1.908472216688    49.31222852    19.61068481
+ H      4   3   1     1.883397726345   121.77539203   104.31317870
+ H      4   3   1     2.091550805033   129.59346248   344.30087327
+ O      1   2   3     5.169263009445    95.39058661   208.70708067
+ H      8   1   2     1.772848097298     4.40608341     2.65246753
+ H      8   1   2     1.727299764991   111.02991453   288.08042903
+ N      3   1   2     4.836953568928   139.29580765   253.84632978
+ H     11   3   1     1.855198733694    93.22917486    83.69852781
+ H     11   3   1     1.822119156970    51.96637564   177.35744870
+ H     11   3   1     2.020569094697    70.68603977   310.20688548
+ O      2   1   3     4.716329460517   117.07779484   351.76506945
+ H     15   2   1     1.714273695111   131.93950139    57.29685523
+ H     15   2   1     1.765640445864   100.45289900   191.33771011
+ O      2   1   3     4.670889432714   124.01738238   243.14441968
+ H     18   2   1     1.944641580316   117.11681047   279.57880522
+ H     18   2   1     1.926954983980    90.79111089    43.92660364
+
+---------------------
+BASIS SET INFORMATION
+---------------------
+There are 3 groups of distinct atoms
+
+ Group   1 Type O   : 12s7p3d1f contracted to 6s4p3d1f pattern {621111/4111/111/1}
+ Group   2 Type H   : 5s2p contracted to 3s2p pattern {311/11}
+ Group   3 Type N   : 12s6p3d1f contracted to 6s3p3d1f pattern {621111/411/111/1}
+
+Atom   0O    basis set group =>   1
+Atom   1H    basis set group =>   2
+Atom   2H    basis set group =>   2
+Atom   3N    basis set group =>   3
+Atom   4H    basis set group =>   2
+Atom   5H    basis set group =>   2
+Atom   6H    basis set group =>   2
+Atom   7O    basis set group =>   1
+Atom   8H    basis set group =>   2
+Atom   9H    basis set group =>   2
+Atom  10N    basis set group =>   3
+Atom  11H    basis set group =>   2
+Atom  12H    basis set group =>   2
+Atom  13H    basis set group =>   2
+Atom  14O    basis set group =>   1
+Atom  15H    basis set group =>   2
+Atom  16H    basis set group =>   2
+Atom  17O    basis set group =>   1
+Atom  18H    basis set group =>   2
+Atom  19H    basis set group =>   2
+---------------------------------
+AUXILIARY/J BASIS SET INFORMATION
+---------------------------------
+There are 3 groups of distinct atoms
+
+ Group   1 Type O   : 12s5p4d2f1g contracted to 6s4p3d1f1g pattern {711111/2111/211/2/1}
+ Group   2 Type H   : 5s2p1d contracted to 3s1p1d pattern {311/2/1}
+ Group   3 Type N   : 12s5p4d2f1g contracted to 6s4p3d1f1g pattern {711111/2111/211/2/1}
+
+Atom   0O    basis set group =>   1
+Atom   1H    basis set group =>   2
+Atom   2H    basis set group =>   2
+Atom   3N    basis set group =>   3
+Atom   4H    basis set group =>   2
+Atom   5H    basis set group =>   2
+Atom   6H    basis set group =>   2
+Atom   7O    basis set group =>   1
+Atom   8H    basis set group =>   2
+Atom   9H    basis set group =>   2
+Atom  10N    basis set group =>   3
+Atom  11H    basis set group =>   2
+Atom  12H    basis set group =>   2
+Atom  13H    basis set group =>   2
+Atom  14O    basis set group =>   1
+Atom  15H    basis set group =>   2
+Atom  16H    basis set group =>   2
+Atom  17O    basis set group =>   1
+Atom  18H    basis set group =>   2
+Atom  19H    basis set group =>   2
+[1793239353.339198] [bhc0186:15080:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239353.339158] [bhc0186:15081:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239353.338904] [bhc0186:15082:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239353.339158] [bhc0186:15083:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239353.339134] [bhc0186:15084:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239353.339194] [bhc0186:15085:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239353.339112] [bhc0186:15086:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239353.339159] [bhc0186:15087:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239353.339171] [bhc0186:15088:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239353.339167] [bhc0186:15089:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239353.339188] [bhc0186:15090:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239353.339186] [bhc0186:15091:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239353.339101] [bhc0186:15092:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239353.339102] [bhc0186:15093:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239353.339197] [bhc0186:15094:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239353.339103] [bhc0186:15096:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239353.339123] [bhc0186:15097:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239353.338997] [bhc0186:15098:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239353.339203] [bhc0186:15101:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239353.339173] [bhc0186:15103:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239353.339171] [bhc0186:15104:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239353.338960] [bhc0186:15105:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239353.339068] [bhc0186:15106:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239353.338903] [bhc0186:15107:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+
+
+           ************************************************************
+           *        Program running with 24 parallel MPI-processes    *
+           *              working on a common directory               *
+           ************************************************************
+------------------------------------------------------------------------------
+                             ORCA STARTUP CALCULATIONS
+                           -- RI-GTO INTEGRALS CHOSEN --
+------------------------------------------------------------------------------
+------------------------------------------------------------------------------
+                   ___                                                        
+                  /   \      - P O W E R E D   B Y -                         
+                 /     \                                                     
+                 |  |  |   _    _      __       _____    __    __             
+                 |  |  |  | |  | |    /  \     |  _  \  |  |  /  |          
+                  \  \/   | |  | |   /    \    | | | |  |  | /  /          
+                 / \  \   | |__| |  /  /\  \   | |_| |  |  |/  /          
+                |  |  |   |  __  | /  /__\  \  |    /   |      \           
+                |  |  |   | |  | | |   __   |  |    \   |  |\   \          
+                \     /   | |  | | |  |  |  |  | |\  \  |  | \   \       
+                 \___/    |_|  |_| |__|  |__|  |_| \__\ |__|  \__/        
+                                                                              
+                      - O R C A' S   B I G   F R I E N D -                    
+                                      &                                       
+                       - I N T E G R A L  F E E D E R -                       
+                                                                              
+ v1 FN, 2020, v2 2021, v3 2022-2024                                           
+------------------------------------------------------------------------------
+
+
+----------------------
+SHARK INTEGRAL PACKAGE
+----------------------
+
+Number of atoms                             ...     20
+Number of basis functions                   ...    360
+Number of shells                            ...    152
+Maximum angular momentum                    ...      3
+Integral batch strategy                     ... SHARK/LIBINT Hybrid
+RI-J (if used) integral strategy            ... SPLIT-RIJ (Revised 2003 algorithm where possible)
+Printlevel                                  ...      1
+Contraction scheme used                     ... SEGMENTED contraction
+Prescreening option                         ... SCHWARTZ
+   Thresh                                   ... 2.500e-11
+   Tcut                                     ... 2.500e-12
+   Tpresel                                  ... 2.500e-12 
+Coulomb Range Separation                    ... NOT USED
+Exchange Range Separation                   ... Long Range
+   Mu parameter                             ... 3.000e-01
+   Scaling (regular/separated)              ... 1.500e-01 8.500e-01
+Robust (split-)RI terms used:
+  metric    (central integrals)             ... YES
+  density   (r.h.s.  integrals)             ... YES
+  potential (l.h.s.  integrals)             ... YES
+Multipole approximations                    ... NOT USED
+Finite Nucleus Model                        ... NOT USED
+CABS basis                                  ... NOT available
+Auxiliary Coulomb fitting basis             ... AVAILABLE
+   # of basis functions in Aux-J            ...    448
+   # of shells in Aux-J                     ...    160
+   Maximum angular momentum in Aux-J        ...      4
+Auxiliary J/K fitting basis                 ... NOT available
+Auxiliary Correlation fitting basis         ... NOT available
+Auxiliary 'external' fitting basis          ... NOT available
+
+Checking pre-screening integrals            ... done (  0.0 sec) Dimension = 152
+   => SHARK Basis and OBASIS are compatible. Storing Pre-screening
+Shell pair information
+Shell pair cut-off parameter TPreSel        ...   2.5e-12
+Total number of shell pairs                 ...     11628
+Shell pairs after pre-screening             ...     10255
+Total number of primitive shell pairs       ...     27669
+Primitive shell pairs kept                  ...     18853
+          la=0 lb=0:   2647 shell pairs
+          la=1 lb=0:   3515 shell pairs
+          la=1 lb=1:   1192 shell pairs
+          la=2 lb=0:   1220 shell pairs
+          la=2 lb=1:    816 shell pairs
+          la=2 lb=2:    147 shell pairs
+          la=3 lb=0:    355 shell pairs
+          la=3 lb=1:    260 shell pairs
+          la=3 lb=2:     87 shell pairs
+          la=3 lb=3:     16 shell pairs
+
+Checking whether 4 symmetric matrices of dimension 360 fit in memory
+:Max Core in MB      =   4096.00
+ MB in use           =     15.24
+ MB left             =   4080.76
+ MB needed           =      1.98
+ Data fit in memory  = YES
+Calculating RI/J V-Matrix + Cholesky decomp.... done (  0.0 sec)
+Calculating Nuclear repulsion               ... done (  0.0 sec) ENN=    279.873927320078 Eh
+
+Diagonalization of the overlap matrix:
+Smallest eigenvalue                        ... 6.489e-05
+Time for diagonalization                   ...    0.021 sec
+Threshold for overlap eigenvalues          ... 1.000e-07
+Number of eigenvalues below threshold      ... 0
+Time for construction of square roots      ...    0.011 sec
+Total time needed                          ...    0.048 sec
+
+-------------------
+DFT GRID GENERATION
+-------------------
+
+General Integration Accuracy     IntAcc      ... 4.388
+Radial Grid Type                 RadialGrid  ... OptM3 with GC (2021)
+Angular Grid (max. ang.)         AngularGrid ... 4 (Lebedev-302)
+Angular grid pruning method      GridPruning ... 4 (adaptive)
+Weight generation scheme         WeightScheme... mBecke (2022)
+Basis function cutoff            BFCut       ... 1.0000e-11
+Integration weight cutoff        WCut        ... 1.0000e-14
+Partially contracted basis set               ... off
+Rotationally invariant grid construction     ... off
+Angular grids for H and He will be reduced by one unit
+Diffuse basis detected: some atoms will have their outermost
+                        angular grid increased by 1.
+
+Total number of grid points                  ...    86624
+Total number of batches                      ...     1364
+Average number of points per batch           ...       63
+Average number of grid points per atom       ...     4331
+
+--------------------
+COSX GRID GENERATION
+--------------------
+
+GRIDX 1
+-------
+General Integration Accuracy     IntAcc      ... 3.816
+Radial Grid Type                 RadialGrid  ... OptM3 with GC (2021)
+Angular Grid (max. ang.)         AngularGrid ... 1 (Lebedev-50)
+Angular grid pruning method      GridPruning ... 4 (adaptive)
+Weight generation scheme         WeightScheme... mBecke (2022)
+Basis function cutoff            BFCut       ... 1.0000e-11
+Integration weight cutoff        WCut        ... 1.0000e-14
+Partially contracted basis set               ... on
+Rotationally invariant grid construction     ... off
+Angular grids for H and He will be reduced by one unit
+Diffuse basis detected: some atoms will have their outermost
+                        angular grid increased by 1.
+
+Total number of grid points                  ...    10832
+Total number of batches                      ...       95
+Average number of points per batch           ...      114
+Average number of grid points per atom       ...      542
+UseSFitting                                  ... on
+
+GRIDX 2
+-------
+General Integration Accuracy     IntAcc      ... 4.020
+Radial Grid Type                 RadialGrid  ... OptM3 with GC (2021)
+Angular Grid (max. ang.)         AngularGrid ... 2 (Lebedev-110)
+Angular grid pruning method      GridPruning ... 4 (adaptive)
+Weight generation scheme         WeightScheme... mBecke (2022)
+Basis function cutoff            BFCut       ... 1.0000e-11
+Integration weight cutoff        WCut        ... 1.0000e-14
+Partially contracted basis set               ... on
+Rotationally invariant grid construction     ... off
+Angular grids for H and He will be reduced by one unit
+Diffuse basis detected: some atoms will have their outermost
+                        angular grid increased by 1.
+
+Total number of grid points                  ...    24945
+Total number of batches                      ...      207
+Average number of points per batch           ...      120
+Average number of grid points per atom       ...     1247
+UseSFitting                                  ... on
+
+GRIDX 3
+-------
+General Integration Accuracy     IntAcc      ... 4.338
+Radial Grid Type                 RadialGrid  ... OptM3 with GC (2021)
+Angular Grid (max. ang.)         AngularGrid ... 3 (Lebedev-194)
+Angular grid pruning method      GridPruning ... 4 (adaptive)
+Weight generation scheme         WeightScheme... mBecke (2022)
+Basis function cutoff            BFCut       ... 1.0000e-11
+Integration weight cutoff        WCut        ... 1.0000e-14
+Partially contracted basis set               ... on
+Rotationally invariant grid construction     ... off
+Angular grids for H and He will be reduced by one unit
+Diffuse basis detected: some atoms will have their outermost
+                        angular grid increased by 1.
+
+Total number of grid points                  ...    56286
+Total number of batches                      ...      449
+Average number of points per batch           ...      125
+Average number of grid points per atom       ...     2814
+UseSFitting                                  ... on
+Grids setup in   1.1 sec
+Initializing property integral containers    ... done (  0.1 sec)
+
+SHARK setup successfully completed in   1.5 seconds
+
+Maximum memory used throughout the entire STARTUP-calculation: 29.9 MB
+[1793239355.786054] [bhc0186:15158:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239355.786283] [bhc0186:15159:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239355.786356] [bhc0186:15160:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239355.786305] [bhc0186:15161:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239355.786318] [bhc0186:15162:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239355.786282] [bhc0186:15163:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239355.786106] [bhc0186:15164:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239355.786260] [bhc0186:15165:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239355.786369] [bhc0186:15166:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239355.786260] [bhc0186:15167:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239355.786305] [bhc0186:15168:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239355.786282] [bhc0186:15169:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239355.786299] [bhc0186:15170:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239355.786360] [bhc0186:15171:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239355.786306] [bhc0186:15172:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239355.786330] [bhc0186:15173:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239355.786361] [bhc0186:15174:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239355.786032] [bhc0186:15175:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239355.786338] [bhc0186:15176:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239355.786167] [bhc0186:15177:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239355.786372] [bhc0186:15178:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239355.786351] [bhc0186:15179:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239355.786349] [bhc0186:15180:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239355.786347] [bhc0186:15181:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+
+
+           ************************************************************
+           *        Program running with 24 parallel MPI-processes    *
+           *              working on a common directory               *
+           ************************************************************
+-------------------------------------------------------------------------------
+                                 ORCA GUESS
+                   Start orbitals & Density for SCF / CASSCF
+-------------------------------------------------------------------------------
+
+------------
+SCF SETTINGS
+------------
+Hamiltonian:
+ Density Functional     Method          .... DFT(GTOs)
+  Functional kind                       .... Exchange-Correlation
+  Functional name                       .... wB97M-V exchange-correlation functional
+  Functional family                     .... Hybrid MGGA
+  Functional refs                              
+    [ 0] N. Mardirossian and M. Head-Gordon.,  J. Chem. Phys. 144, 214110 (2016), doi: 10.1063/1.4952647
+  Fraction of HF Exchange (short range) .... 0.1500
+  Fraction of HF Exchange ( int64 range )  .... 1.0000
+  Range separation parameter mu         .... 0.3000
+  Functional external parameters        .... 17
+    Parameter  0 _cx00      =  8.500000e-01 : u^00 coefficient for exchange
+    Parameter  1 _cx01      =  1.007000e+00 : u^01 coefficient for exchange
+    Parameter  2 _cx10      =  2.590000e-01 : u^10 coefficient for exchange
+    Parameter  3 _css00     =  4.430000e-01 : u^00 coefficient for same-spin correlation
+    Parameter  4 _css04     = -1.437000e+00 : u^04 coefficient for same-spin correlation
+    Parameter  5 _css10     = -4.535000e+00 : u^10 coefficient for same-spin correlation
+    Parameter  6 _css20     = -3.390000e+00 : u^20 coefficient for same-spin correlation
+    Parameter  7 _css43     =  4.278000e+00 : u^43 coefficient for same-spin correlation
+    Parameter  8 _cos00     =  1.000000e+00 : u^00 coefficient for opposite-spin correlation
+    Parameter  9 _cos10     =  1.358000e+00 : u^10 coefficient for opposite-spin correlation
+    Parameter 10 _cos20     =  2.924000e+00 : u^20 coefficient for opposite-spin correlation
+    Parameter 11 _cos21     = -8.812000e+00 : u^21 coefficient for opposite-spin correlation
+    Parameter 12 _cos60     = -1.390000e+00 : u^60 coefficient for opposite-spin correlation
+    Parameter 13 _cos61     =  9.142000e+00 : u^61 coefficient for opposite-spin correlation
+    Parameter 14 _alpha     =  1.000000e+00 : fraction of HF exchange
+    Parameter 15 _beta      = -8.500000e-01 : fraction of short-range exchange
+    Parameter 16 _omega     =  3.000000e-01 : range-separation constant
+ Long-range corrected/Screened/Range-Separated Hybrid DFT is turned on
+   Amount of maximum screened exact exchange              ....  0.850000
+   Range separation parameter mu (erf(mu*r12)/r12)        ....  0.300000
+ RI-approximation to the Coulomb term is turned on
+   Number of AuxJ basis functions       .... 448
+   RIJ-COSX (HFX calculated with COS-X)).... on
+
+
+General Settings:
+ Integral files         IntName         .... /gpfs/fs2/scratch/kshao4/mlip/codes/X_semiactivelearning/dft_launches/p10_2gpu_6h/P10p0000GPa/acquisition/inputs/cluster_113
+ Hartree-Fock type      HFTyp           .... RHF
+ Total Charge           Charge          ....    0
+ Multiplicity           Mult            ....    1
+ Number of Electrons    NEL             ....   60
+ Basis Dimension        Dim             ....  360
+ Nuclear Repulsion      ENuc            ....    279.8739273201 Eh
+
+Convergence Acceleration:
+ AO-DIIS                CNVDIIS         .... on
+   Start iteration      DIISMaxIt       ....    12
+   Startup error        DIISStart       ....  0.200000
+   # of expansion vecs  DIISMaxEq       ....     5
+   Bias factor          DIISBfac        ....   1.050
+   Max. coefficient     DIISMaxC        ....  10.000
+ MO-DIIS                CNVKDIIS        .... off
+ Trust-Rad. Augm. Hess. CNVTRAH         .... auto
+   Auto Start mean grad. ratio tolernc. ....  1.125000
+   Auto Start start iteration           ....    50
+   Auto Start num. interpolation iter.  ....    10
+   Max. Number of Micro iterations      ....    24
+   Max. Number of Macro iterations      .... Maxiter - #DIIS iter
+   Number of Davidson start vectors     ....     2
+   Converg. threshold    (grad. norm)   ....   1.000e-05
+   Grad. Scal. Fac. for Micro threshold ....   0.100
+   Minimum threshold for Micro iter.    ....   1.000e-02
+   NR start threshold (gradient norm)   ....   1.000e-04
+   Initial trust radius                 ....   0.400
+   Minimum AH scaling param. (alpha)    ....   1.000
+   Maximum AH scaling param. (alpha)    .... 1000.000
+   Quad. conv. algorithm                .... NR
+   White noise on init. David. guess    .... on
+   Maximum white noise                  ....   0.010
+   Pseudo random numbers                .... off
+   Inactive MOs                         .... canonical
+   Orbital update algorithm             .... Taylor
+   Preconditioner                       .... Diag
+   Full preconditioner red. dimension   ....   250
+ SOSCF                 CNVSOSCF           .... on
+   Start iteration     SOSCFMaxIt         ....   150
+   Startup grad/error  SOSCFStart         ....  0.003300
+   Hessian update      SOSCFHessUp        .... L-BFGS
+   Autom. constraints  SOSCFAutoConstrain .... off
+ Level Shifting         CNVShift        .... on
+   Level shift para.    LevelShift      ....    0.2500
+   Turn off err/grad.   ShiftErr        ....    0.0010
+ Zerner damping         CNVZerner       .... off
+ Static damping         CNVDamp         .... on
+   Fraction old density DampFac         ....    0.7000
+   Max. Damping (<1)    DampMax         ....    0.9800
+   Min. Damping (>=0)   DampMin         ....    0.0000
+   Turn off err/grad.   DampErr         ....    0.1000
+
+SCF Procedure:
+ Maximum # iterations   MaxIter         ....   125
+ SCF integral mode      SCFMode         .... Direct
+   Integral package                     .... SHARK and LIBINT hybrid scheme
+ Reset frequency        DirectResetFreq ....    20
+ Integral Threshold     Thresh          ....  2.500e-11 Eh
+ Primitive CutOff       TCut            ....  2.500e-12 Eh
+
+Convergence Tolerance:
+ Convergence Check Mode ConvCheckMode   .... Total+1el-Energy
+ Convergence forced     ConvForced      .... 0
+ Energy Change          TolE            ....  1.000e-08 Eh
+ 1-El. energy change                    ....  1.000e-05 Eh
+ Orbital Gradient       TolG            ....  1.000e-05
+ Orbital Rotation angle TolX            ....  1.000e-05
+ DIIS Error             TolErr          ....  5.000e-07
+
+------------------------------
+INITIAL GUESS: MODEL POTENTIAL
+------------------------------
+Loading Hartree-Fock densities                     ... done
+Calculating cut-offs                               ... done
+Initializing the effective Hamiltonian             ... done
+Setting up the integral package (SHARK)            ... done
+Starting the Coulomb interaction                   ... done (   0.0 sec)
+Making the grid                                    ... done (   0.2 sec)
+Mapping shells                                     ... done
+Starting the XC term evaluation                    ... done (   0.0 sec)
+  promolecular density results
+     # of electrons  =     59.994471405
+     EX              =    -49.793504803
+     EC              =     -1.911620542
+     EX+EC           =    -51.705125345
+Transforming the Hamiltonian                       ... done (   0.0 sec)
+Diagonalizing the Hamiltonian                      ... done (   0.0 sec)
+Back transforming the eigenvectors                 ... done (   0.0 sec)
+Now organizing SCF variables                       ... done
+                      ------------------
+                      INITIAL GUESS DONE (   0.4 sec)
+                      ------------------
+             **** ENERGY FILE WAS UPDATED (/gpfs/fs2/scratch/kshao4/mlip/codes/X_semiactivelearning/dft_launches/p10_2gpu_6h/P10p0000GPa/acquisition/inputs/cluster_113.en.tmp) ****
+Finished Guess after   1.3 sec
+Maximum memory used throughout the entire GUESS-calculation: 20.7 MB
+[1793239357.114859] [bhc0186:15235:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239357.114813] [bhc0186:15236:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239357.114632] [bhc0186:15237:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239357.114812] [bhc0186:15238:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239357.114655] [bhc0186:15239:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239357.114837] [bhc0186:15240:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239357.114832] [bhc0186:15241:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239357.114812] [bhc0186:15242:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239357.114832] [bhc0186:15243:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239357.114892] [bhc0186:15244:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239357.114830] [bhc0186:15245:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239357.114814] [bhc0186:15246:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239357.114876] [bhc0186:15247:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239357.114821] [bhc0186:15248:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239357.114850] [bhc0186:15249:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239357.114831] [bhc0186:15250:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239357.114834] [bhc0186:15251:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239357.114859] [bhc0186:15253:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239357.117065] [bhc0186:15254:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239357.114856] [bhc0186:15255:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239357.114616] [bhc0186:15256:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239357.114901] [bhc0186:15257:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239357.114843] [bhc0186:15258:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239357.114857] [bhc0186:15259:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+
+
+           ************************************************************
+           *        Program running with 24 parallel MPI-processes    *
+           *              working on a common directory               *
+           ************************************************************
+
+-------------------------------------------------------------------------------------------
+                                      ORCA LEAN-SCF
+                              memory conserving SCF solver
+-------------------------------------------------------------------------------------------
+
+----------------------------------------D-I-I-S--------------------------------------------
+Iteration    Energy (Eh)           Delta-E    RMSDP     MaxDP     DIISErr   Damp  Time(sec)
+-------------------------------------------------------------------------------------------
+               ***  Starting incremental Fock matrix formation  ***
+    1    -418.3747606475114935     0.00e+00  8.16e-03  6.01e-02  3.43e-01  0.700   2.1
+    2    -418.6521226087289733    -2.77e-01  6.30e-03  7.09e-02  1.83e-01  0.700   1.4
+                               ***Turning on AO-DIIS***
+    3    -418.7701218043653171    -1.18e-01  3.15e-03  3.60e-02  7.72e-02  0.700   1.2
+    4    -418.8392404388171144    -6.91e-02  6.09e-03  6.06e-02  4.33e-02  0.000   1.2
+    5    -418.9897154150174856    -1.50e-01  4.93e-04  5.26e-03  5.96e-03  0.000   1.3
+    6    -418.9898243855519695    -1.09e-04  1.23e-04  1.14e-03  3.48e-03  0.000   1.1
+                              *** Initializing SOSCF ***
+---------------------------------------S-O-S-C-F--------------------------------------
+Iteration    Energy (Eh)           Delta-E    RMSDP     MaxDP     MaxGrad    Time(sec)
+--------------------------------------------------------------------------------------
+    7    -418.9898429306133494    -1.85e-05  6.69e-05  3.16e-04  7.10e-04     1.1
+               *** Restarting incremental Fock matrix formation ***
+    8    -418.9898542557911014    -1.13e-05  1.88e-04  1.23e-03  7.93e-05     2.0
+    9    -418.9898550020728862    -7.46e-07  8.74e-05  4.99e-04  4.52e-05     1.5
+   10    -418.9898551199779604    -1.18e-07  5.84e-05  3.94e-04  3.24e-05     1.5
+   11    -418.9898551698165647    -4.98e-08  7.02e-06  6.36e-05  3.55e-06     1.5
+   12    -418.9898551712510653    -1.43e-09  1.73e-06  1.28e-05  3.10e-06     1.3
+                 **** Energy Check signals convergence ****
+
+               *****************************************************
+               *                     SUCCESS                       *
+               *           SCF CONVERGED AFTER  12 CYCLES          *
+               *****************************************************
+
+Recomputing exchange energy using gridx3       ... done (    2.824 sec)
+Old exchange energy                            :    -15.708035017 Eh
+New exchange energy                            :    -15.708037393 Eh
+Exchange energy change after final integration :     -0.000002376 Eh
+Total energy after final integration           :   -418.989857541 Eh
+             **** ENERGY FILE WAS UPDATED (/gpfs/fs2/scratch/kshao4/mlip/codes/X_semiactivelearning/dft_launches/p10_2gpu_6h/P10p0000GPa/acquisition/inputs/cluster_113.en.tmp) ****
+
+----------------
+TOTAL SCF ENERGY
+----------------
+
+Total Energy       :       -418.98985754096333 Eh          -11401.29365 eV
+
+Components:
+Nuclear Repulsion  :        279.87392732007754 Eh            7615.75674 eV
+Electronic Energy  :       -698.86378248526557 Eh          -19017.05033 eV
+One Electron Energy:      -1129.45493704757632 Eh          -30734.03133 eV
+Two Electron Energy:        430.59115456231069 Eh           11716.98100 eV
+
+Virial components:
+Potential Energy   :       -837.06922414413737 Eh          -22777.81159 eV
+Kinetic Energy     :        418.07936660317404 Eh           11376.51794 eV
+Virial Ratio       :          2.00217779448239
+
+DFT components:
+N(Alpha)           :       29.999932667670 electrons
+N(Beta)            :       29.999932667670 electrons
+N(Total)           :       59.999865335340 electrons
+E(XC)              :      -37.833727889169 Eh       
+
+---------------
+SCF CONVERGENCE
+---------------
+
+  Last Energy change         ...    1.4345e-09  Tolerance :   1.0000e-08
+  Last MAX-Density change    ...    1.2751e-05  Tolerance :   1.0000e-07
+  Last RMS-Density change    ...    1.7283e-06  Tolerance :   5.0000e-09
+  Last DIIS Error            ...    7.0971e-04  Tolerance :   5.0000e-07
+  Last Orbital Gradient      ...    3.0986e-06  Tolerance :   1.0000e-05
+  Last Orbital Rotation      ...    2.7760e-06  Tolerance :   1.0000e-05
+
+
+----------------
+ORBITAL ENERGIES
+----------------
+
+  NO   OCC          E(Eh)            E(eV) 
+   0   2.0000     -19.365446      -526.9606 
+   1   2.0000     -19.334714      -526.1243 
+   2   2.0000     -19.333643      -526.0952 
+   3   2.0000     -19.294690      -525.0352 
+   4   2.0000     -14.496272      -394.4636 
+   5   2.0000     -14.475361      -393.8946 
+   6   2.0000      -1.180634       -32.1267 
+   7   2.0000      -1.165528       -31.7156 
+   8   2.0000      -1.134154       -30.8619 
+   9   2.0000      -1.122274       -30.5386 
+  10   2.0000      -0.995378       -27.0856 
+  11   2.0000      -0.979931       -26.6653 
+  12   2.0000      -0.684338       -18.6218 
+  13   2.0000      -0.664845       -18.0914 
+  14   2.0000      -0.658567       -17.9205 
+  15   2.0000      -0.620788       -16.8925 
+  16   2.0000      -0.601446       -16.3662 
+  17   2.0000      -0.588723       -16.0200 
+  18   2.0000      -0.548831       -14.9344 
+  19   2.0000      -0.538565       -14.6551 
+  20   2.0000      -0.518629       -14.1126 
+  21   2.0000      -0.505370       -13.7518 
+  22   2.0000      -0.495936       -13.4951 
+  23   2.0000      -0.464136       -12.6298 
+  24   2.0000      -0.447406       -12.1745 
+  25   2.0000      -0.445625       -12.1261 
+  26   2.0000      -0.430844       -11.7239 
+  27   2.0000      -0.398375       -10.8403 
+  28   2.0000      -0.393910       -10.7188 
+  29   2.0000      -0.362142        -9.8544 
+  30   0.0000       0.006345         0.1726 
+  31   0.0000       0.027042         0.7358 
+  32   0.0000       0.042119         1.1461 
+  33   0.0000       0.051151         1.3919 
+  34   0.0000       0.071255         1.9390 
+  35   0.0000       0.075049         2.0422 
+  36   0.0000       0.084131         2.2893 
+  37   0.0000       0.087793         2.3890 
+  38   0.0000       0.089284         2.4295 
+  39   0.0000       0.107969         2.9380 
+  40   0.0000       0.115437         3.1412 
+*Only the first 10 virtual orbitals were printed.
+
+                    ********************************
+                    * MULLIKEN POPULATION ANALYSIS *
+                    ********************************
+
+-----------------------
+MULLIKEN ATOMIC CHARGES
+-----------------------
+   0 O :   -0.757164
+   1 H :    0.402114
+   2 H :    0.198319
+   3 N :   -0.636275
+   4 H :    0.228891
+   5 H :    0.253358
+   6 H :    0.233242
+   7 O :   -0.619566
+   8 H :    0.423499
+   9 H :    0.278388
+  10 N :   -0.765245
+  11 H :    0.241390
+  12 H :    0.267084
+  13 H :    0.265298
+  14 O :   -0.509029
+  15 H :    0.235826
+  16 H :    0.270821
+  17 O :   -0.638052
+  18 H :    0.320469
+  19 H :    0.306631
+Sum of atomic charges:   -0.0000000
+
+--------------------------------
+MULLIKEN REDUCED ORBITAL CHARGES
+--------------------------------
+  0 O s       :     3.839335  s :     3.839335
+      pz      :     1.811636  p :     4.871468
+      px      :     1.522183
+      py      :     1.537649
+      dz2     :     0.000897  d :     0.045109
+      dxz     :     0.013899
+      dyz     :     0.013552
+      dx2y2   :     0.008511
+      dxy     :     0.008250
+      f0      :     0.000200  f :     0.001252
+      f+1     :     0.000246
+      f-1     :     0.000141
+      f+2     :     0.000175
+      f-2     :     0.000120
+      f+3     :    -0.000007
+      f-3     :     0.000377
+
+  1 H s       :     0.541671  s :     0.541671
+      pz      :     0.022349  p :     0.056215
+      px      :    -0.000671
+      py      :     0.034537
+
+  2 H s       :     0.732079  s :     0.732079
+      pz      :     0.015388  p :     0.069602
+      px      :     0.004021
+      py      :     0.050193
+
+  3 N s       :     3.544453  s :     3.544453
+      pz      :     1.257343  p :     4.031073
+      px      :     1.463780
+      py      :     1.309951
+      dz2     :     0.007269  d :     0.060048
+      dxz     :     0.023553
+      dyz     :    -0.001963
+      dx2y2   :     0.025949
+      dxy     :     0.005239
+      f0      :     0.000040  f :     0.000701
+      f+1     :     0.000136
+      f-1     :     0.000100
+      f+2     :     0.000038
+      f-2     :     0.000084
+      f+3     :    -0.000001
+      f-3     :     0.000305
+
+  4 H s       :     0.726867  s :     0.726867
+      pz      :     0.012766  p :     0.044242
+      px      :     0.028840
+      py      :     0.002636
+
+  5 H s       :     0.647305  s :     0.647305
+      pz      :     0.021461  p :     0.099337
+      px      :     0.036429
+      py      :     0.041447
+
+  6 H s       :     0.699368  s :     0.699368
+      pz      :     0.024320  p :     0.067390
+      px      :     0.020721
+      py      :     0.022350
+
+  7 O s       :     3.756562  s :     3.756562
+      pz      :     1.638549  p :     4.836603
+      px      :     1.367161
+      py      :     1.830893
+      dz2     :     0.005032  d :     0.024884
+      dxz     :     0.010780
+      dyz     :     0.006141
+      dx2y2   :     0.001013
+      dxy     :     0.001918
+      f0      :     0.000104  f :     0.001516
+      f+1     :    -0.000006
+      f-1     :     0.000041
+      f+2     :     0.000352
+      f-2     :     0.000379
+      f+3     :     0.000261
+      f-3     :     0.000385
+
+  8 H s       :     0.609069  s :     0.609069
+      pz      :    -0.023143  p :    -0.032568
+      px      :     0.002512
+      py      :    -0.011937
+
+  9 H s       :     0.654839  s :     0.654839
+      pz      :     0.016907  p :     0.066773
+      px      :     0.020792
+      py      :     0.029074
+
+ 10 N s       :     3.669501  s :     3.669501
+      pz      :     1.219828  p :     4.073109
+      px      :     1.495701
+      py      :     1.357580
+      dz2     :     0.006767  d :     0.020843
+      dxz     :     0.005338
+      dyz     :     0.001619
+      dx2y2   :     0.007290
+      dxy     :    -0.000170
+      f0      :     0.000295  f :     0.001792
+      f+1     :     0.000118
+      f-1     :     0.000054
+      f+2     :     0.000220
+      f-2     :     0.000327
+      f+3     :     0.000476
+      f-3     :     0.000302
+
+ 11 H s       :     0.694116  s :     0.694116
+      pz      :     0.005792  p :     0.064494
+      px      :     0.031785
+      py      :     0.026917
+
+ 12 H s       :     0.706969  s :     0.706969
+      pz      :    -0.006669  p :     0.025947
+      px      :    -0.006939
+      py      :     0.039555
+
+ 13 H s       :     0.689779  s :     0.689779
+      pz      :     0.026844  p :     0.044923
+      px      :    -0.001303
+      py      :     0.019381
+
+ 14 O s       :     3.707417  s :     3.707417
+      pz      :     1.685021  p :     4.787332
+      px      :     1.473994
+      py      :     1.628317
+      dz2     :     0.001807  d :     0.012625
+      dxz     :     0.000409
+      dyz     :     0.004579
+      dx2y2   :     0.005909
+      dxy     :    -0.000079
+      f0      :     0.000264  f :     0.001654
+      f+1     :     0.000119
+      f-1     :     0.000254
+      f+2     :     0.000550
+      f-2     :     0.000158
+      f+3     :     0.000241
+      f-3     :     0.000069
+
+ 15 H s       :     0.698349  s :     0.698349
+      pz      :     0.017970  p :     0.065825
+      px      :     0.034617
+      py      :     0.013238
+
+ 16 H s       :     0.667253  s :     0.667253
+      pz      :     0.029533  p :     0.061927
+      px      :     0.013093
+      py      :     0.019301
+
+ 17 O s       :     3.781589  s :     3.781589
+      pz      :     1.914479  p :     4.841373
+      px      :     1.548546
+      py      :     1.378348
+      dz2     :     0.003068  d :     0.013731
+      dxz     :     0.001713
+      dyz     :     0.001904
+      dx2y2   :     0.005949
+      dxy     :     0.001097
+      f0      :     0.000186  f :     0.001360
+      f+1     :     0.000220
+      f-1     :     0.000266
+      f+2     :     0.000127
+      f-2     :     0.000054
+      f+3     :     0.000022
+      f-3     :     0.000485
+
+ 18 H s       :     0.625335  s :     0.625335
+      pz      :     0.028407  p :     0.054196
+      px      :     0.014083
+      py      :     0.011706
+
+ 19 H s       :     0.634244  s :     0.634244
+      pz      :     0.019348  p :     0.059124
+      px      :     0.004357
+      py      :     0.035419
+
+
+
+                     *******************************
+                     * LOEWDIN POPULATION ANALYSIS *
+                     *******************************
+
+----------------------
+LOEWDIN ATOMIC CHARGES
+----------------------
+   0 O :   -0.025891
+   1 H :    0.119895
+   2 H :   -0.150460
+   3 N :    0.007110
+   4 H :   -0.021672
+   5 H :    0.005151
+   6 H :    0.073729
+   7 O :   -0.020432
+   8 H :   -0.045793
+   9 H :   -0.013711
+  10 N :    0.029506
+  11 H :   -0.009588
+  12 H :   -0.063353
+  13 H :    0.076953
+  14 O :   -0.016072
+  15 H :   -0.004058
+  16 H :    0.032990
+  17 O :   -0.131267
+  18 H :    0.097331
+  19 H :    0.059631
+
+-------------------------------
+LOEWDIN REDUCED ORBITAL CHARGES
+-------------------------------
+  0 O s       :     3.307860  s :     3.307860
+      pz      :     1.618779  p :     4.564771
+      px      :     1.520145
+      py      :     1.425847
+      dz2     :     0.016012  d :     0.150087
+      dxz     :     0.031730
+      dyz     :     0.048158
+      dx2y2   :     0.023384
+      dxy     :     0.030803
+      f0      :     0.000177  f :     0.003174
+      f+1     :     0.000603
+      f-1     :     0.000255
+      f+2     :     0.000451
+      f-2     :     0.000277
+      f+3     :     0.000186
+      f-3     :     0.001225
+
+  1 H s       :     0.547682  s :     0.547682
+      pz      :     0.126502  p :     0.332423
+      px      :     0.092161
+      py      :     0.113760
+
+  2 H s       :     0.645882  s :     0.645882
+      pz      :     0.159505  p :     0.504577
+      px      :     0.207277
+      py      :     0.137795
+
+  3 N s       :     3.126132  s :     3.126132
+      pz      :     1.143824  p :     3.662378
+      px      :     1.316645
+      py      :     1.201908
+      dz2     :     0.040104  d :     0.198391
+      dxz     :     0.048281
+      dyz     :     0.017942
+      dx2y2   :     0.051966
+      dxy     :     0.040097
+      f0      :     0.000416  f :     0.005989
+      f+1     :     0.001301
+      f-1     :     0.000735
+      f+2     :     0.001173
+      f-2     :     0.000454
+      f+3     :     0.000283
+      f-3     :     0.001627
+
+  4 H s       :     0.623262  s :     0.623262
+      pz      :     0.135835  p :     0.398410
+      px      :     0.157034
+      py      :     0.105541
+
+  5 H s       :     0.667377  s :     0.667377
+      pz      :     0.083418  p :     0.327472
+      px      :     0.099050
+      py      :     0.145004
+
+  6 H s       :     0.636824  s :     0.636824
+      pz      :     0.108332  p :     0.289446
+      px      :     0.104712
+      py      :     0.076402
+
+  7 O s       :     3.337761  s :     3.337761
+      pz      :     1.577458  p :     4.615158
+      px      :     1.357056
+      py      :     1.680644
+      dz2     :     0.002498  d :     0.064815
+      dxz     :     0.031148
+      dyz     :     0.011082
+      dx2y2   :     0.008364
+      dxy     :     0.011722
+      f0      :     0.000360  f :     0.002697
+      f+1     :     0.000213
+      f-1     :     0.000077
+      f+2     :     0.000678
+      f-2     :     0.000657
+      f+3     :     0.000238
+      f-3     :     0.000475
+
+  8 H s       :     0.590932  s :     0.590932
+      pz      :     0.158038  p :     0.454861
+      px      :     0.146424
+      py      :     0.150399
+
+  9 H s       :     0.638224  s :     0.638224
+      pz      :     0.126436  p :     0.375487
+      px      :     0.134132
+      py      :     0.114919
+
+ 10 N s       :     3.052639  s :     3.052639
+      pz      :     1.185739  p :     3.815152
+      px      :     1.348094
+      py      :     1.281319
+      dz2     :     0.028525  d :     0.096731
+      dxz     :     0.024424
+      dyz     :     0.013132
+      dx2y2   :     0.022000
+      dxy     :     0.008649
+      f0      :     0.001888  f :     0.005973
+      f+1     :     0.000390
+      f-1     :     0.000835
+      f+2     :     0.000633
+      f-2     :     0.000886
+      f+3     :     0.001060
+      f-3     :     0.000281
+
+ 11 H s       :     0.663927  s :     0.663927
+      pz      :     0.088754  p :     0.345662
+      px      :     0.108478
+      py      :     0.148430
+
+ 12 H s       :     0.669671  s :     0.669671
+      pz      :     0.160667  p :     0.393682
+      px      :     0.122309
+      py      :     0.110706
+
+ 13 H s       :     0.635493  s :     0.635493
+      pz      :     0.081944  p :     0.287554
+      px      :     0.132864
+      py      :     0.072746
+
+ 14 O s       :     3.315956  s :     3.315956
+      pz      :     1.578308  p :     4.582472
+      px      :     1.451784
+      py      :     1.552380
+      dz2     :     0.017567  d :     0.114767
+      dxz     :     0.013074
+      dyz     :     0.021092
+      dx2y2   :     0.037621
+      dxy     :     0.025413
+      f0      :     0.000492  f :     0.002877
+      f+1     :     0.000152
+      f-1     :     0.000334
+      f+2     :     0.000911
+      f-2     :     0.000116
+      f+3     :     0.000654
+      f-3     :     0.000218
+
+ 15 H s       :     0.631779  s :     0.631779
+      pz      :     0.111186  p :     0.372279
+      px      :     0.161764
+      py      :     0.099329
+
+ 16 H s       :     0.619783  s :     0.619783
+      pz      :     0.125459  p :     0.347227
+      px      :     0.081620
+      py      :     0.140148
+
+ 17 O s       :     3.419630  s :     3.419630
+      pz      :     1.766088  p :     4.652650
+      px      :     1.507371
+      py      :     1.379191
+      dz2     :     0.011800  d :     0.057232
+      dxz     :     0.004554
+      dyz     :     0.006857
+      dx2y2   :     0.022365
+      dxy     :     0.011657
+      f0      :     0.000158  f :     0.001755
+      f+1     :     0.000281
+      f-1     :     0.000322
+      f+2     :     0.000204
+      f-2     :     0.000015
+      f+3     :     0.000003
+      f-3     :     0.000772
+
+ 18 H s       :     0.592960  s :     0.592960
+      pz      :     0.088767  p :     0.309709
+      px      :     0.142299
+      py      :     0.078643
+
+ 19 H s       :     0.589099  s :     0.589099
+      pz      :     0.100358  p :     0.351270
+      px      :     0.082972
+      py      :     0.167941
+
+
+
+                      *****************************
+                      * MAYER POPULATION ANALYSIS *
+                      *****************************
+
+  NA   - Mulliken gross atomic population
+  ZA   - Total nuclear charge
+  QA   - Mulliken gross atomic charge
+  VA   - Mayer's total valence
+  BVA  - Mayer's bonded valence
+  FA   - Mayer's free valence
+
+  ATOM       NA         ZA         QA         VA         BVA        FA
+  0 O      8.7572     8.0000    -0.7572     1.7902     1.7902     0.0000
+  1 H      0.5979     1.0000     0.4021     0.8805     0.8805     0.0000
+  2 H      0.8017     1.0000     0.1983     1.0264     1.0264     0.0000
+  3 N      7.6363     7.0000    -0.6363     2.9208     2.9208    -0.0000
+  4 H      0.7711     1.0000     0.2289     1.0734     1.0734    -0.0000
+  5 H      0.7466     1.0000     0.2534     1.0353     1.0353    -0.0000
+  6 H      0.7668     1.0000     0.2332     1.0040     1.0040    -0.0000
+  7 O      8.6196     8.0000    -0.6196     1.6803     1.6803     0.0000
+  8 H      0.5765     1.0000     0.4235     0.7735     0.7735     0.0000
+  9 H      0.7216     1.0000     0.2784     0.9543     0.9543     0.0000
+ 10 N      7.7652     7.0000    -0.7652     2.6007     2.6007    -0.0000
+ 11 H      0.7586     1.0000     0.2414     0.9632     0.9632    -0.0000
+ 12 H      0.7329     1.0000     0.2671     0.8845     0.8845    -0.0000
+ 13 H      0.7347     1.0000     0.2653     0.9296     0.9296    -0.0000
+ 14 O      8.5090     8.0000    -0.5090     2.0806     2.0806    -0.0000
+ 15 H      0.7642     1.0000     0.2358     1.0039     1.0039    -0.0000
+ 16 H      0.7292     1.0000     0.2708     0.9658     0.9658     0.0000
+ 17 O      8.6381     8.0000    -0.6381     1.8267     1.8267     0.0000
+ 18 H      0.6795     1.0000     0.3205     0.9312     0.9312     0.0000
+ 19 H      0.6934     1.0000     0.3066     0.9523     0.9523     0.0000
+
+  Mayer bond orders larger than 0.100000
+B(  0-O ,  1-H ) :   0.8357 B(  0-O ,  2-H ) :   0.9576 B(  3-N ,  4-H ) :   0.9544 
+B(  3-N ,  5-H ) :   0.9918 B(  3-N ,  6-H ) :   0.9365 B(  7-O ,  8-H ) :   0.7534 
+B(  7-O ,  9-H ) :   0.9461 B( 10-N , 11-H ) :   0.8908 B( 10-N , 12-H ) :   0.7965 
+B( 10-N , 13-H ) :   0.8642 B( 14-O , 15-H ) :   0.9982 B( 14-O , 16-H ) :   1.0031 
+B( 17-O , 18-H ) :   0.9176 B( 17-O , 19-H ) :   0.9031 
+
+-------
+TIMINGS
+-------
+
+Total SCF time: 0 days 0 hours 0 min 22 sec 
+
+Total time                  ....      22.207 sec
+Sum of individual times     ....      20.890 sec  ( 94.1%)
+
+SCF preparation             ....       0.865 sec  (  3.9%)
+Fock matrix formation       ....      18.682 sec  ( 84.1%)
+  Startup                   ....       0.144 sec  (  0.8% of F)
+  Split-RI-J                ....       0.912 sec  (  4.9% of F)
+  Chain of spheres X        ....      14.346 sec  ( 76.8% of F)
+  XC integration            ....       3.657 sec  ( 19.6% of F)
+    XC Preparation          ....       0.000 sec  (  0.0% of XC)
+    Basis function eval.    ....       0.478 sec  ( 13.1% of XC)
+    Density eval.           ....       0.983 sec  ( 26.9% of XC)
+    XC-Functional eval.     ....       0.125 sec  (  3.4% of XC)
+    XC-Potential eval.      ....       0.974 sec  ( 26.6% of XC)
+Diagonalization             ....       0.000 sec  (  0.0%)
+Density matrix formation    ....       0.224 sec  (  1.0%)
+Total Energy calculation    ....       0.074 sec  (  0.3%)
+Population analysis         ....       0.051 sec  (  0.2%)
+Orbital Transformation      ....       0.107 sec  (  0.5%)
+Orbital Orthonormalization  ....       0.000 sec  (  0.0%)
+DIIS solution               ....       0.582 sec  (  2.6%)
+SOSCF solution              ....       0.305 sec  (  1.4%)
+Finished LeanSCF after  22.3 sec
+
+Maximum memory used throughout the entire LEANSCF-calculation: 32.6 MB
+
+
+-------------------------------------------------------------------------------
+                          DFT DISPERSION CORRECTION                            
+                                                                               
+                                DFTD4 V3.4.0                                   
+-------------------------------------------------------------------------------
+The WB97M-D4rev functional is recognized
+Active option DFTDOPT                   ...         5   
+
+-------------------------   ----------------
+Dispersion correction           -0.009601744
+-------------------------   ----------------
+
+
+-------------------------   --------------------
+FINAL SINGLE POINT ENERGY      -418.999459285321
+-------------------------   --------------------
+
+[1793239379.676500] [bhc0186:15348:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239379.676388] [bhc0186:15349:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239379.676528] [bhc0186:15350:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239379.676382] [bhc0186:15351:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239379.676392] [bhc0186:15352:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239379.676535] [bhc0186:15353:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239379.676572] [bhc0186:15354:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239379.676389] [bhc0186:15355:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239379.676572] [bhc0186:15356:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239379.676543] [bhc0186:15357:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239379.676403] [bhc0186:15358:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239379.676513] [bhc0186:15359:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239379.676540] [bhc0186:15360:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239379.676500] [bhc0186:15361:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239379.676396] [bhc0186:15362:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239379.676468] [bhc0186:15363:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239379.676581] [bhc0186:15364:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239379.676461] [bhc0186:15365:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239379.676577] [bhc0186:15367:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239379.676415] [bhc0186:15368:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239379.676570] [bhc0186:15369:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239379.676580] [bhc0186:15370:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239379.676391] [bhc0186:15371:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239379.676606] [bhc0186:15373:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+
+
+           ************************************************************
+           *        Program running with 24 parallel MPI-processes    *
+           *              working on a common directory               *
+           ************************************************************
+------------------------------------------------------------------------------
+                         ORCA SCF GRADIENT CALCULATION
+------------------------------------------------------------------------------
+
+Nuc. rep. gradient        (SHARK) ... done (  0.0 sec)
+HCore & Overlap gradient  (SHARK) ... done (  0.1 sec)
+Split-RIJ-J gradient      (SHARK) ... done (  0.3 sec)
+COSX-gradient                     ... done (  5.3 sec)
+XC gradient                       ... done (  1.1 sec)
+Dispersion correction             ... done (  0.0 sec)
+
+-------------------
+DISPERSION GRADIENT
+-------------------
+
+   1   O   :    0.000469090   -0.000037996   -0.000294590
+   2   H   :    0.000033541   -0.000058599   -0.000026552
+   3   H   :   -0.000158439    0.000099571   -0.000032260
+   4   N   :   -0.000058681    0.000385008    0.000323907
+   5   H   :    0.000073287    0.000089520    0.000013528
+   6   H   :    0.000025832    0.000192971    0.000054312
+   7   H   :    0.000021458    0.000105863    0.000086595
+   8   O   :    0.000178138   -0.000105295   -0.000186951
+   9   H   :    0.000088882   -0.000059602   -0.000079296
+  10   H   :    0.000027609   -0.000019490   -0.000035056
+  11   N   :   -0.000399979    0.000176153   -0.000462447
+  12   H   :   -0.000075735   -0.000030725   -0.000059025
+  13   H   :   -0.000085912    0.000027331   -0.000096928
+  14   H   :   -0.000021240    0.000032393   -0.000084854
+  15   O   :   -0.000312336   -0.000175344    0.000267919
+  16   H   :   -0.000197544   -0.000062272    0.000022165
+  17   H   :   -0.000089249   -0.000169606    0.000115447
+  18   O   :    0.000339487   -0.000263084    0.000352775
+  19   H   :    0.000052030   -0.000042965    0.000044615
+  20   H   :    0.000089761   -0.000083832    0.000076695
+
+Difference to translation invariance:
+           :   -0.0000000000    0.0000000000    0.0000000000
+
+Difference to rotation invariance:
+           :   -0.0000000000   -0.0000000000   -0.0000000000
+
+Norm of the Dispersion gradient    ...    0.0013597317
+RMS gradient                       ...    0.0001755406
+MAX gradient                       ...    0.0004690903
+
+------------------
+CARTESIAN GRADIENT
+------------------
+
+   1   O   :   -0.169724892    0.152099554   -0.019716384
+   2   H   :   -0.026013952   -0.035663216    0.030492543
+   3   H   :    0.196571008   -0.109595929   -0.010206101
+   4   N   :   -0.052609611   -0.000103483   -0.073753253
+   5   H   :    0.000238300   -0.006080436    0.028407165
+   6   H   :    0.003041565   -0.026874996    0.017965373
+   7   H   :    0.042967738    0.008445514    0.019003801
+   8   O   :    0.023098678    0.008510285    0.051021622
+   9   H   :    0.015632565   -0.016368451   -0.016243082
+  10   H   :   -0.042838544    0.008726253   -0.029125411
+  11   N   :   -0.015954272   -0.043447647    0.033866327
+  12   H   :   -0.004662956    0.039864884    0.030978748
+  13   H   :   -0.014749654   -0.035145619   -0.044195334
+  14   H   :    0.036783020    0.037060298   -0.020302840
+  15   O   :   -0.061481337   -0.005674363    0.005714494
+  16   H   :    0.062230540   -0.000731594    0.011720809
+  17   H   :    0.006223813    0.022884848   -0.016212122
+  18   O   :   -0.019871460   -0.005040691   -0.002607982
+  19   H   :    0.042428223   -0.045899373   -0.008866685
+  20   H   :   -0.021308771    0.053034162    0.012058311
+
+Difference to translation invariance:
+           :    0.0000000000   -0.0000000000   -0.0000000000
+
+Difference to rotation invariance:
+           :   -0.0000292271    0.0001270874    0.0000886603
+
+Norm of the Cartesian gradient     ...    0.3924315439
+RMS gradient                       ...    0.0506626945
+MAX gradient                       ...    0.1965710079
+
+-------
+TIMINGS
+-------
+
+Total SCF gradient time     ....        6.785 sec
+
+Densities                   ....       0.003 sec  (  0.0%)
+One electron gradient       ....       0.090 sec  (  1.3%)
+RI-J Coulomb gradient       ....       0.290 sec  (  4.3%)
+COSX gradient               ....       5.274 sec  ( 77.7%)
+XC gradient                 ....       1.071 sec  ( 15.8%)
+
+Maximum memory used throughout the entire SCFGRAD-calculation: 41.4 MB
+[1793239387.480509] [bhc0186:15432:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239387.480610] [bhc0186:15433:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239387.480621] [bhc0186:15434:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239387.480621] [bhc0186:15435:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239387.480616] [bhc0186:15436:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239387.480618] [bhc0186:15437:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239387.480696] [bhc0186:15438:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239387.480703] [bhc0186:15439:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239387.480549] [bhc0186:15440:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239387.480676] [bhc0186:15441:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239387.480655] [bhc0186:15442:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239387.480749] [bhc0186:15443:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239387.480699] [bhc0186:15444:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239387.480518] [bhc0186:15445:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239387.480845] [bhc0186:15446:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239387.480753] [bhc0186:15447:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239387.480789] [bhc0186:15448:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239387.480660] [bhc0186:15449:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239387.480814] [bhc0186:15450:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239387.480722] [bhc0186:15451:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239387.480721] [bhc0186:15452:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239387.480700] [bhc0186:15453:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239387.480778] [bhc0186:15454:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239387.480725] [bhc0186:15455:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+
+
+           ************************************************************
+           *        Program running with 24 parallel MPI-processes    *
+           *              working on a common directory               *
+           ************************************************************
+
+------------------------------------------------------------------------------
+                              ORCA PROPERTY CALCULATIONS
+------------------------------------------------------------------------------
+
+GBWName                                 ... /gpfs/fs2/scratch/kshao4/mlip/codes/X_semiactivelearning/dft_launches/p10_2gpu_6h/P10p0000GPa/acquisition/inputs/cluster_113.gbw
+Number of atoms                         ...     20
+Number of basis functions               ...    360
+Max core memory                         ...   4096 MB
+
+Electric properties:
+Dipole moment                           ... YES
+Quadrupole moment                       ...  NO
+Static polarizability (Dipole/Dipole)   ...  NO
+Static polarizability (Dipole/Quad.)    ...  NO
+Static polarizability (Quad./Quad.)     ...  NO
+Static polarizability (Velocity)        ...  NO
+Static hyperpolarizability              ...  NO
+
+Atomic electric properties:
+Dipole moment                           ...  NO
+Quadrupole moment                       ...  NO
+Static polarizability                   ...  NO
+
+Choice of electric origin               ... Center of mass
+Position of electric origin             ...    -1.067949    -0.398102     1.317773
+
+General magnetic properties:
+Magnetizability                         ...  NO
+
+EPR properties:
+g-Tensor (aka g-matrix)                 ...  NO
+Zero-Field splitting spin-orbit         ...  NO
+Zero-field splitting spin-spin          ...  NO
+Hyperfine couplings                     ...  NO (   0 nuclei)
+Quadrupole couplings                    ...  NO (   0 nuclei)
+Contact density                         ...  NO (   0 nuclei)
+
+NMR properties:
+Chemical shifts                         ...  NO (   0 nuclei)
+Spin-rotation constants                 ...  NO (   0 nuclei)
+Spin-spin couplings                     ...  NO (   0 nuclei,    0 pairs)
+
+Choice of magnetic origin               ... GIAO
+Position of magnetic origin             ...     0.000000     0.000000     0.000000
+
+Properties with geometric perturbations:
+SCF Hessian                             ...  NO
+IR spectrum                             ...  NO
+VCD spectrum                            ...  NO
+X-ray spectroscopy properties:
+SCF XES/XAS/RIXS spectra                ...  NO
+
+SCF SOC stabilization energy            ...  NO
+Diagonal Born-Oppenheimer correction    ...  NO
+
+-------------
+DIPOLE MOMENT
+-------------
+
+Method             : SCF
+Type of density    : Electron Density
+Multiplicity       :   1
+Irrep              :   0
+Energy             :  -418.9898575409633281 Eh
+Basis              : AO
+                                X                 Y                 Z
+Electronic contribution:      1.968194424      -2.749647192      -0.201751487
+Nuclear contribution   :     -1.662827410       2.742984864       2.226583073
+                        -----------------------------------------
+Total Dipole Moment    :      0.305367014      -0.006662327       2.024831586
+                        -----------------------------------------
+Magnitude (a.u.)       :      2.047739327
+Magnitude (Debye)      :      5.204939726
+
+
+
+--------------------
+Rotational spectrum 
+--------------------
+ 
+Rotational constants in cm-1:             0.046612             0.038976             0.025867 
+Rotational constants in MHz :          1397.389302          1168.483844           775.462802 
+
+Dipole components along the rotational axes: 
+x,y,z [a.u.] :     0.286759     2.022833    -0.138384 
+x,y,z [Debye]:     0.728884     5.141634    -0.351745 
+
+ 
+
+Dipole moment calculation done in   0.0 sec 
+
+Maximum memory used throughout the entire PROP-calculation: 19.4 MB
+[1793239388.504974] [bhc0186:15509:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239388.505047] [bhc0186:15511:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239388.505053] [bhc0186:15514:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239388.505060] [bhc0186:15516:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239388.504974] [bhc0186:15518:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239388.504931] [bhc0186:15519:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239388.505068] [bhc0186:15531:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239388.504883] [bhc0186:15532:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239388.507451] [bhc0186:15508:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239388.507415] [bhc0186:15510:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239388.507455] [bhc0186:15512:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239388.507370] [bhc0186:15515:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239388.507409] [bhc0186:15517:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239388.507497] [bhc0186:15520:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239388.507423] [bhc0186:15521:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239388.507398] [bhc0186:15522:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239388.507438] [bhc0186:15523:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239388.507496] [bhc0186:15524:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239388.507415] [bhc0186:15525:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239388.507481] [bhc0186:15526:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239388.507493] [bhc0186:15527:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239388.507452] [bhc0186:15528:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239388.507543] [bhc0186:15529:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+[1793239388.507391] [bhc0186:15530:0]    ucp_context.c:1470 UCX  WARN  UCP version is incompatible, required: 1.15, actual: 1.8 (release 0 /lib64/libucp.so.0)
+
+--------------------------------
+SUGGESTED CITATIONS FOR THIS RUN
+--------------------------------
+
+Below you find a list of papers that are relevant to this ORCA run
+We neither can nor want to force you to cite these papers, but we appreciate if you do
+You receive ORCA, which is the product of decades of hard work by many enthusiastic individuals, for free
+The only thing we kindly ask in return is that you cite our papers,
+We deeply appreciate it, if you show your appreciation for ORCA by not just citing the generic ORCA reference.
+
+Please note that relegating all ORCA citations to the supporting information does *not* help us.
+SI sections are not indexed - citations you put there will not count into any citation statistics
+But we need these citations in order to attract the funding resources that allow us to do what we are doing
+
+Therefore, if you are a happy ORCA user, please consider citing a few of the papers listed below in the main body of your paper
+
+In addition to the list printed below, the program has created the file /gpfs/fs2/scratch/kshao4/mlip/codes/X_semiactivelearning/dft_launches/p10_2gpu_6h/P10p0000GPa/acquisition/inputs/cluster_113.bibtex that contains the list in bibtex format
+You can import this file easily into all common literature databanks and citation aid programs
+
+It goes without saying that in many instances, there are alternative algorithms to achieve similar
+results as the ones you have gotten from ORCA. It is, of course, also the case that in some instances
+ORCA just re-implements algorithms worked out by others. We are fully aware of that and we are also
+fully appreciative of our colleagues work. Hence this citation list should not be read as indicating
+that the listed papers, which are focused on our own work, are the only ones worth citing. It simply
+meant to make it easier for users to cite ORCA specific papers. It is not a substitute for doing your
+own literature research and citing the relevant literature in a scientifically appropriate manner.
+
+List of essential papers. We consider these as the minimum necessary citations
+
+  1. Neese, F.
+     Software update: the ORCA program system, version 6.0
+     WIRES Comput. Molec. Sci. 2025 15(1), e70019
+     doi.org/10.1002/wcms.70019
+
+List of papers to cite with high priority. The work reported in these papers was absolutely
+necessary for this run to complete.
+Our perspective: the developers of density functionals and basis sets usually get cited in chemistry papers
+Good! But without the algorithms to do something with them, the functionals or basis sets would not do anything.
+Hence, in our opinion, the algorithm design and method developments papers are equally worthy of getting cited
+
+  1. Neese, F.
+     An improvement of the resolution of the identity approximation for the formation of the Coulomb matrix
+     J. Comp. Chem. 2003 24(14), 1740-1747
+     doi.org/10.1002/jcc.10318
+  2. Neese, F.; Wennmohs, F.; Hansen, A.; Becker, U.
+     Efficient, approximate and parallel Hartree-Fock and hybrid DFT calculations. A 'chain-of-spheres' algorithm for the Hartree-Fock exchange
+     Chem. Phys. 2009 356(1-3), 98-109
+     doi.org/10.1016/j.chemphys.2008.10.036
+  3. Caldeweyher, E.; Bannwarth, C.; Grimme, S.
+     Extension of the D3 dispersion coefficient model
+     J. Chem. Phys. 2017 147 , 034112
+     doi.org/10.1063/1.4993215
+  4. Lehtola, S.; Steigemann, C.; Oliveira, M.; Marques, M.
+     Recent developments in Libxc - A comprehensive library of functionals for density functional theory
+     Software X 2018 7 , 
+     doi.org/10.1016/j.softx.2017.11.002
+  5. Caldeweyher, E.; Ehlert, S.; Hansen, A.; Neugebauer, H.; Spicher, S.; Bannwarth, C.; Grimme, S.
+     A generally applicable atomic-charge dependent London dispersion correction
+     J. Chem. Phys. 2019 150 , 154122
+     doi.org/10.1063/1.5090222
+  6. Helmich-Paris, B.; de Souza, B.; Neese, F.; Izsák, R.
+     An improved chain of spheres for exchange algorithm
+     J. Chem. Phys. 2021 155(10), 104109
+     doi.org/10.1063/5.0058766
+  7. Neese, F.
+     The SHARK Integral Generation and Digestion System
+     J. Comp. Chem. 2022 44(3), 381
+     doi.org/10.1002/jcc.26942
+  8. Friede, M.; Ehlert, S.; Grimme, S.; Mewes, J.
+     Do Optimally Tuned Range-Separated Hybrid Functionals Require a Reparametrization of the Dispersion Correction? It Depends
+     J. Chem. Theory Comput. 2023 19(22), 8097-8107
+     doi.org/10.1021/acs.jctc.3c00717
+
+List of suggested additional citations. These are papers that are important in the 'surrounding' of 
+of this run, or papers that preceded the highly important papers. If you like your results we are grateful for a citation.
+
+  1. Izsak, R.; Neese, F.
+     An overlap fitted chain of spheres exchange method
+     J. Chem. Phys. 2011 135 , 144105
+     doi.org/10.1063/1.3646921
+  2. Izsak, R.; Hansen, A.; Neese, F.
+     The resolution of identity and chain of spheres approximations for the LPNO-CCSD singles Fock term
+     Molec. Phys. 2012 110 , 2413-2417
+     doi.org/10.1080/00268976.2012.687466
+  3. Neese, F.
+     The ORCA program system
+     WIRES Comput. Molec. Sci. 2012 2(1), 73-78
+     doi.org/10.1002/wcms.81
+  4. Izsak, R.; Neese, F.; Klopper, W.
+     Robust fitting techniques in the chain of spheres approximation to the Fock exchange: The role of the complementary space
+     J. Chem. Phys. 2013 139 , 
+     doi.org/10.1063/1.4819264
+  5. Neese, F.
+     Software update: the ORCA program system, version 4.0
+     WIRES Comput. Molec. Sci. 2018 8(1), 1-6
+     doi.org/10.1002/wcms.1327
+  6. Neese, F.; Wennmohs, F.; Becker, U.; Riplinger, C.
+     The ORCA quantum chemistry program package
+     J. Chem. Phys. 2020 152(22), 224108
+     doi.org/10.1063/5.0004608
+  7. Neese, F.
+     Software update: The ORCA program system—Version 5.0
+     WIRES Comput. Molec. Sci. 2022 12(1), e1606
+     doi.org/10.1002/wcms.1606
+
+List of optional additional citations
+
+  1. Neese, F.
+     Approximate second-order SCF convergence for spin unrestricted wavefunctions
+     Chem. Phys. Lett. 2000 325(1-3), 93-98
+     doi.org/10.1016/s0009-2614(00)00662-x
+
+Timings for individual modules:
+
+Sum of individual times          ...       35.059 sec (=   0.584 min)
+Startup calculation              ...        2.355 sec (=   0.039 min)   6.7 %
+SCF iterations                   ...       23.907 sec (=   0.398 min)  68.2 %
+Property calculations            ...        0.992 sec (=   0.017 min)   2.8 %
+SCF Gradient evaluation          ...        7.804 sec (=   0.130 min)  22.3 %
+                             ****ORCA TERMINATED NORMALLY****
+TOTAL RUN TIME: 0 days 0 hours 0 minutes 36 seconds 614 msec
