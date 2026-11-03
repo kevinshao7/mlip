@@ -22,6 +22,21 @@ git pull
 git branch --show-current   # must print: dev
 ```
 
+## Where to run
+
+- **ORCA DFT: Viper (here) or BlueHive, using Slurm.** Maintain separate
+  site-specific `.slurm` scripts because modules, MPI setup, executable paths,
+  filesystem roots, and resource directives differ. Preserve scientific inputs
+  when moving sites.
+- **MACE-POLAR: GPU execution.** Fine tuning should run from a Python `.py`
+  launcher on **dungeon**, or a GPU `.slurm` wrapper on **DAIS** calling the
+  same workflow launcher and retaining its experiment logging.
+
+See the [execution matrix and site examples](codes/WORKFLOW_MAP.md#machine-and-launch-policy).
+D2 provides `codes/D2_naive/finetune_dais.slurm`, reusing the working DAIS
+GPU environment and preserving Slurm GPU visibility. Windows/local examples
+below are retained as historical reference.
+
 ## Current Focus
 
 The active cluster-validation workflow is:

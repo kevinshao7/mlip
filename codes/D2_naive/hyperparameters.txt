@@ -7539,3 +7539,19 @@ ANALYSIS 2026-10-27T13:56:36.882790-04:00
 - next one-factor test: Stop autonomous fine tuning for human review.
 - why this test is informative: Promotion uses the same frozen validation set and compares saved checkpoints only after the complete 20-epoch sibling group.
 - changed factor relative to this run: none; controller stopped.
+
+DOCUMENTATION 2026-11-03 — machine execution policy
+- observation / evidence: User specifies Slurm ORCA DFT on Viper or BlueHive, GPU MACE-POLAR, and fine tuning via .py on dungeon or .slurm on DAIS. Site evidence: codes/A_parityplot/8_1_viperDFT/viper.slurm and codes/A_parityplot/8_5_bluehiveDFT/base.slurm. D2 has no training .slurm wrapper; launch_single_gpu.py unconditionally sets CUDA_VISIBLE_DEVICES from --gpu, default 1.
+- diagnosis / uncertainty: Windows-first notes obscure intended deployment. DAIS training must preserve scheduler GPU visibility. The DAIS MD environment (gcc/14, cuda/12.8, /dais/fs/scratch/kshao/mlipenv) is not yet confirmed for training.
+- documentation change: Updated root AGENTS.md, README.md, codes/WORKFLOW_MAP.md, and D2 README with machine routes, separate DFT site setup, and the current DAIS implementation gap.
+- proposed next test: After DAIS environment confirmation, prepare scheduler-aware launcher handling and a Slurm wrapper; dry-run to verify GPU visibility and the resolved training command.
+- why informative: Verifies execution-site integration before GPU optimization without changing scientific/training settings.
+- changed factor relative to this run: None; documentation only. No run inspected or launched; defaults, datasets, and scientific settings are unchanged.
+
+IMPLEMENTATION 2026-11-03 — reuse working DAIS GPU environment
+- observation / evidence: User directs DAIS to use what already works. codes/B_conditionsproduction/NPTMACEproduction_base.slurm provides gpu1 / one H200 / gcc/14 / cuda/12.8 / /dais/fs/scratch/kshao/mlipenv.
+- diagnosis / uncertainty: Reuse that environment rather than define a separate training installation; actual DAIS dependency/CUDA availability remains subject to on-site preflight.
+- change: Added finetune_dais.slurm calling launch_single_gpu.py; launcher preserves exactly one Slurm-visible GPU and rejects --gpu inside Slurm. Dungeon retains physical GPU 1 by default. Updated machine policy and READMEs in the same task.
+- proposed next test: Submit finetune_dais.slurm --dry-run on DAIS to check imports, allocated CUDA, and resolved training command without optimization.
+- why informative: Verifies the existing site environment and scheduler integration independently of training behavior.
+- changed factor relative to this run: Execution-site integration only; no scientific/training hyperparameter, dataset, or active experiment default changed. No training launched.

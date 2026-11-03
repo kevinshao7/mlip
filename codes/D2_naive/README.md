@@ -83,6 +83,37 @@ To reproduce a split, rerun `prepare_data.py` with the same `--seed` (default
 `3`). You can also provide explicit files with `--train-file` and
 `--valid-file` after `--` to `launch_single_gpu.py`.
 
+## Training machines
+
+MACE-POLAR fine tuning requires a CUDA GPU. On **dungeon**, launch from this
+directory with `python launch_single_gpu.py` using the training environment.
+On **DAIS**, the required route is a GPU `.slurm` wrapper submitted with
+`sbatch`, calling the same workflow launcher with the same training defaults,
+unique run directories, and single `hyperparameters.txt`.
+
+Use the existing working DAIS GPU environment (`gcc/14`, `cuda/12.8`,
+`/dais/fs/scratch/kshao/mlipenv`), as in the production MD scripts. The
+[`finetune_dais.slurm`](finetune_dais.slurm) wrapper uses that environment and
+one H200 on `gpu1`. Submit from the DAIS workflow directory:
+
+```bash
+mkdir -p /dais/fs/scratch/kshao/mlip/outputsfull/slurm
+sbatch finetune_dais.slurm
+```
+
+For a launch-command smoke check without training, submit
+`sbatch finetune_dais.slurm --dry-run`. Slurm logs go under `outputsfull/slurm`;
+real runs retain the launcher's unique run folders and append to this
+workflow's single `hyperparameters.txt`. The launcher automatically preserves
+Slurm's assigned `CUDA_VISIBLE_DEVICES` and rejects `--gpu` under Slurm. On
+dungeon it retains default physical GPU `1` and accepts `--gpu` overrides.
+The wrapper checks CUDA and imports before invoking the training launcher;
+actual DAIS execution has not been verified from Viper.
+
+Generate ORCA DFT data on **Viper or BlueHive**, using separate site-specific
+Slurm setup. Windows commands below are retained as historical
+preparation/reproduction examples.
+
 ## Training
 
 Run production training on one GPU (the current default physical GPU ID is `1`):
@@ -91,7 +122,7 @@ Run production training on one GPU (the current default physical GPU ID is `1`):
 C:\\Users\\shaoq\\AppData\\Local\\Programs\\Python\\Python312\\python.exe .\\mlip\\codes\\D2_naive\\launch_single_gpu.py --gpu 1
 ```
 
-The launcher accepts exactly one physical GPU ID, sets `CUDA_VISIBLE_DEVICES`,
+Outside Slurm, the launcher accepts exactly one physical GPU ID, sets `CUDA_VISIBLE_DEVICES`,
 and invokes `trainmace.py` directly. Distributed training is not supported in
 this workflow. Training and validation batch sizes are both `1`.
 

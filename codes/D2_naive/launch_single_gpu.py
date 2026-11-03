@@ -20,7 +20,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--gpu", default="1", help="Physical GPU ID to use (active experiment default: 1).")
+    parser.add_argument("--gpu", help="Physical GPU ID on dungeon (default: 1); under Slurm, preserve the allocated GPU.")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
         "train_args",
@@ -32,15 +32,23 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    if not args.gpu.strip() or "," in args.gpu:
-        raise ValueError("--gpu must name exactly one physical GPU ID, e.g. --gpu 0")
+    environment = os.environ.copy()
+    if environment.get("SLURM_JOB_ID"):
+        if args.gpu is not None:
+            raise ValueError("Do not set --gpu under Slurm; use the allocated GPU.")
+        visible = environment.get("CUDA_VISIBLE_DEVICES", "").strip()
+        if not visible or "," in visible or visible in {"-1", "NoDevFiles"}:
+            raise ValueError("Slurm must expose exactly one GPU in CUDA_VISIBLE_DEVICES.")
+    else:
+        visible = "1" if args.gpu is None else args.gpu.strip()
+        if not visible or "," in visible or visible in {"-1", "NoDevFiles"}:
+            raise ValueError("--gpu must name exactly one GPU, e.g. --gpu 0")
+        environment["CUDA_VISIBLE_DEVICES"] = visible
 
     forwarded = args.train_args
     if forwarded[:1] == ["--"]:
         forwarded = forwarded[1:]
     command = [sys.executable, str(SCRIPT_DIR / "trainmace.py"), *forwarded]
-    environment = os.environ.copy()
-    environment["CUDA_VISIBLE_DEVICES"] = args.gpu.strip()
     print(f"CUDA_VISIBLE_DEVICES={environment['CUDA_VISIBLE_DEVICES']}")
     print(shlex.join(command))
     if args.dry_run:

@@ -16,6 +16,47 @@ before selecting code or training data.
 | `7_29_finetunepolar`, `A_parityplot`, `7_7b_clustervalidation` | Earlier H2/path validation and diagnostic studies | Historical/validation support | Not the source of the D2 training split. |
 | `old`, `archive` | Superseded scripts and snapshots | Preserve until an approved cleanup | Never use as a default workflow. |
 
+## Machine and launch policy
+
+| Work | Machine | Required launch route |
+| --- | --- | --- |
+| ORCA DFT | Viper (current host) | Viper-specific `.slurm`, submitted with `sbatch`. |
+| ORCA DFT | BlueHive | BlueHive-specific `.slurm`, submitted with `sbatch`. |
+| MACE-POLAR simulation/inference | GPU host/allocation | CUDA GPU through the workflow launcher. |
+| MACE-POLAR fine tuning | dungeon | Direct Python `.py` workflow launcher. |
+| MACE-POLAR fine tuning | DAIS | GPU `.slurm` wrapper calling the same Python workflow launcher. |
+
+DFT workflows should support **both Viper and BlueHive**. Existing site examples:
+
+- [Viper ORCA](A_parityplot/8_1_viperDFT/viper.slurm) loads `orca/6.1.1`,
+  invokes `orca` from PATH, and defaults to `/ptmp/kshao/mlip`.
+- [BlueHive ORCA](A_parityplot/8_5_bluehiveDFT/base.slurm) loads `orca/6.1.1`,
+  checks `mpirun`, defaults to `/software/orca/6.1.1/orca`, and uses
+  `/gpfs/fs2/scratch/kshao4/mlip`. Its partition, task layout, and MPI settings
+  also differ from the Viper example.
+
+These are environment examples, not universal scientific/resource defaults.
+Keep site settings centralized in separate templates or explicit profiles.
+Adapt paths, modules, MPI setup, resource directives, and log destinations
+without silently changing geometry, DFT method, charge, or multiplicity.
+Create Slurm log folders under `outputsfull/` **before** `sbatch`: Slurm opens
+its logs before the script body runs. Historical templates can contain older
+log paths. The C/C3 grouped-job notes describe BlueHive; they do not establish
+Viper support in those generators.
+
+The [DAIS GPU MD template](B_conditionsproduction/NPTMACEproduction_base.slurm)
+uses `gpu1`, one H200, `gcc/14`, `cuda/12.8`, and
+`/dais/fs/scratch/kshao/mlipenv`. Per user instruction, D2 reuses this working
+environment and allocation in
+[`D2_naive/finetune_dais.slurm`](D2_naive/finetune_dais.slurm).
+The Python launcher preserves Slurm GPU visibility automatically and rejects
+physical GPU overrides inside Slurm. On dungeon it defaults to physical GPU 1.
+The wrapper calls the same launcher, so training defaults and experiment
+logging remain shared. DAIS execution must be verified on DAIS; local syntax
+and launcher smoke checks do not establish remote dependency availability.
+Windows examples and dungeon-local DFT notes remain historical or
+workflow-specific context.
+
 ## D2 dataset catalog
 
 | File | Meaning | Use in current workflow |

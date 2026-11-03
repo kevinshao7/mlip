@@ -36,6 +36,29 @@ C:\Users\shaoq\AppData\Local\Programs\Python\Python312\python.exe
 
 The local MACE checkout is imported from `mlip/mace`. MACE-POLAR model downloads should cache inside `outputsfull/.cache` by setting `XDG_CACHE_HOME` rather than writing to the user home directory.
 
+## Machines and launch policy
+
+**ORCA DFT must be runnable on Viper (this host) or BlueHive.** Both use
+Slurm, but require separate site-specific `.slurm` templates or explicit site
+profiles. Adapt module/MPI setup, ORCA executable paths, filesystem roots,
+partitions, resource directives, and log paths for each site. Moving a
+calculation between sites must preserve its geometry, functional, basis,
+explicitly verified formal charge, and spin multiplicity.
+
+**MACE-POLAR simulations and fine tuning run on GPUs.** Fine tuning must
+support a direct Python `.py` workflow launch on **dungeon** and a GPU
+`.slurm` submission on **DAIS**. The DAIS wrapper must call the workflow's
+Python launcher, retaining the same training defaults, unique run directories,
+and workflow-level `hyperparameters.txt`. Preserve Slurm's assigned GPU
+visibility; do not overwrite it with a dungeon physical GPU ID. Reuse the
+working DAIS GPU environment from
+`codes/B_conditionsproduction/NPTMACEproduction_base.slurm` (`gcc/14`,
+`cuda/12.8`, `/dais/fs/scratch/kshao/mlipenv`).
+
+Windows commands and dungeon-local DFT instructions in older notes are
+historical or workflow-specific context, not the default deployment policy.
+See `codes/WORKFLOW_MAP.md` for site examples and current implementation gaps.
+
 ## Scientific Rules
 
 Be explicit about units, thermodynamic ensemble, cutoffs, periodic boundary conditions, charge, spin multiplicity, and reference energies.
