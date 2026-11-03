@@ -33,45 +33,24 @@ git branch --show-current   # must print: dev
   same workflow launcher and retaining its experiment logging.
 
 See the [execution matrix and site examples](codes/WORKFLOW_MAP.md#machine-and-launch-policy).
-D2 provides `codes/D2_naive/finetune_dais.slurm`, reusing the working DAIS
-GPU environment and preserving Slurm GPU visibility. Windows/local examples
+X provides `codes/X_semiactivelearning/finetune_dais.slurm` and
+`md_dais.slurm`, reusing the working DAIS GPU environment and preserving
+Slurm GPU visibility. The separate D2 wrapper is retained for its own studies. Windows/local examples
 below are retained as historical reference.
 
-## Current Focus
+## Current data protocol (2026-11-03)
 
-The active cluster-validation workflow is:
+The active workflow is **[X_semiactivelearning](codes/X_semiactivelearning/README.md)**:
+polar-1-l MD → clusters → dispersion-free wB97M DFT → fine tuning → held-out
+force error. Continue acquisition/training at the same pressure until force
+component RMSE is **<20 meV/Angstrom**, then increase pressure by **5 GPa**.
+Start at 10 GPa; keep historical runs separate in the new `wb97m_step5` namespace.
 
-1. Extract representative clusters from `outputsfull/r09_hot_w7n1`.
-2. Generate ORCA input files from those clusters.
-3. Run ORCA single-point calculations.
-4. Compare MACE-POLAR cluster energies against ORCA DFT energies after subtracting DFT atomic reference energies.
-
-Relevant scripts:
-
-```text
-codes/7_7b_clustervalidation/extract_dft_sized_clusters.py
-codes/7_7b_clustervalidation/extract_small_cutoff_clusters.py
-codes/7_7b_clustervalidation/compare_mace_polar_orca_clusters.py
-codes/7_7b_clustervalidation/compute_trajectory_rdf.py
-codes/7_7b_clustervalidation/summarize_npt_block_errors.py
-codes/7_13a_orcaclusterssmall/expand77c.py
-```
-
-## Energy Convention
-
-ORCA total energies are read from `FINAL SINGLE POINT ENERGY` in Hartree and converted to eV.
-
-MACE-POLAR energies are compared to:
-
-```text
-DFT relative energy = ORCA total energy in eV - sum(DFT atomic reference energies)
-```
-
-The atomic reference energies are stored in:
-
-```text
-codes/7_7b_clustervalidation/atomizationenergies.txt
-```
+[DATA_PROTOCOL.md](DATA_PROTOCOL.md) maps the active workflow and supporting
+C6 conversion labels, atomic references, validators, site launchers and MD tools.
+wB97M-V and D4rev-inclusive labels are excluded. A direct-method ORCA pilot is
+required before production DFT; no new simulation/training has been launched.
+The previous X controller/launcher/guide are preserved under its `deprecated/`.
 
 ## Local Dependencies
 

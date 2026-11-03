@@ -11,7 +11,7 @@ import numpy as np
 from ase import Atoms
 
 
-FORMAL_CHARGES = {"H": 1, "N": -3, "O": -2, "S": -2}
+FORMAL_CHARGES = {"H": 1, "N": -3, "O": -2}
 HARTREE_TO_EV = 27.211386245988
 HARTREE_PER_BOHR_TO_EV_PER_ANGSTROM = HARTREE_TO_EV / 0.529177210903
 FLOAT = r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[Ee][+-]?\d+)?"
@@ -42,6 +42,9 @@ def parse_input(path: Path) -> tuple[int, int, list[str], np.ndarray, str]:
     if route is None:
         raise ValueError("missing strict '! FUNCTIONAL BASIS EnGrad RIJCOSX' route")
     functional_basis = route.group(1).strip()
+    if functional_basis == "def2-TZVPD" and re.search(
+            r"%method\s+Method DFT\s+Functional hyb_mgga_xc_wb97m_v\s+end", text, re.I):
+        functional_basis = "wB97M/def2-TZVPD"
     match = XYZ_RE.search(text)
     if match is None:
         raise ValueError("missing * xyz charge multiplicity declaration")
@@ -131,6 +134,15 @@ def process(job: Job) -> tuple[dict[str, object], Atoms | None]:
                 issues.append("stale_output_input_spin")
         else:
             issues.append("missing_output_input_provenance")
+        if job.expected_functional_basis == "wB97M/def2-TZVPD":
+            from workflow_policy import validate_nodisp_output
+            try:
+                validate_nodisp_output(text, job.input_path.read_text())
+            except ValueError as exc:
+                issues.append(str(exc))
+        output_spins = re.findall(r"Multiplicity\s+Mult\s+\.+\s+(\d+)", text)
+        if not output_spins or int(output_spins[-1]) != input_spin:
+            issues.append("output_multiplicity_mismatch")
         normal = "ORCA TERMINATED NORMALLY" in text
         if not normal:
             issues.append("no_normal_termination")
@@ -144,6 +156,8 @@ def process(job: Job) -> tuple[dict[str, object], Atoms | None]:
             issues.append("output_formal_charge_mismatch")
         energies = ENERGY_RE.findall(text)
         energy_hartree = float(energies[-1]) if energies else None
+        if energy_hartree is not None and not np.isfinite(energy_hartree):
+            issues.append("nonfinite_energy")
         if energy_hartree is None:
             issues.append("missing_energy")
         parsed_gradient = last_gradient(text)
@@ -151,6 +165,8 @@ def process(job: Job) -> tuple[dict[str, object], Atoms | None]:
             issues.append("missing_gradient")
         else:
             gradient_symbols, gradient = parsed_gradient
+            if not np.isfinite(gradient).all():
+                issues.append("nonfinite_gradient")
             if gradient_symbols != symbols:
                 issues.append("gradient_symbol_or_count_mismatch")
 
@@ -161,6 +177,9 @@ def process(job: Job) -> tuple[dict[str, object], Atoms | None]:
         atoms.info.update({
             "REF_energy": energy_hartree * HARTREE_TO_EV,
             "charge": calculated_charge,
+            "orca_input_charge": input_charge,
+            "orca_output_charge": output_charge,
+            "orca_input_multiplicity": input_spin,
             "spin": input_spin,
             "config_type": "ORCA_DFT",
             "source_file": job.output_path.name,

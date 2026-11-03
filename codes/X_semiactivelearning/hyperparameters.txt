@@ -67,3 +67,99 @@ diagnosis or uncertainty: The DFT method, frame provenance, and atomic-energy re
 proposed next test: Run the no-flag launch_single_gpu.py baseline, then compare saved-model validation energy/force metrics against polar-1-l before changing another factor.
 why this test is most informative: It establishes the D4rev acquisition baseline with the exact frozen split while retaining GPU 1, lr=1e-4, 20 epochs, no SWA, and the existing loss recipe.
 one parameter/factor changed relative to the foundation baseline: acquisition_dataset together with its required matching D4rev reference. No fine tuning was started during integration.
+
+2026-11-03 UTC — Current protocol and local trajectory audit.
+Observation/evidence: C6 release 20261103T171628_022947Z contains 266 accepted
+wB97M-only labels / 363 source outputs, 97 excluded. X launch_single_gpu.py
+still selects acquisition_p10 D4rev data; its README records 213/53 split.
+No campaign **/md/*.xyz was found locally. Legacy P10GPa_R1 production xyz
+contains real 350-atom PBC coordinates; generated production_P10GPa_R1.py
+specifies polar-1-s, 10 GPa, 1920 K, 0.5 fs, IsotropicMTKNPT. X README/log
+records latest large-model P10 replicas as compression transients (3.6717 GPa
+pooled mean, final-window means 5.848/5.884 GPa).
+Diagnosis/uncertainty: Current user direction is wB97M-only, avoiding V and
+D4rev-inclusive targets; C6 preparation is available but no no-dispersion
+training launch is prepared or evidenced. Legacy trajectory equilibrium and
+actual run completion are not certified by its job script.
+Proposed next test: audit source-identity mapping of C6 labels against frozen
+parent split and verify matching atomic references before preparing a child;
+recover latest campaign MD or audit local legacy pressure/volume before any
+new extraction. These tests separate label/ensemble integrity from optimization.
+One future training factor: target dispersion content only; preserve parent
+split, model and optimizer recipe. No experiment/default changes or launch.
+Documentation synchronized: root DATA_PROTOCOL.md and README.md highlight C6,
+supporting tools, legacy-launcher mismatch, and P10 availability/caveats.
+Verification follow-up: full streaming scan of local legacy P10 R1 xyz found
+223477 complete 350-atom frames, 16320160968 bytes, no truncated frame. Only
+the xyz is present in that run directory; thermodynamic logs were not found
+there. This confirms availability, not equilibrium. Documentation whitespace
+check passed; no executable code changed.
+
+2026-11-03 UTC — User-approved active X workflow revision; no optimization launched.
+Observation / exact evidence: Previous autonomous_policy.json used an energy-MAE
+trigger of 30 meV/atom, allowed one DFT label, disabled MD launches and used the
+historical log-spaced pressure ladder. campaign.py resplit each changing data
+snapshot and required wB97M-D4rev labels/E0s. User now specifies polar-1-l MD,
+clusters, dispersion-free wB97M DFT, fine tuning and characterization, with
+continued acquisition/training until force error <20 meV/Angstrom, then +5 GPa.
+Diagnosis / uncertainty: Historical controller/launcher defaults contradict that
+protocol. Treat this as a new campaign baseline, not a causal child of the old
+D4rev experiment. Direct LibXC wB97M syntax is supported by ORCA documentation,
+but no target-site ORCA pilot or GPU optimization has been performed. The
+20 meV/Angstrom error is interpreted explicitly as held-out force-component
+RMSE; equality fails. Adjacent temporal blocks may remain correlated and the
+repeatedly consulted evaluation set is adaptive validation, not a final test.
+Prepared workflow: X is the primary workflow; prior controller, tournament,
+policy, launcher, guide and instructions are preserved in deprecated/pre_wb97m_*.
+New default output namespace wb97m_step5 avoids legacy data/model lineage.
+Pressure grid 10:5:100 GPa; profile temperature interpolation retained. MD
+recipe retained (R1, 100 molecules, 0.5 fs, 2 ps ramps, 37 ps hold, 2000 frames).
+Acquisition contains 500 requested six-molecule clusters; evaluation requests
+50, requires >=30 valid labels and finite RMSE strictly <20 meV/Angstrom.
+Whole 50-frame temporal blocks use residues modulo 6: 0 evaluation, 1 validation,
+2--5 training. All evaluation centres are excluded from acquisitions; split
+membership stays fixed as rounds grow. Zero illegal components is eligible;
+>=5% is blocked, and illegal molecules never enter clusters. Pressure/volume
+and species review plus campaign approval remain required before extraction.
+Training changes acquisition_dataset only: polar-1-l or the retained best parent,
+lr=1e-4, 20 epochs, no SWA, same shared D2 loss/precision/optimizer recipe.
+launch_single_gpu.py needs no flags for the current prepared pressure batch.
+Parent and saved child are scored on exactly the same validation snapshot;
+regressed children are retained as evidence while parent promotion is refused.
+Raw ORCA charge/input/output/multiplicity fields survive collection and must
+match recomputed molecular formal charge before training and evaluation.
+Matching E0s: atomic_references.py audited neutral H/N/O/S C5 raw outputs,
+verified explicit charge 0, multiplicities 2/4/3/3, method/basis, normal
+termination, exactly zero printed D4 energy and dispersion-gradient norm, then
+exported the underlying wB97M E0 JSON/provenance. Neutral-atom reference-state
+charges are distinct from the H-3N-2O molecular-label rule. New molecular data
+are H/N/O only. Cluster labels retain absolute electronic energies (eV) and
+forces (eV/Angstrom), isolated PBC=False; no atomization subtraction.
+Proposed next test: run the single-geometry method pilot from the audited C6
+release on Viper/BlueHive, then verify strict input/output/method/charge/spin
+and energy/force equivalence (<=1e-3 eV cluster energy, <=1e-4 eV/Angstrom max
+component). Production DFT is blocked until that succeeds; no SCF retry or
+automatic tolerance loosening. This isolates method equivalence before spending
+DFT/training resources. The pilot changes dispersion evaluation only against
+its same-geometry C6 subtraction reference; it is not a training trial.
+Machine integration: fetched remote commit 7033a008 adds launch policy. X now
+prepares separate Viper and BlueHive site profiles/Slurm packages; partial and
+failed results, property/scratch artifacts and per-job exit codes are preserved.
+GPU stages support dungeon Python launch and DAIS wrappers reusing gcc/14,
+cuda/12.8 and mlipenv; allocated CUDA visibility is preserved. Site transfers
+and Slurm submission remain operator-owned. Source dependencies B/D2 are kept
+in place because X imports them. README, AGENTS, DATA_PROTOCOL and workflow map
+are synchronized with this active protocol; old release notes remain historical.
+Validation: 14 isolated unittest checks passed using
+/dais/fs/scratch/kshao/mlipenv/bin/python. They exercise threshold equality/NaN,
+minimum evaluation size, +5 GPa advancement, stale model re-evaluation, pending
+Slurm jobs, actual C6 geometry loading and pilot-package writing, strict DFT
+charge/spin/dispersion/stale-input rejection, energy/force units, growing stable
+splits, held-out leakage rejection, both site scripts' bash syntax and atomic
+reference auditing. py_compile passed for all nine active Python modules;
+bash -n passed for both DAIS wrappers. Dry-run controller returned ['init'];
+no production state, MD, DFT or optimization was launched. System Python 3.6
+was unsuitable; final checks used existing Python 3.11 mlipenv. CPU checks do
+not establish target-site ORCA compatibility, GPU runtime or equilibrium.
+One factor for each subsequent training child: acquisition_dataset only;
+keep other training factors fixed and compare against its direct parent.

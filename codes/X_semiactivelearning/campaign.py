@@ -25,13 +25,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 MLIP = ROOT.parents[1]
 BASE_OUT = MLIP / "outputsfull" / ROOT.name
-RUN_ID = os.environ.get("SAL_RUN_ID", "").strip()
+RUN_ID = os.environ.get("SAL_RUN_ID", "wb97m_step5").strip()
 if RUN_ID and (not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", RUN_ID)):
     raise ValueError("SAL_RUN_ID must contain only letters, digits, '.', '_' or '-'")
 OUT = BASE_OUT / RUN_ID if RUN_ID else BASE_OUT
 DEFAULT_CONFIG = ROOT / "campaign_config.json"
-FORMAL_CHARGES = {"H": 1, "N": -3, "O": -2, "S": -2}
+FORMAL_CHARGES = {"H": 1, "N": -3, "O": -2}
 D4REV_REFERENCE_METHOD = "wB97M-D4rev def2-TZVPD"
+WB97M_REFERENCE_METHOD = "wB97M/def2-TZVPD"
 
 
 def now() -> str:
@@ -492,8 +493,16 @@ def command_md(args: argparse.Namespace) -> None:
     if n != 1: raise RuntimeError("Could not set production-only first save step")
     text, n = re.subn(r"if total_steps >= next_save_step:", "if stage == \"production_hold\" and total_steps >= next_save_step:", text, count=1)
     if n != 1: raise RuntimeError("Could not restrict trajectory saving to production hold")
-    gpu_values = [value.strip() for value in (args.gpus or str(cfg["md"]["gpu"])).split(",")]
-    if not gpu_values or any(not re.fullmatch(r"\d+", value) for value in gpu_values):
+    if os.environ.get("SLURM_JOB_ID"):
+        if args.gpus:
+            raise ValueError("Slurm owns GPU visibility; omit --gpus inside the allocation")
+        visible = os.environ.get("CUDA_VISIBLE_DEVICES")
+        if not visible:
+            raise ValueError("Slurm GPU allocation did not set CUDA_VISIBLE_DEVICES")
+        gpu_values = [visible]
+    else:
+        gpu_values = [value.strip() for value in (args.gpus or str(cfg["md"]["gpu"])).split(",")]
+    if not os.environ.get("SLURM_JOB_ID") and (not gpu_values or any(not re.fullmatch(r"\d+", value) for value in gpu_values)):
         raise ValueError("--gpus must be a comma-separated list of non-negative CUDA device indices")
     if len(set(gpu_values)) != len(gpu_values):
         raise ValueError("--gpus must not contain duplicate CUDA device indices")
@@ -599,6 +608,7 @@ def command_md(args: argparse.Namespace) -> None:
     if args.run:
         subprocess.run([str(launcher)], cwd=launch_root, check=True)
         trajectories = sorted(md.glob("**/production_*.xyz"))
+        write_json(md / "complete.json", {"utc":now(), "parent_model":parent})
         event("md_completed", args.pressure, generated_files, trajectories, parent_model=parent, replicas=replicas)
 
 
@@ -774,7 +784,7 @@ def command_analyze(args: argparse.Namespace) -> None:
     figure.tight_layout(); figure.savefig(out / "pressure_volume_time_series.png", dpi=180); plt.close(figure)
     illegal_fraction = len(events) / total_components if total_components else 0.0
     max_fraction=config()["analysis"]["max_illegal_component_fraction"]
-    eligible=bool(events) and illegal_fraction < max_fraction
+    eligible=bool(total_components) and illegal_fraction < max_fraction
     pressures=np.asarray([row["pressure_GPa"] for row in thermo_rows]); volumes=np.asarray([row["volume_A3"] for row in thermo_rows])
     pressure_finite=pressures[np.isfinite(pressures)]
     summary={"trajectory": str(trajectories[0]), "trajectories": {key: str(value) for key, value in zip(identifiers, trajectories, strict=True)}, "replica_summaries": per_trajectory, "analysis_workers": workers, "production_start_frame_0based": args.production_start_frame, "production_frame_stride": args.production_frame_stride, "thermo_frames": len(thermo_rows), "frame_time_ps": frame_time_ps, "mean_pressure_GPa": float(np.mean(pressure_finite)) if pressure_finite.size else None, "pressure_std_GPa": float(np.std(pressure_finite)) if pressure_finite.size else None, "volume_start_A3": float(volumes[0]) if volumes.size else None, "volume_end_A3": float(volumes[-1]) if volumes.size else None, "frames": len(rows), "base_species": sorted(allowed), "non_base_events": len(events), "complete_components_sampled": total_components, "illegal_component_fraction": illegal_fraction, "max_illegal_component_fraction": max_fraction, "cluster_eligible": eligible, "non_base_formulas": sorted({x['formula'] for x in events}), "human_review_required": bool(events) and not eligible}
@@ -928,9 +938,9 @@ def command_clusters(args: argparse.Namespace) -> None:
     from ase.io import write
     cdir = cycle(args.pressure); analysis = cdir / "analysis"
     acquisition = args.kind.startswith("acquisition")
-    if acquisition and not (cdir / "approval_acquisition.json").is_file():
+    if (acquisition or args.kind == "evaluation") and not (cdir / "approval_acquisition.json").is_file():
         raise PermissionError("Acquisition clusters require a recorded human approval: campaign.py approve")
-    selected_count = args.count if args.count is not None else config()["clusters"]["acquisition_count" if acquisition else "diagnostic_count"]
+    selected_count = args.count if args.count is not None else config()["clusters"]["acquisition_count" if acquisition else "evaluation_count" if args.kind == "evaluation" else "diagnostic_count"]
     if selected_count < 1:
         raise ValueError("--count must be positive")
     workers = args.workers if args.workers is not None else int(config()["analysis"]["workers"])
@@ -949,8 +959,8 @@ def command_clusters(args: argparse.Namespace) -> None:
     # ORCA.  Uniqueness is enforced on (trajectory_id, frame, center_component)
     # so the same molecular neighbourhood is never DFT-labelled twice.
     used: set = set()
-    if acquisition and args.kind != "acquisition":
-        for previous in cdir.glob("clusters/acquisition*/selection.csv"):
+    if acquisition or args.kind == "evaluation":
+        for previous in cdir.glob("clusters/*/selection.csv"):
             with previous.open(encoding="utf-8") as stream:
                 for row in csv.DictReader(stream):
                     traj_id = row.get("trajectory_id", "legacy")
@@ -990,8 +1000,12 @@ def command_clusters(args: argparse.Namespace) -> None:
     candidates_per_traj: dict = {}
     for traj_id, n_alloc in allocated.items():
         tf = replica_frames[traj_id]
-        n_sample = min(tf, n_alloc)
-        idxs = sorted(set(np.linspace(0, tf - 1, n_sample, dtype=int).tolist()))
+        from workflow_policy import partition
+        available = [i for i in range(tf) if (partition(i) == "evaluation") == (args.kind == "evaluation")]
+        if not available:
+            raise ValueError("No frames available for the requested temporal partition")
+        n_sample = min(len(available), n_alloc)
+        idxs = sorted({available[i] for i in np.linspace(0, len(available)-1, n_sample, dtype=int)})
         needed_frames.setdefault(traj_id, set()).update(idxs)
         candidates_per_traj[traj_id] = idxs
 
@@ -1266,16 +1280,22 @@ def dft_input(
         )
     if not re.fullmatch(r"[A-Za-z0-9()+,./_-]+(?: [A-Za-z0-9()+,./_-]+)*", functional_basis):
         raise ValueError(f"Unsafe ORCA functional/basis route: {functional_basis!r}")
-    lines = [f"! {functional_basis} EnGrad RIJCOSX", f"%pal nprocs {nprocs} end", f"* xyz {charge} {multiplicity}"]
+    route = functional_basis
+    if functional_basis == WB97M_REFERENCE_METHOD:
+        route = "def2-TZVPD"
+    lines = [f"! {route} EnGrad RIJCOSX", f"%pal nprocs {nprocs} end", f"* xyz {charge} {multiplicity}"]
+    if functional_basis == WB97M_REFERENCE_METHOD:
+        lines[1:1] = ["%method", "  Method DFT", "  Functional hyb_mgga_xc_wb97m_v", "end"]
     lines += [f"{symbol} {x:.12f} {y:.12f} {z:.12f}" for symbol, (x,y,z) in zip(atoms.symbols, atoms.positions, strict=True)]
     return "\n".join(lines) + "\n*\n"
 
 
-def write_parity_report(frames, destination: Path) -> Path:
+def write_parity_report(frames, destination: Path, model_override=None) -> Path:
     """Make the human-review diagnostic; collection stays valid if no GPU is available."""
+    destination.mkdir(parents=True, exist_ok=True)
     report = destination / "parity_summary.json"
     if not frames:
-        write_json(report, {"status":"unavailable", "reason":"no validated DFT frames", "parent_model":current_parent(), "n_clusters":0})
+        write_json(report, {"status":"unavailable", "reason":"no validated DFT frames", "parent_model":model_override or current_parent(), "n_clusters":0})
         return report
     try:
         import numpy as np
@@ -1283,22 +1303,40 @@ def write_parity_report(frames, destination: Path) -> Path:
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         from mace.calculators import mace_polar
-        model = current_parent()
+        model = model_override or current_parent()
         calculator = mace_polar(model=model, device="cuda", default_dtype="float64")
         dft_e=[]; mace_e=[]; dft_f=[]; mace_f=[]
         for atoms in frames:
+            if (atoms.info.get("dft_functional_basis") != config()["dft"]["functional_basis"]
+                    or atoms.info.get("charge") != formal_charge(atoms.get_chemical_symbols())
+                    or atoms.info.get("orca_input_charge") != formal_charge(atoms.get_chemical_symbols())
+                    or atoms.info.get("orca_output_charge") != formal_charge(atoms.get_chemical_symbols())
+                    or atoms.info.get("orca_input_multiplicity") != 1
+                    or atoms.info.get("spin") != 1
+                    or not atoms.info.get("formal_charge_verified")):
+                raise ValueError("Evaluation frame has inconsistent method/charge/spin provenance")
+            if destination.name == "evaluation":
+                from workflow_policy import partition
+                if partition(atoms.info["source_frame"]) != "evaluation":
+                    raise ValueError("Evaluation labels contain acquisition frames")
             atoms.calc=calculator
             dft_e.append(float(atoms.info["REF_energy"]) / len(atoms)); mace_e.append(float(atoms.get_potential_energy()) / len(atoms))
             dft_f.extend(atoms.arrays["REF_forces"].ravel()); mace_f.extend(atoms.get_forces().ravel())
         dft_e=np.asarray(dft_e); mace_e=np.asarray(mace_e); dft_f=np.asarray(dft_f); mace_f=np.asarray(mace_f)
-        stats={"status":"complete", "parent_model":model, "energy_mae_mev_per_atom":float(np.mean(np.abs(mace_e-dft_e))*1000), "force_mae_ev_per_angstrom":float(np.mean(np.abs(mace_f-dft_f))), "n_clusters":len(frames)}
+        stats={"force_rmse_mev_per_angstrom":float(np.sqrt(np.mean((mace_f-dft_f)**2))*1000), "force_mae_mev_per_angstrom":float(np.mean(np.abs(mace_f-dft_f))*1000), "status":"complete", "parent_model":model, "energy_mae_mev_per_atom":float(np.mean(np.abs(mace_e-dft_e))*1000), "force_mae_ev_per_angstrom":float(np.mean(np.abs(mace_f-dft_f))), "n_clusters":len(frames)}
         figure, axes=plt.subplots(1,2,figsize=(10,4))
         for axis, reference, prediction, label in ((axes[0],dft_e,mace_e,"energy / eV atom$^{-1}$"),(axes[1],dft_f,mace_f,"force component / eV Å$^{-1}$")):
             lower=min(reference.min(),prediction.min()); upper=max(reference.max(),prediction.max()); axis.scatter(reference,prediction,s=14); axis.plot([lower,upper],[lower,upper],"k--"); axis.set(xlabel="DFT "+label,ylabel="MACE "+label)
         figure.suptitle(f"Diagnostic parity: energy MAE {stats['energy_mae_mev_per_atom']:.1f} meV/atom")
         figure.tight_layout(); figure.savefig(destination / "parity.png",dpi=180); plt.close(figure)
     except Exception as exc:
-        stats={"status":"unavailable", "reason":f"{type(exc).__name__}: {exc}", "parent_model":current_parent(), "n_clusters":len(frames)}
+        stats={"status":"unavailable", "reason":f"{type(exc).__name__}: {exc}", "parent_model":model_override or current_parent(), "n_clusters":len(frames)}
+    model = model_override or current_parent()
+    stats["model_sha256"] = sha(Path(model)) if Path(model).is_file() else model
+    dataset = destination / "processed.extxyz"
+    stats["dataset_sha256"] = sha(dataset) if dataset.is_file() else None
+    stats["dft_functional_basis"] = config()["dft"]["functional_basis"]
+    stats["evaluation_scope"] = "reserved_temporal_blocks" if destination.name == "evaluation" else "acquisition_diagnostic_includes_training"
     write_json(report,stats); return report
 
 
@@ -1467,11 +1505,24 @@ def command_dft(args: argparse.Namespace) -> None:
         import orca_output_validation as condenser
         from ase.io import write
         manifest=ddir / "manifest.csv"; outputs=ddir / "outputs"; accepted=[]; rows=[]
+        source_hashes={}
+        selection_rows=list(csv.DictReader((cdir / "clusters" / args.kind / "selection.csv").open()))
+        trajectory_paths=json.loads((cdir / "analysis/summary.json").read_text())["trajectories"]
         with manifest.open(newline="", encoding="utf-8") as f:
             for raw in csv.DictReader(f):
                 job=condenser.Job(frame=int(raw["frame"]), stem=raw["stem"], input_path=ddir / raw["input"], output_path=outputs / f"{raw['stem']}.out", manifest_charge=int(raw["charge"]), manifest_spin=int(raw["multiplicity"]), manifest_natoms=int(raw["n_atoms"]), expected_functional_basis=config()["dft"]["functional_basis"])
                 result, atoms=condenser.process(job); rows.append(result)
-                if atoms is not None: accepted.append(atoms)
+                if atoms is not None:
+                    selection = selection_rows[int(raw["frame"])]
+                    trajectory_id=selection["trajectory_id"]
+                    if trajectory_id not in source_hashes:
+                        source_hashes[trajectory_id]=sha(Path(trajectory_paths[trajectory_id]))
+                    atoms.info.update(source_trajectory_id=selection["trajectory_id"],
+                                      source_frame=int(selection["frame"]),
+                                      source_center_component=int(selection["center_component"]),
+                                      source_pressure_gpa=args.pressure,
+                                      source_trajectory_sha256=source_hashes[trajectory_id])
+                    accepted.append(atoms)
         prior_collection = [ddir / name for name in ("processed.extxyz", "collection.csv", "parity.png", "parity_summary.json") if (ddir / name).exists()]
         if prior_collection:
             archive = ddir / "history" / "collection" / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -1488,6 +1539,9 @@ def command_dft(args: argparse.Namespace) -> None:
     if args.run_local:
         run_local_orca(args, ddir)
         return
+    if config()["dft"]["functional_basis"] == WB97M_REFERENCE_METHOD:
+        from workflow_policy import require_method_verified
+        require_method_verified()
     from ase.io import read
     if not clusters.is_file(): raise FileNotFoundError(f"Generate clusters first: {clusters}")
     if ddir.exists() and any(ddir.iterdir()):
@@ -1507,7 +1561,7 @@ def command_dft(args: argparse.Namespace) -> None:
         stem=f"cluster_{i:03d}"
         charge=formal_charge(atoms.get_chemical_symbols())
         recorded_charge = atoms.info.get("charge")
-        if recorded_charge is None or int(recorded_charge) != charge:
+        if recorded_charge is None or recorded_charge != charge:
             raise ValueError(
                 f"{stem}: extxyz charge {recorded_charge!r} does not match formal charge {charge}"
             )
@@ -1538,103 +1592,16 @@ def command_dft(args: argparse.Namespace) -> None:
     launch_inputs.mkdir()
     for record in records:
         shutil.copy2(inp / f"{record['stem']}.inp", launch_inputs / f"{record['stem']}.inp")
-    slurm_log_dir = ddir / "slurm_logs"
-    slurm_log_dir.mkdir()
-    group_size = int(cfg.get("slurm_group_size", 10))
-    if group_size < 1:
-        raise ValueError("dft.slurm_group_size must be positive")
-    ddir_relative = ddir.relative_to(MLIP)
-    scripts = []
-    exclude = cfg.get("slurm_exclude", "")
-    exclude_line = f"#SBATCH --exclude={exclude}\n" if exclude else ""
-    bluehive_mlip = Path(cfg.get("bluehive_mlip_dir", "/gpfs/fs2/scratch/kshao4/mlip"))
-    bluehive_log_dir = bluehive_mlip / slurm_log_dir.relative_to(MLIP)
-    launch_relative = launch_root.relative_to(MLIP)
-    for group_index, start in enumerate(range(0, len(records), group_size)):
-        group = records[start:start + group_size]
-        end = start + len(group) - 1
-        group_name = f"sal_{tag(args.pressure)}_{args.kind}_{start:04d}_{end:04d}"
-        stems = " ".join(row["stem"] for row in group)
-        script = launch_root / f"group_{start:04d}_{end:04d}.slurm"
-        script.write_text(
-            "#!/bin/bash\n"
-            f"#SBATCH --job-name={group_name}\n"
-            f"#SBATCH --partition={cfg['slurm_partition']}\n"
-            "#SBATCH --nodes=1\n"
-            f"#SBATCH --ntasks-per-node={cfg['orca_nprocs']}\n"
-            f"#SBATCH -n {cfg['orca_nprocs']}\n"
-            f"{exclude_line}"
-            f"#SBATCH --time={cfg['slurm_time']}\n"
-            f"#SBATCH -o {bluehive_log_dir}/{group_name}_%j.slurmlog.txt\n"
-            f"#SBATCH -e {bluehive_log_dir}/{group_name}_%j.slurmerr.txt\n\n"
-            "set -euo pipefail\n"
-            f"module load {cfg['orca_module']}\n"
-            f'MLIP_DIR="${{MLIP_DIR:-{bluehive_mlip}}}"\n'
-            f'DFT_DIR="$MLIP_DIR/{ddir_relative.as_posix()}"\n'
-            f'INPUT_DIR="$MLIP_DIR/{launch_relative.as_posix()}/inputs"\n'
-            f'ORCA_COMMAND="${{ORCA_COMMAND:-{cfg["orca_command"]}}}"\n'
-            'cd "$DFT_DIR"\nmkdir -p outputs\n'
-            f"for stem in {stems}; do\n"
-            '    output="outputs/${stem}.out"\n'
-            '    if [[ -f "$output" ]] && grep -q "FINAL SINGLE POINT ENERGY" "$output" && grep -q "ORCA TERMINATED NORMALLY" "$output"; then\n'
-            '        echo "Skipping completed $output"\n        continue\n    fi\n'
-            '    echo "Starting $stem"\n'
-            '    "$ORCA_COMMAND" "$INPUT_DIR/${stem}.inp" > "$output"\n'
-            '    grep -q "FINAL SINGLE POINT ENERGY" "$output"\n'
-            '    grep -q "ORCA TERMINATED NORMALLY" "$output"\n'
-            '    echo "Finished $stem"\n'
-            "done\n",
-            encoding="utf-8",
-        )
-        scripts.append(script)
-    submit_all = launch_root / "submit_all.sh"
-    submit_all.write_text(
-        "#!/bin/bash\nset -euo pipefail\n"
-        f'MLIP_DIR="${{MLIP_DIR:-{bluehive_mlip}}}"\n'
-        f'mkdir -p "$MLIP_DIR/{(ddir / "outputs").relative_to(MLIP).as_posix()}"\n'
-        f'mkdir -p "$MLIP_DIR/{slurm_log_dir.relative_to(MLIP).as_posix()}"\n'
-        'cd "$(dirname "$0")"\n'
-        + "\n".join(f"sbatch {shlex.quote(script.name)}" for script in scripts)
-        + "\n",
-        encoding="utf-8",
-    )
-    package_manifest = launch_root / "bluehive_package.json"
-    write_json(package_manifest, {
-        "generated_utc": now(),
-        "run_id": RUN_ID,
-        "pressure_gpa": args.pressure,
-        "kind": args.kind,
-        "input_count": len(records),
-        "slurm_job_count": len(scripts),
-        "clusters_per_job": group_size,
-        "functional_basis": cfg["functional_basis"],
-        "orca_module": cfg["orca_module"],
-        "orca_nprocs": cfg["orca_nprocs"],
-        "formal_charge_rule": FORMAL_CHARGES,
-        "outputs_relative_to_mlip": str(ddir_relative),
-    })
-    event(
-        "dft_prepared",
-        args.pressure,
-        [clusters],
-        [ddir / "manifest.csv", package_manifest, submit_all, *scripts],
-        kind=args.kind,
-        cluster_count=len(frames),
-        formal_charge_verified=True,
-        functional_basis=cfg["functional_basis"],
-        slurm_group_size=group_size,
-        slurm_job_count=len(scripts),
-    )
-    print(
-        f"Generated {len(frames)} ORCA inputs and {len(scripts)} grouped BlueHive "
-        f"Slurm jobs; submit with {submit_all}"
-    )
+    from site_dft import prepare, submit
+    scripts=prepare(ddir, launch_root, records, cfg, sys.modules[__name__])
+    event("dft_prepared", args.pressure, [clusters], [ddir / "manifest.csv", *scripts],
+          kind=args.kind, cluster_count=len(frames), formal_charge_verified=True,
+          functional_basis=cfg["functional_basis"])
+    print(f"Prepared Viper and BlueHive Slurm packages: {launch_root}")
     if args.submit:
-        if shutil.which("sbatch") is None:
-            raise RuntimeError("sbatch is unavailable on this host. Run locally with --run-local, or generate here and submit from a Slurm login node.")
-        for script in scripts:
-            subprocess.run(["sbatch", script.name], cwd=script.parent, check=True)
-        event("dft_submitted", args.pressure, scripts, [], kind=args.kind, job_count=len(scripts))
+        if not args.site:
+            raise ValueError("--submit requires explicit --site viper or bluehive")
+        submit(launch_root, args.site)
 
 
 def command_finetune(args: argparse.Namespace) -> None:
@@ -1651,11 +1618,8 @@ def command_finetune(args: argparse.Namespace) -> None:
     # becomes progressively less representative as campaign labels grow.
     all_frames=[]
     required_method = str(config()["dft"]["functional_basis"])
-    if required_method != D4REV_REFERENCE_METHOD:
-        raise ValueError(
-            f"Active fine tuning requires {D4REV_REFERENCE_METHOD!r}; "
-            f"campaign configuration declares {required_method!r}"
-        )
+    if required_method != WB97M_REFERENCE_METHOD:
+        raise ValueError("Active campaign requires dispersion-free wB97M/def2-TZVPD")
     for labelled in acquired:
         frames = list(read(labelled, ":"))
         for index, frame in enumerate(frames):
@@ -1668,7 +1632,12 @@ def command_finetune(args: argparse.Namespace) -> None:
         all_frames.extend(frames)
     for index, atoms in enumerate(all_frames):
         expected = formal_charge(atoms.get_chemical_symbols())
-        if (atoms.info.get("charge") != expected or atoms.info.get("spin") != 1
+        if (atoms.info.get("charge") != expected
+                or atoms.info.get("orca_input_charge") != expected
+                or atoms.info.get("orca_output_charge") != expected
+                or atoms.info.get("orca_input_multiplicity") != 1
+                or atoms.info.get("spin") != 1
+                or (int(sum(atoms.numbers)) - expected) % 2
                 or not atoms.info.get("formal_charge_verified", False)):
             raise ValueError(f"Training pool frame {index}: unverified or inconsistent charge/spin")
     if len(all_frames) < 30:
@@ -1677,26 +1646,22 @@ def command_finetune(args: argparse.Namespace) -> None:
     if not 0.0 < fraction < 1.0:
         raise ValueError("finetune.validation_fraction must lie strictly between zero and one")
     acquired_sha256={str(x.resolve()):sha(x) for x in acquired}
-    # A changing data snapshot deterministically creates a new randomized
-    # split; the manifest preserves the seed and exact members for replay.
-    snapshot_token="\n".join(f"{path}:{digest}" for path, digest in sorted(acquired_sha256.items()))
-    split_seed=int(hashlib.sha256(snapshot_token.encode("utf-8")).hexdigest()[:16], 16)
-    indices=list(range(len(all_frames))); random.Random(split_seed).shuffle(indices)
-    valid_count=max(1, min(len(all_frames)-1, round(len(all_frames)*fraction)))
-    valid_indices=sorted(indices[:valid_count]); train_indices=sorted(indices[valid_count:])
-    portable = OUT / "hpc_dataset/dataset.json"
-    if RUN_ID == "acquisition_p10" and portable.exists():
-        frozen = json.loads(portable.read_text())
-        if not frozen["ready_for_training"]:
-            raise ValueError("Portable acquisition is a transfer preview; preparation is not complete")
-        if len(acquired) != 1 or sha(acquired[0]) != frozen["files"]["processed.extxyz"]:
-            raise ValueError("Campaign pool differs from the frozen portable acquisition")
-        split_seed = frozen["seed"]
-        valid_indices = frozen["validation_indices"]
-        train_indices = frozen["train_indices"]
-        if (sorted(valid_indices + train_indices) != list(range(len(all_frames)))
-                or set(valid_indices) & set(train_indices)):
-            raise ValueError("Portable split has overlapping or missing members")
+    from workflow_policy import partition
+    train_indices=[]; valid_indices=[]
+    identities=set()
+    for index, atoms in enumerate(all_frames):
+        identity=(atoms.info["source_pressure_gpa"], atoms.info["source_trajectory_id"],
+                  int(atoms.info["source_frame"]), int(atoms.info["source_center_component"]))
+        if identity in identities:
+            raise ValueError(f"Duplicate training source: {identity}")
+        identities.add(identity)
+        assignment=partition(int(atoms.info["source_frame"]))
+        if assignment == "evaluation":
+            raise ValueError(f"Held-out evaluation frame entered acquisition pool: {identity}")
+        (valid_indices if assignment == "validation" else train_indices).append(index)
+    if not train_indices or not valid_indices:
+        raise ValueError("Acquisition needs both training and validation temporal blocks")
+    split_seed=None
     train=[all_frames[index] for index in train_indices]
     validation=[all_frames[index] for index in valid_indices]
     data=cdir / "training"
@@ -1706,7 +1671,7 @@ def command_finetune(args: argparse.Namespace) -> None:
     all_data=data / "cumulative_all.extxyz"; merged=data / "cumulative_train.extxyz"; valid=data / "random_validation.extxyz"
     split=data / "random_split.json"
     write(all_data, all_frames, format="extxyz"); write(merged, train, format="extxyz"); write(valid, validation, format="extxyz")
-    write_json(split, {"created_utc":now(), "method":"deterministic_shuffle_per_campaign_data_snapshot", "seed":split_seed,
+    write_json(split, {"created_utc":now(), "method":"fixed_temporal_blocks", "seed":split_seed,
                        "dft_functional_basis":required_method,
                        "validation_fraction":fraction, "total_frames":len(all_frames), "train_count":len(train), "validation_count":len(validation),
                        "train_indices":train_indices, "validation_indices":valid_indices, "acquired_sha256":acquired_sha256})
@@ -1717,9 +1682,7 @@ def command_finetune(args: argparse.Namespace) -> None:
         if not parent_path.is_file():
             raise FileNotFoundError(f"Fine-tuning parent model is missing: {parent_path}")
         parent=str(parent_path)
-    launcher=(ROOT / "../D2_naive/launch_single_gpu.py").resolve()
-    if RUN_ID == "acquisition_p10":
-        launcher = ROOT / "training_bridge.py"
+    launcher=ROOT / "training_bridge.py"
     lineage=json.loads((OUT / "model_lineage.json").read_text(encoding="utf-8"))
     current_branch = active_branch(lineage)
     batch_number=1 + sum(1 for entry in branch_history(lineage)
@@ -1735,7 +1698,7 @@ def command_finetune(args: argparse.Namespace) -> None:
     # their own opt-in SWA defaults; this policy is campaign-specific.
     if not math.isfinite(args.lr) or args.lr <= 0:
         raise ValueError("--lr must be a finite positive number")
-    command=[sys.executable, str(launcher), "--gpu", cfg["gpu"], "--", f"--foundation-model={parent}", f"--train-file={merged}", f"--valid-file={valid}", f"--name={finetune_id}", f"--max-num-epochs={epochs}", f"--lr={args.lr}", "--e0s=d4rev", f"--reference-method={required_method}", "--no-swa", f"--changed-parameter={args.changed_parameter}", f"--change-note={args.change_note}"]
+    command=[sys.executable, str(launcher), "--gpu", cfg["gpu"], "--", f"--foundation-model={parent}", f"--train-file={merged}", f"--valid-file={valid}", f"--name={finetune_id}", f"--max-num-epochs={epochs}", f"--lr={args.lr}", f"--e0s={ROOT / cfg['e0s']}", f"--reference-method={required_method}", "--no-swa", f"--changed-parameter={args.changed_parameter}", f"--change-note={args.change_note}"]
     (data / "launch_command.sh").write_text("#!/usr/bin/env bash\nset -euo pipefail\n" + shlex.join(command) + "\n", encoding="utf-8")
     status_path=data / "finetune_status.json"
     status={"state":"prepared", "updated_utc":now(), "pressure_gpa":args.pressure,
@@ -1743,11 +1706,13 @@ def command_finetune(args: argparse.Namespace) -> None:
             "gpu":str(cfg["gpu"]), "parent_model":parent, "learning_rate":args.lr, "train_count":len(train),
             "validation_count":len(validation), "changed_parameter":args.changed_parameter,
             "change_note":args.change_note, "dft_functional_basis":required_method,
-            "e0s":"C5_atomizationD4rev/e0s_wb97m_d4rev.json"}
+            "e0s":str(ROOT / cfg["e0s"])}
     write_json(status_path, status)
-    event("finetune_prepared", args.pressure, [*acquired], [all_data, merged, valid, split, data / "launch_command.sh", status_path], parent_model=parent, finetune_id=finetune_id, batch_number=batch_number, batch_epochs=epochs, learning_rate=args.lr, acquired_datasets=[str(x) for x in acquired], training_data_scope="named_run_campaign_DFT_plus_immutable_inherited_snapshot", validation_policy="deterministic_random_campaign_snapshot", validation_fraction=fraction, validation_seed=split_seed, train_count=len(train), validation_count=len(validation), changed_parameter=args.changed_parameter, change_note=args.change_note)
+    event("finetune_prepared", args.pressure, [*acquired], [all_data, merged, valid, split, data / "launch_command.sh", status_path], parent_model=parent, finetune_id=finetune_id, batch_number=batch_number, batch_epochs=epochs, learning_rate=args.lr, acquired_datasets=[str(x) for x in acquired], training_data_scope="named_run_campaign_DFT_plus_immutable_inherited_snapshot", validation_policy="fixed_temporal_blocks", validation_fraction=fraction, validation_seed=split_seed, train_count=len(train), validation_count=len(validation), changed_parameter=args.changed_parameter, change_note=args.change_note)
     print(shlex.join(command))
     if args.run:
+        from atomic_references import prepare
+        prepare()
         def refresh_dashboard() -> None:
             try:
                 from campaign_dashboard import render
@@ -1757,6 +1722,10 @@ def command_finetune(args: argparse.Namespace) -> None:
 
         status.update({"state":"running", "started_utc":now(), "updated_utc":now()})
         write_json(status_path, status); refresh_dashboard()
+        parent_report=write_parity_report(validation, data / "parent_validation", model_override=parent)
+        parent_metrics=json.loads(parent_report.read_text())
+        if parent_metrics.get("status") != "complete":
+            raise RuntimeError(f"Cannot evaluate direct parent: {parent_report}")
         process=subprocess.Popen(command, cwd=launcher.parent)
         try:
             while True:
@@ -1773,13 +1742,26 @@ def command_finetune(args: argparse.Namespace) -> None:
             status.update({"state":"failed", "updated_utc":now(), "return_code":return_code})
             write_json(status_path, status); refresh_dashboard()
             raise subprocess.CalledProcessError(return_code, command)
-        candidates=sorted(((OUT / "runs") if RUN_ID == "acquisition_p10" else (launcher.parent / "runs")).glob(f"{finetune_id}_*/models/*.model"), key=lambda p:p.stat().st_mtime)
+        candidates=sorted((OUT / "runs").glob(f"{finetune_id}_*/models/*.model"), key=lambda p:p.stat().st_mtime)
+        candidates=[p for p in candidates if "compiled" not in p.name]
         if not candidates: raise RuntimeError("Fine tuning completed but no campaign-named model was found")
-        model=str(candidates[-1].resolve()); state=json.loads((OUT / "model_lineage.json").read_text()); state["history"].append({"pressure_gpa":args.pressure,"parent":parent,"model":model,"train_sha256":sha(merged),"validation_sha256":sha(valid),"split_sha256":sha(split),"acquired_sha256":acquired_sha256,"utc":now(),"batch_number":batch_number,"batch_epochs":epochs,"learning_rate":args.lr,"finetune_id":finetune_id,"branch_id":current_branch,"validation_policy":"deterministic_random_campaign_snapshot","validation_fraction":fraction,"validation_seed":split_seed,"train_count":len(train),"validation_count":len(validation)}); state["current_model"]=model; write_json(OUT / "model_lineage.json", state)
-        write_json(data / "batch_complete.json", {"utc":now(), "batch_number":batch_number, "batch_epochs":epochs, "learning_rate":args.lr, "parent_model":parent, "model":model, "train_sha256":sha(merged), "validation_sha256":sha(valid), "split_sha256":sha(split), "validation_policy":"deterministic_random_campaign_snapshot", "validation_fraction":fraction, "validation_seed":split_seed, "train_count":len(train), "validation_count":len(validation), "acquired_datasets":[str(x) for x in acquired], "acquired_sha256":acquired_sha256})
+        model=str(candidates[-1].resolve())
+        child_report=write_parity_report(validation, data / "child_validation", model_override=model)
+        child_metrics=json.loads(child_report.read_text())
+        if child_metrics.get("status") != "complete":
+            raise RuntimeError(f"Cannot evaluate saved child: {child_report}")
+        parent_rmse=parent_metrics["force_rmse_mev_per_angstrom"]
+        child_rmse=child_metrics["force_rmse_mev_per_angstrom"]
+        promoted=math.isfinite(child_rmse) and child_rmse < parent_rmse
+        comparison={"parent_model":parent,"child_model":model,"parent_force_rmse_mev_per_angstrom":parent_rmse,"child_force_rmse_mev_per_angstrom":child_rmse,"validation_sha256":sha(valid),"promoted":promoted}
+        write_json(data / "parent_child_comparison.json", comparison)
+        with (ROOT / "hyperparameters.txt").open("a") as notebook:
+            notebook.write(f"\n{now()} parent/child evidence: {comparison}; report={data / 'parent_child_comparison.json'}. Diagnosis: {'improved' if promoted else 'no improvement; parent retained'}. Next test: held-out pressure error, then new acquisition if needed; changes acquisition_dataset only, holding optimization fixed. This separates data coverage from optimizer changes.\n")
+        state=json.loads((OUT / "model_lineage.json").read_text()); state["history"].append({"pressure_gpa":args.pressure,"parent":parent,"model":model,"train_sha256":sha(merged),"validation_sha256":sha(valid),"split_sha256":sha(split),"acquired_sha256":acquired_sha256,"utc":now(),"batch_number":batch_number,"batch_epochs":epochs,"learning_rate":args.lr,"finetune_id":finetune_id,"branch_id":current_branch,"promoted":promoted,"parent_validation_force_rmse":parent_rmse,"child_validation_force_rmse":child_rmse,"validation_policy":"fixed_temporal_blocks","validation_fraction":fraction,"validation_seed":split_seed,"train_count":len(train),"validation_count":len(validation)}); state["current_model"]=model if promoted else parent; write_json(OUT / "model_lineage.json", state)
+        write_json(data / "batch_complete.json", {"utc":now(), "batch_number":batch_number, "batch_epochs":epochs, "learning_rate":args.lr, "parent_model":parent, "model":model, "train_sha256":sha(merged), "validation_sha256":sha(valid), "split_sha256":sha(split), "validation_policy":"fixed_temporal_blocks", "validation_fraction":fraction, "validation_seed":split_seed, "train_count":len(train), "validation_count":len(validation), "acquired_datasets":[str(x) for x in acquired], "acquired_sha256":acquired_sha256})
         status.update({"state":"completed", "updated_utc":now(), "completed_utc":now(), "model":model})
         write_json(status_path, status)
-        event("finetune_completed", args.pressure, [merged, valid, split], [Path(model), OUT / "model_lineage.json", data / "batch_complete.json"], parent_model=parent, model=model, batch_number=batch_number, batch_epochs=epochs, learning_rate=args.lr, validation_policy="deterministic_random_campaign_snapshot", validation_fraction=fraction, validation_seed=split_seed)
+        event("finetune_completed", args.pressure, [merged, valid, split], [Path(model), OUT / "model_lineage.json", data / "batch_complete.json"], parent_model=parent, model=model, batch_number=batch_number, batch_epochs=epochs, learning_rate=args.lr, validation_policy="fixed_temporal_blocks", validation_fraction=fraction, validation_seed=split_seed)
         refresh_dashboard()
 
 
@@ -1787,6 +1769,9 @@ def parser() -> argparse.ArgumentParser:
     p=argparse.ArgumentParser(description=__doc__); sub=p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("init").set_defaults(func=command_init)
     sub.add_parser("status").set_defaults(func=command_status)
+    from method_pilot import prepare as prepare_pilot, verify as verify_pilot
+    sub.add_parser("prepare-method-pilot").set_defaults(func=prepare_pilot)
+    sub.add_parser("verify-method-pilot").set_defaults(func=verify_pilot)
     from prepare_acquisition import prepare
     q = sub.add_parser("prepare-acquisition", help="Condense the incoming approved P10 ORCA transfer without launching training.")
     q.add_argument("--source", type=Path, default=MLIP / "outputsfull/acquisition/outputs")
@@ -1822,10 +1807,10 @@ def parser() -> argparse.ArgumentParser:
             q.add_argument("--frame-time-ps", type=float, help="Time between stored trajectory frames, in ps; inferred for campaign trajectories.")
         if name == "approve": q.add_argument("--reason", required=True)
     def kind(value: str) -> str:
-        if value == "diagnostic" or re.fullmatch(r"acquisition(?:_r[2-9][0-9]*)?", value): return value
+        if value in {"diagnostic", "evaluation"} or re.fullmatch(r"acquisition(?:_r(?:[2-9]|[1-9][0-9]+))?", value): return value
         raise argparse.ArgumentTypeError("kind must be diagnostic, acquisition, or acquisition_r<N> (N >= 2)")
     q=sub.add_parser("clusters"); q.add_argument("--pressure", type=float, required=True); q.add_argument("--kind", type=kind, required=True); q.add_argument("--count", type=int, help="Override the configured cluster count for this selection."); q.add_argument("--workers", type=int, help="CPU worker processes; defaults to analysis.workers in the run configuration."); q.add_argument("--visualization-limit", type=int, default=12, help="Maximum evenly sampled clusters to render for visual audit (default: 12)."); q.set_defaults(func=command_clusters)
-    q=sub.add_parser("dft"); q.add_argument("--pressure", type=float, required=True); q.add_argument("--kind", type=kind, required=True); q.add_argument("--submit", action="store_true", help="Submit the prepared job to Slurm."); q.add_argument("--run-local", action="store_true", help="Run already-prepared inputs locally, one 24-rank ORCA job at a time; failed jobs are recorded and skipped."); q.add_argument("--replace-prepared", action="store_true", help="Archive unused prepared inputs before regenerating them; refuses if output files exist."); q.add_argument("--collect", action="store_true"); q.add_argument("--parity", action="store_true", help="Re-evaluate MACE parity from already validated DFT frames."); q.set_defaults(func=command_dft)
+    q=sub.add_parser("dft"); q.add_argument("--pressure", type=float, required=True); q.add_argument("--kind", type=kind, required=True); q.add_argument("--submit", action="store_true", help="Submit the prepared job to Slurm."); q.add_argument("--site", choices=("viper", "bluehive")); q.add_argument("--run-local", action="store_true", help="Run already-prepared inputs locally, one 24-rank ORCA job at a time; failed jobs are recorded and skipped."); q.add_argument("--replace-prepared", action="store_true", help="Archive unused prepared inputs before regenerating them; refuses if output files exist."); q.add_argument("--collect", action="store_true"); q.add_argument("--parity", action="store_true", help="Re-evaluate MACE parity from already validated DFT frames."); q.set_defaults(func=command_dft)
     q=sub.add_parser("finetune"); q.add_argument("--pressure", type=float, required=True); q.add_argument("--run", action="store_true"); q.add_argument("--epochs", type=int, help="Epochs in this continuation batch; defaults to finetune.batch_epochs."); q.add_argument("--lr", type=float, default=1e-4, help="Learning rate; default preserves the validated 1e-4 baseline."); q.add_argument("--parent-model", help="Explicit parent checkpoint selected by an auditable workflow launcher; defaults to current lineage parent."); q.add_argument("--changed-parameter", required=True); q.add_argument("--change-note", required=True); q.set_defaults(func=command_finetune)
     return p
 

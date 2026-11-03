@@ -6,12 +6,14 @@ before selecting code or training data.
 
 | Area | Purpose | Status | Dataset relationship |
 | --- | --- | --- | --- |
+| `X_semiactivelearning` | polar-1-l MD -> clusters -> dispersion-free wB97M DFT -> fine tuning -> force error | **Primary active campaign** | New wb97m_step5 namespace; held-out force-component RMSE <20 meV/Angstrom gates each +5 GPa step, starting at 10 GPa. |
+| `C6_wb97m_nodisp` | Audited subtraction of D4 energy and force terms | Supporting label/calibration evidence | Supplies same-geometry method-pilot labels; no automatic import into the new X training pool. |
 | `B_conditionsproduction`, `B2_conditionsfine` | Production MD and condition-specific job generation | Active simulation support | Produces trajectory data; it is not a training split. |
 | `C_DFTproduction` | Original water-cluster extraction and ORCA generation | Provenance source | Its 162 water-only DFT structures are retained in D2 for provenance. |
 | `C3_DFTproductionstopH2` | Nitrogen/closest-approach cluster extraction and ORCA generation | Active DFT source | Supplies the newer nitrogen-bearing configurations in the D2 target dataset. |
 | `C2_atomizationDFT` | Isolated-atom ORCA references | Shared reference workflow | Regenerates the H/N/O/S reference-energy CSV. |
 | `C5_atomizationD4rev` | Isolated neutral-atom ORCA references at wB97M-D4rev/def2-TZVPD | Current D4 reference workflow | Generates a separate H/N/O/S D4rev reference-energy CSV without replacing the older wB97M-V values. |
-| `D2_naive` | Target-only PolarMACE fine tuning | **Current target fine-tuning workflow** | `data/target_all.xyz` combines the formal-charge-validated C_DFT and C3 DFT data. |
+| `D2_naive` | Target-only PolarMACE fine tuning | Shared training recipe and separate historical baseline | `data/target_all.xyz` combines the formal-charge-validated C_DFT and C3 DFT data. |
 | `D_MHFT` | Multihead fine tuning with OMol replay | Separate legacy/experimental workflow | Its 162-frame target data is oxygen-only and must not replace D2 data for N-bearing fine tuning. |
 | `7_29_finetunepolar`, `A_parityplot`, `7_7b_clustervalidation` | Earlier H2/path validation and diagnostic studies | Historical/validation support | Not the source of the D2 training split. |
 | `old`, `archive` | Superseded scripts and snapshots | Preserve until an approved cleanup | Never use as a default workflow. |
@@ -25,6 +27,11 @@ before selecting code or training data.
 | MACE-POLAR simulation/inference | GPU host/allocation | CUDA GPU through the workflow launcher. |
 | MACE-POLAR fine tuning | dungeon | Direct Python `.py` workflow launcher. |
 | MACE-POLAR fine tuning | DAIS | GPU `.slurm` wrapper calling the same Python workflow launcher. |
+
+The active X workflow provides `site_profiles.json` and `site_dft.py` for
+both Viper and BlueHive packages, and `finetune_dais.slurm` / `md_dais.slurm`
+for DAIS GPU stages. The direct wB97M route requires its method pilot first.
+See [the active campaign guide](X_semiactivelearning/README.md).
 
 DFT workflows should support **both Viper and BlueHive**. Existing site examples:
 
@@ -57,9 +64,9 @@ and launcher smoke checks do not establish remote dependency availability.
 Windows examples and dungeon-local DFT notes remain historical or
 workflow-specific context.
 
-## D2 dataset catalog
+## Historical/separate D2 dataset catalog
 
-| File | Meaning | Use in current workflow |
+| File | Meaning | Use in the separate D2 workflow |
 | --- | --- | --- |
 | `data/target_all.xyz` | 227 formal-charge-validated H/N/O ORCA DFT frames, including 45 N-bearing frames | Authoritative source; never train directly without a declared split. |
 | `data/target_train.xyz`, `target_valid.xyz`, `target_test.xyz` | Seeded 80/10/10 source-family/nitrogen-presence split derived from `target_all.xyz` | Current train/validation/test inputs; audit before a new experiment. |

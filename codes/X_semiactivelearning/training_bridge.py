@@ -9,31 +9,25 @@ MLIP = ROOT.parents[1]
 
 
 def main():
+    import campaign
     # Retain the shared training recipe and registry, with campaign-owned logs.
     argv = sys.argv[1:]
     gpu_index = argv.index("--gpu")
-    os.environ["CUDA_VISIBLE_DEVICES"] = argv[gpu_index + 1]
+    if os.environ.get("SLURM_JOB_ID"):
+        if not os.environ.get("CUDA_VISIBLE_DEVICES"):
+            raise ValueError("Missing Slurm-assigned GPU visibility")
+    else:
+        os.environ["CUDA_VISIBLE_DEVICES"] = argv[gpu_index + 1]
     forwarded = argv[argv.index("--") + 1:]
     path = ROOT.parent / "D2_naive/trainmace.py"
     spec = importlib.util.spec_from_file_location("campaign_training_recipe", path)
     recipe = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(recipe)
-    for name in ("append_experiment_log", "append_run_outcome"):
-        original = getattr(recipe, name)
-
-        def mirrored(*args, _original=original, **kwargs):
-            source = path.parent / "hyperparameters.txt"
-            offset = source.stat().st_size if source.exists() else 0
-            _original(*args, **kwargs)
-            with source.open("rb") as handle:
-                handle.seek(offset)
-                entry = handle.read().decode("utf-8")
-            with (ROOT / "hyperparameters.txt").open("a", encoding="utf-8") as handle:
-                handle.write(entry)
-
-        setattr(recipe, name, mirrored)
+    # Logging resolves through SCRIPT_DIR; constants for data/model dependencies
+    # were already initialized from the shared recipe. Keep one X lab notebook.
+    recipe.SCRIPT_DIR = ROOT
     sys.argv = [str(path), *forwarded, "--runs-root", str(
-        MLIP / "outputsfull/X_semiactivelearning/acquisition_p10/runs")]
+        campaign.OUT / "runs")]
     recipe.main()
 
 
