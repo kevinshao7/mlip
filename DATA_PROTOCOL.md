@@ -10,7 +10,8 @@ previous C6 release and historical P10 data, not the active launcher.
 
 
 The currently prepared P10 deployment is [the foundation batch](codes/X_semiactivelearning/P10_BATCH.md):
-ten one-GPU polar-1-l replicas, 24 h per job, 176 ps production plus 4 ps ramps,
+ten one-GPU polar-1-l replicas, 1 ns production plus 4 ps ramps via resumable
+24 h jobs (six allocation waves prepared),
 2,000 saved frames each. Its 2,000-label Viper budget includes 50 held-out
 clusters. Whole-molecule PBC geometry and reviewed-window checks precede DFT.
 The foundation checkpoint is pinned; no jobs have been submitted.

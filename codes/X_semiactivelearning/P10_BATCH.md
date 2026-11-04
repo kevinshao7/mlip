@@ -6,11 +6,11 @@ audit and are superseded. The active plan uses **foundation polar-1-l** per the
 user's 2026-11-04 direction. The earlier fine-tuned-checkpoint requirement is
 superseded for these ten runs.
 
-## MD model and 24-hour resources
+## MD model, 1 ns target and 24-hour segments
 
 Ten independently seeded replicas are prepared as Slurm array `0-9`, with
-**one H200, 12 CPU cores, 64 GiB host memory and a 24-hour limit per replica**
-on DAIS. This is 240 GPU-hours of requested wall-clock allocation if all ten
+**one H200, 12 CPU cores, 64 GiB host memory and a 24-hour limit per allocation**
+on DAIS. This is 240 GPU-hours of requested wall-clock allocation per array wave if all ten
 are later submitted. Slurm owns GPU visibility. Each replica has a distinct
 output directory and seeds NumPy, Python and Torch before packing/velocities.
 The working gcc/14, cuda/12.8, mlipenv setup is retained.
@@ -25,18 +25,34 @@ URL/hash; on another GPU host, `python p10_batch.py cache-foundation` prepares
 those same bytes and rejects a different download. Model weights stay out of
 Git. No fine-tuned model is selected by this plan.
 
-The prepared physical duration is **176 ps production plus 2 ps pressure and
-2 ps temperature ramps**: 360,000 NPT steps at 0.5 fs, plus the existing initial
-100-step NVT thermalization. Each replica saves 2,000 production frames, every
-176 steps = 88 fs. The old 37 ps batch remains preserved in its dated plan.
+The target is **1 ns (1,000 ps) production per replica**, plus unchanged
+2 ps pressure and 2 ps temperature ramps: 2,008,000 NPT steps at 0.5 fs, plus
+100 initial NVT steps. Each replica saves 2,000 frames, every 1,000 steps
+(0.5 ps). The earlier 176 ps bundle is archived.
 
-Sizing is provisional: 108,000 historical steps / 6.6 h gives 360,000 steps in
-about 22 h, leaving 2 h for startup/output within the allocation. That timing
-was **not** a polar-1-l H200 benchmark. Actual wall time is not guaranteed; an
-incomplete run is preserved and cannot enter extraction as a completed replica.
-The optional runtime clarification asked whether fixed physical duration or
-wall-clock-limited production is preferred; fixed length is the documented
-default pending further steering.
+DAIS `sinfo -p gpu1` reports a maximum allocation of **1 day**. The prepared
+MD submission helper therefore chains **six 24-hour arrays** using `afterok`
+dependencies. Each allocation computes for at most 22 h and checkpoints before
+exiting; the next allocation resumes the same replica. Completed replicas skip
+later allocations. The historical timing proxy projects approximately 123 h per
+replica, so six segments provide 132 h of nominal compute budget. This remains
+uncalibrated for polar-1-l/H200; additional segments may be needed. No array has
+been submitted. Six full waves would request up to 1,440 GPU-hours across ten
+replicas; jobs exit once their individual physical target is reached.
+
+`md_segments.py` saves positions, momenta, cell, reference-cell/volume variables,
+thermostat and barostat chain coordinates/momenta, progress and output offsets
+in atomic, pickle-free checkpoints. ASE version, Torch version, model/config
+hashes and physical parameters must match on restart. Uncommitted output tails
+are archived before replay, preventing duplicate frames. Initial thermalization
+and ramps are not repeated after resuming.
+
+The inherited runner recreated its NPT integrator every 20 steps during
+production. This reset its chain state. The new production runner keeps one
+persistent integrator and restores its complete state between allocations;
+nominal temperature, pressure and damping settings remain the same. The existing
+changing-target ramp schedule is retained. Tiny CPU restart fixtures matched
+uninterrupted integration and preserved frame counts; no campaign MD was run.
 
 Scientific settings remain 10 GPa, 1920 K, NH3/H2O R1 (50+50 molecules,
 350 atoms), PBC=True, IsotropicMTKNPT, total charge 0, singlet, float32,

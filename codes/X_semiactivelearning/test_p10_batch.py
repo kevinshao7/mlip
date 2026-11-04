@@ -20,7 +20,7 @@ class BatchTests(unittest.TestCase):
         self.temp=tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
         self.root=Path(self.temp.name); self.code=self.root/'codes/X_semiactivelearning'
         self.code.mkdir(parents=True)
-        for name in ['campaign.py','p10_batch.py','workflow_policy.py','campaign_config.json','method_pilot.py','orca_output_validation.py','site_dft.py','site_profiles.json','cluster_quality.py']:
+        for name in ['campaign.py','p10_batch.py','workflow_policy.py','campaign_config.json','method_pilot.py','orca_output_validation.py','site_dft.py','site_profiles.json','cluster_quality.py','md_segments.py']:
             shutil.copy2(batch.ROOT/name,self.code/name)
         profile=Path(json.loads((self.code/'campaign_config.json').read_text())['profile_csv'])
         target=(self.code/profile).resolve(); target.parent.mkdir(parents=True)
@@ -47,8 +47,10 @@ class BatchTests(unittest.TestCase):
         self.assertIn('--gres=gpu:h200:1',md)
         self.assertIn('--time=24:00:00',md)
         self.assertIn('--mem=64G',md)
-        self.assertEqual(self.plan['md']['production_duration_ps'],176)
+        self.assertEqual(self.plan['md']['production_duration_ps'],1000)
         self.assertEqual(self.plan['model_mode'],'foundation')
+        self.assertEqual(self.plan['planned_segments_per_replica'],6)
+        self.assertIn('afterok:',(code/'submit_md_dais.sh').read_text())
         self.assertNotIn('CUDA_VISIBLE_DEVICES=',md)
         self.assertIn('#SBATCH --array=0-199%20',(code/'dft_2000_viper.slurm').read_text())
 
@@ -103,9 +105,9 @@ class BatchTests(unittest.TestCase):
                 manifest=json.loads((directory/'manifest.json').read_text())
                 codepath=Path(manifest['replicas'][0]['launcher'])
                 text=codepath.read_text(); ast.parse(text)
-                self.assertEqual(manifest['production_duration_ps'],176)
-                self.assertEqual(manifest['total_steps'],360000)
-                self.assertEqual(manifest['save_interval_steps'],176)
+                self.assertEqual(manifest['production_duration_ps'],1000)
+                self.assertEqual(manifest['total_steps'],2008000)
+                self.assertEqual(manifest['save_interval_steps'],1000)
                 self.assertIn(f"RUN_SEED = {replica['seed']}",text)
                 self.assertIn('torch.manual_seed(RUN_SEED)',text)
                 self.assertIn('GPU-fixture',text)

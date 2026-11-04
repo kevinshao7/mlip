@@ -9,7 +9,7 @@ supporting dependencies, not alternative default launchers.
 ## Prepared 10 GPa batch
 
 [P10_BATCH.md](P10_BATCH.md) describes ten independent one-GPU **foundation
-polar-1-l** replicas, each with a **24 h allocation and 176 ps production**
+polar-1-l** replicas, each with a **1 ns production through resumable 24 h allocations**
 (plus unchanged 4 ps ramps), and exactly 2,000 Viper DFT clusters (1,950
 acquisition +50 evaluation). Runtime sizing is provisional, not a measured H200
 benchmark. `p10_batch_active.json` points to the frozen, checkpoint-pinned plan.

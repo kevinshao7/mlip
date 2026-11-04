@@ -517,6 +517,18 @@ def command_md(args: argparse.Namespace) -> None:
         if count != 1:
             raise RuntimeError("Could not record the independent replica's model/runtime settings")
 
+    if replica_id and cfg["md"].get("resumable_production"):
+        adapter=(ROOT/"md_segments.py").resolve()
+        override=("\nimport importlib.util\n"
+                  f"_segment_spec = importlib.util.spec_from_file_location('md_segments', {str(adapter)!r})\n"
+                  "_segment_module = importlib.util.module_from_spec(_segment_spec)\n"
+                  "_segment_spec.loader.exec_module(_segment_module)\n"
+                  "def stagedMD(*args, **kwargs):\n"
+                  f"    return _segment_module.staged_md(*args, timestep_fs={cfg['md']['timestep_fs']!r}, pressure_ramp_ps={cfg['md']['pressure_ramp_ps']!r}, temperature_ramp_ps={cfg['md']['temperature_ramp_ps']!r}, **kwargs)\n"
+                  "\nstagedMD(\n")
+        text,count=re.subn(r"\nstagedMD\(\n",lambda match:override,text,count=1)
+        if count!=1: raise RuntimeError("Could not install the resumable production runner")
+
     if os.environ.get("SLURM_JOB_ID"):
         if args.gpus:
             raise ValueError("Slurm owns GPU visibility; omit --gpus inside the allocation")

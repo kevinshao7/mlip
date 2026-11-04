@@ -90,15 +90,18 @@ def prepare(args):
     if ACTIVE_PLAN.exists() and not args.new_batch:
         raise FileExistsError('An active P10 plan already exists; inspect it or use --new-batch to preserve it and prepare another')
     stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')
-    run_id = f'p10_foundation_24h_10rep_2000dft_{stamp}'
+    run_id = f'p10_foundation_1ns_10rep_2000dft_{stamp}'
     code = ROOT/'batch_launches'/run_id
     out = MLIP/'outputsfull/X_semiactivelearning'/run_id
     code.mkdir(parents=True, exist_ok=False); out.mkdir(parents=True, exist_ok=False)
     cfg = json.loads((ROOT/'campaign_config.json').read_text())
     cfg['campaign_name'] = run_id
-    cfg['md']['production_duration_ps'] = 176
+    cfg['md']['production_duration_ps'] = 1000
+    cfg['md']['resumable_production'] = True
+    cfg['md']['segment_compute_hours'] = 22
+    cfg['md']['planned_segments'] = 6
     cfg['md']['walltime_target_hours'] = 24
-    cfg['md']['runtime_estimate_basis'] = 'Provisional: 360000 NPT steps / 108000 historical steps * 6.6 h = 22 h; 2 h headroom. Historical model/hardware differs; polar-1-l H200 throughput uncalibrated.'
+    cfg['md']['runtime_estimate_basis'] = 'Provisional: 2008000 NPT steps / 108000 historical steps * 6.6 h = 122.71 h. Six 24 h allocations per replica, 22 h compute budget each; resume until 1 ns. polar-1-l H200 throughput uncalibrated.'
     cfg['clusters']['acquisition_count'] = 1950
     cfg['clusters']['evaluation_count'] = 50
     cfg['finetune']['initial_parent'] = 'polar-1-l'
@@ -121,10 +124,10 @@ def prepare(args):
             'source_sha256':{str(path.relative_to(MLIP)):sha(path) for path in
                                [ROOT/'campaign.py',ROOT/'p10_batch.py',ROOT/'workflow_policy.py',
                                 ROOT.parent/'B_conditionsproduction/NPTMACEproduction_base.py',
-                                ROOT/'method_pilot.py',ROOT/'orca_output_validation.py',ROOT/'site_dft.py',ROOT/'site_profiles.json',ROOT/'cluster_quality.py',
+                                ROOT/'method_pilot.py',ROOT/'orca_output_validation.py',ROOT/'site_dft.py',ROOT/'site_profiles.json',ROOT/'cluster_quality.py',ROOT/'md_segments.py',
                                 (ROOT/cfg['profile_csv']).resolve()]},
             'model_mode':'foundation', 'model_requirement':'frozen_foundation_polar_1_l_checkpoint',
-            'gpu_walltime_hours':24, 'estimated_compute_hours':22, 'runtime_estimate_is_calibrated':False,
+            'gpu_walltime_hours':24, 'estimated_compute_hours':122.71111111111111, 'planned_segments_per_replica':6, 'runtime_estimate_is_calibrated':False,
             'cluster_source':'ten_new_MD_replicas'}
     write_json(code/'plan.json', plan)
     write_json(ACTIVE_PLAN, {'plan':plan['plan_relative']})
@@ -203,6 +206,22 @@ cd "$MLIP_ROOT"
 {env}{command} codes/X_semiactivelearning/p10_batch.py --plan "$MLIP_ROOT/{relative}" {stage}
 mkdir -p "$MLIP_ROOT/{plan['output_relative']}/slurm"
 sbatch "$MLIP_ROOT/{plan['code_relative']}/{script}"
+''')
+    md_submit=code/'submit_md_dais.sh'
+    md_submit.write_text(f'''#!/bin/bash
+set -euo pipefail
+export MLIP_ROOT=${{MLIP_ROOT:-/dais/fs/scratch/kshao/mlip}}
+source "${{MLIP_ENV:-/dais/fs/scratch/kshao/mlipenv}}/bin/activate"
+cd "$MLIP_ROOT"
+python codes/X_semiactivelearning/p10_batch.py --plan "$MLIP_ROOT/{relative}" check-md
+mkdir -p "$MLIP_ROOT/{plan['output_relative']}/slurm"
+dependency=()
+for segment in $(seq 1 "${{MD_SEGMENTS:-6}}"); do
+    job=$(sbatch --parsable "${{dependency[@]}}" "$MLIP_ROOT/{plan['code_relative']}/md_10_replicas_dais.slurm")
+    job=${{job%%;*}}
+    echo "Prepared segment $segment submitted as array $job"
+    dependency=(--dependency=afterok:$job)
+done
 ''')
 
 
@@ -287,8 +306,34 @@ def run_md(args, plan):
     os.environ['XDG_CACHE_HOME']=str(MLIP/'outputsfull/.cache')
     replica=plan['replicas'][args.index]
     campaign.current_parent=lambda:str(model)
-    arguments=campaign.parser().parse_args(['md','--pressure','10','--replica-id',replica['id'], '--seeds',str(replica['seed']),'--run'])
-    arguments.func(arguments)
+    md=campaign.cycle(10)/'md'/replica['id']
+    if (md/'complete.json').exists():
+        print(f"Replica {replica['id']} already reached 1 ns; skipping")
+        return
+    resume_code=md/'resume_code.json'
+    if resume_code.exists():
+        saved=json.loads(resume_code.read_text()); script=Path(saved['script'])
+        if sha(script)!=saved['sha256']: raise ValueError('Prepared replica runner changed')
+    else:
+        arguments=campaign.parser().parse_args(['md','--pressure','10','--replica-id',replica['id'],'--seeds',str(replica['seed'])])
+        arguments.func(arguments)
+        manifest=json.loads((md/'manifest.json').read_text())
+        script=Path(manifest['replicas'][0]['launcher'])
+        write_json(resume_code,{'script':str(script),'sha256':sha(script)})
+    env=os.environ.copy()
+    env['MLIP_SEGMENT_SECONDS']=str(plan['md']['segment_compute_hours']*3600)
+    env['MLIP_MODEL_SHA256']=binding(plan)[1]['sha256']
+    env['MLIP_TORCH_VERSION']=str(torch.__version__)
+    env['MLIP_BATCH_CONFIG_SHA256']=plan['config_sha256']
+    result=subprocess.run([sys.executable,str(script)],cwd=script.parent,env=env)
+    from md_segments import PAUSED_EXIT_CODE
+    if result.returncode==PAUSED_EXIT_CODE:
+        print('Segment checkpoint saved; next allocation resumes this replica')
+        return
+    result.check_returncode()
+    status=json.loads((md/'production_status.json').read_text())
+    if not status['complete']: raise ValueError('Runner exited before the 1 ns target')
+    write_json(md/'complete.json',status)
 
 
 def analyze(plan, start_frame=0):

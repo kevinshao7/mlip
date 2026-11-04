@@ -313,3 +313,53 @@ Records and defaults synchronized in P10_BATCH.md, README, DATA_PROTOCOL,
 AGENTS.md, active plan and frozen configuration. Git HTTPS token is still invalid;
 read-only SSH remote verification succeeded, enabling the user-authorized push
 via SSH without exposing credentials or changing the global credential store.
+
+2026-11-04T00:26:30.858289+00:00 — P10 batch preparation
+Observation/evidence: Prepared /dais/fs/scratch/kshao/mlip/codes/X_semiactivelearning/batch_launches/p10_foundation_1ns_10rep_2000dft_20261104T002630841603Z; ten distinct seeds; exactly 1950 acquisition +50 evaluation labels; no jobs submitted.
+Diagnosis/uncertainty: Foundation polar-1-l is explicitly selected. Its exact bytes must be frozen once before the ensemble; polar-1-l H200 runtime remains uncalibrated.
+Proposed next test: Cache/freeze foundation polar-1-l once; inspect the prepared 24 h jobs before any operator submission.
+Why informative: Freezes one model across independent seeds and preserves the 2000-label budget without mixing evaluation into training.
+One changed factor: MD seed/replica only within the ensemble; acquisition budget only for subsequent training; other settings retained.
+
+2026-11-04T00:26:38.974253+00:00 — P10 batch preparation
+Observation/evidence: Foundation polar-1-l frozen: {'model_mode': 'foundation', 'foundation_model': 'polar-1-l', 'model_relative': 'outputsfull/X_semiactivelearning/p10_foundation_1ns_10rep_2000dft_20261104T002630841603Z/model/foundation_polar_1_l.model', 'sha256': '9f65f8dc6ddaff1d631e299cb531376a7da5e68d1bef04f34a2d5073d5ef114b', 'provenance_relative': 'outputsfull/X_semiactivelearning/p10_foundation_1ns_10rep_2000dft_20261104T002630841603Z/model/foundation_provenance.json', 'provenance_sha256': '03a1ee86e694f5ca16ba5a744fa774a8a6ad5227f533c862472940824fc32e96'}
+Diagnosis/uncertainty: No model inference or MD run; all ten jobs will verify the same checkpoint bytes.
+Proposed next test: Inspect resources and run-code before any later submission.
+Why informative: Removes fine-tuned-model ambiguity and parallel download races.
+One changed factor: Foundation initialization selected by user; replica seed alone varies within this ensemble.
+
+2026-11-04T00:27:35.856024+00:00 — User-directed 1 ns production target; preparation only.
+Observation/evidence: user requests 1 ns for each GPU replica. Live read-only
+sinfo -p gpu1 reports MaxTime=1-00:00:00 for H200/B200/RTX nodes. A single
+144 h allocation is therefore unavailable on this partition. Active plan:
+codes/X_semiactivelearning/batch_launches/p10_foundation_1ns_10rep_2000dft_20261104T002630841603Z/plan.json. Prior 176 ps code bundle archived; outputs preserved.
+Prepared settings: 1000 ps production +2 ps pressure +2 ps temperature ramps,
+0.5 fs, 2008000 NPT steps plus 100 NVT thermalization steps; 2000 production
+frames at stride1000=0.5 ps. Ten foundation polar-1-l replicas retain their
+seeds, 10 GPa/1920 K/R1/PBC/charge0/singlet/float32 and damping100/1000 fs.
+Resource policy: retain one H200/12 CPUs/64G/24 h per allocation, prepare six
+afterok-dependent arrays, allow22 h compute per segment with restart headroom.
+Historical uncalibrated proxy: 2008000/108000*6.6=122.71 h per replica; six
+segments allow132 h nominal compute, not guaranteed completion. Longer actual
+runtime can be continued with additional explicitly submitted segments. No
+submissions occurred; the code does not auto-submit from compute jobs.
+Diagnosis/fix: legacy base constructed a fresh IsotropicMTKNPT every20 steps,
+including production, resetting its extended chain variables. New md_segments
+keeps a persistent production integrator and atomically saves/restores _q,_p,
+_eps,_p_eps,_cell0,_volume0, thermostat _eta/_p_eta and barostat _xi/_p_xi,
+plus atom arrays, progress, output offsets, model/config signatures and ASE/
+Torch versions. Ramps retain the prior changing-target chunk schedule; restart
+does not rethermalize or repeat them. Uncommitted output tails are archived
+before replay. This is an explicit production-integrator bug fix, not a claim
+that the previous effective algorithm was already continuous NPT.
+Next test/rationale: operator review of the prepared 1 ns code, then only after
+separate submission authorization measure first-segment throughput and stability;
+these isolate restart correctness, real runtime and equilibrium eligibility.
+One intended physical factor relative to the earlier prepared deployment:
+production duration. Production chain-reset bug is separately corrected for
+valid continuous dynamics; no optimizer or fine-tuning experiment is launched.
+Validation: all28 isolated checks passed, including real ASE MTK restart-state
+comparison on tiny CPU Lennard-Jones fixtures (positions/momenta/cell and chain
+variables agree to1e-12), segmented output with no duplicate frames, and archive/
+rollback of uncommitted output tails. No campaign GPU MD, ORCA, or training ran.
+Docs/defaults/active launch plan, restart module and experiment log synchronized.

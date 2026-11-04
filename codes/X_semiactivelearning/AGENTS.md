@@ -71,7 +71,9 @@ isolated workflow tests before finishing; report runtime/dependency blockers.
 
 The user explicitly selected foundation polar-1-l for the ten P10 replicas.
 Use p10_batch_active.json and P10_BATCH.md: one H200, 12 CPU cores, 64 GiB,
-24 h per replica; 176 ps production plus unchanged 4 ps ramps and 2000 frames.
+24 h per allocation; 1 ns production plus unchanged 4 ps ramps and 2000 frames.
+The prepared helper chains six arrays; production checkpoints retain the full
+MTK thermostat/barostat state. Finished replicas skip subsequent allocations.
 This runtime estimate is provisional, not a measured H200 benchmark. All jobs
 verify the same frozen foundation checkpoint SHA256. Do not revive the earlier
 fine-tuned-model binding requirement for this batch. No jobs are submitted.
