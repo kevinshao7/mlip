@@ -163,3 +163,153 @@ was unsuitable; final checks used existing Python 3.11 mlipenv. CPU checks do
 not establish target-site ORCA compatibility, GPU runtime or equilibrium.
 One factor for each subsequent training child: acquisition_dataset only;
 keep other training factors fixed and compare against its direct parent.
+
+2026-11-03T23:51:32.830896+00:00 — P10 batch preparation
+Observation/evidence: Prepared /dais/fs/scratch/kshao/mlip/codes/X_semiactivelearning/batch_launches/p10_ft_10rep_2000dft_20261103T235132803760Z; ten distinct seeds; exactly 1950 acquisition +50 evaluation labels; no jobs submitted.
+Diagnosis/uncertainty: No local fine-tuned polar-1-l checkpoint/lineage was found. New MD and target-site direct-method pilot remain unrun.
+Proposed next test: Bind the exact fine-tuned checkpoint and audit metadata; then inspect the prepared jobs before operator submission.
+Why informative: Freezes one model across independent seeds and preserves the 2000-label budget without mixing evaluation into training.
+One changed factor: MD seed/replica only within the ensemble; acquisition budget only for subsequent training; other settings retained.
+
+2026-11-03T23:54:31.945700+00:00 — Preparation-only P10 ensemble and Viper DFT code validation.
+Observation/evidence: User requested 2000 Viper DFT clusters and ten independent
+single-GPU MD replicas using the current fine-tuned polar-1-l at 10 GPa, then
+explicitly instructed no submission and code preparation only. Full repository
+search found no current fine-tuned .model or model_lineage.json; available old
+Polar S/M and OFF artifacts are not substituted. User was asked for the actual
+checkpoint/machine and cluster source; pending source clarification, the code
+assumes clusters from the ten new replicas. No existing trajectory was selected.
+Prepared code: p10_batch.py, p10_batch_active.json and its dated batch_launches
+plan; MD array 0-9, one H200 per task; Viper array 0-199%20, ten ORCA calculations
+per task, 20 CPU cores/64G/120h per group. Exactly 1950 acquisition plus the
+existing 50 evaluation labels totals 2000, with 195+5 per equal-length replica.
+Frozen configuration retains R1, 10 GPa, profile temperature 1920 K and density
+metadata 0.344 g/cm3, initial density 0.2 g/cm3, 0.5 fs, 2 ps pressure and 2 ps
+temperature ramps, 37 ps nominal hold, 2000 frames, NPT tdamp/pdamp 100/1000 fs,
+float32, PBC, total charge 0 and singlet. Distinct seeds initialize NumPy,
+Python and Torch before packing/velocities. Actual checkpoint neighbour cutoff
+is recorded at runtime; calculator long-range settings are not overridden.
+Diagnosis/uncertainty: Checkpoint identity remains unbound and target-site
+wB97M direct-method equivalence remains unrun. Ten seeds do not establish
+stationary 10 GPa sampling; old short holds were compression transients.
+All model/config/source hashes are frozen; no foundation fallback is allowed.
+MD output directories are independent and cannot overwrite one another.
+Formal charge/spin/finite geometry and input hashes are recomputed before ORCA.
+Proposed next test: obtain and bind the exact checkpoint with its training
+metadata/lineage; review the launch code, then separately approve any actual
+submission. Later analyze all ten completed trajectories, review pressure/volume
+and species, and pass the method pilot before selecting/preparing production DFT.
+Why informative: establishes model identity and ensemble eligibility before
+spending resources on a 2000-label acquisition, isolating seed variability.
+One factor per MD sibling: RNG seed only. Relative to the existing acquisition,
+the future training-data factor is the larger acquisition budget (1950 rather
+than 500); no optimizer/learning rate/loss/model/precision change is prepared.
+Code/defaults/docs synchronized: campaign.py adds replica IDs, preserved Slurm
+visibility, explicit seed streams and per-replica cutoff/runtime provenance;
+README and P10_BATCH.md describe commands, counts, physical settings, missing
+inputs and operator-owned submission. No training experiment/default altered.
+Validation evidence: 7 new isolated preparation tests passed (exact budget,
+ten unique seeds, one-GPU array, shell syntax, model binding/mismatch guards,
+source/config hash freeze, formal-charge rejection, transferable config, and
+AST compilation of independent replica launch code without executing it).
+The initial launch-mock assertion also caught a numerical library's read-only
+lscpu capability query; it was narrowed to permit that query and still reject
+any MD/DFT/Slurm launch. py_compile passed. No sbatch, GPU simulation, ORCA or
+optimization was executed. Generated plan is preparation evidence, not completed
+simulation data or 2000 available cluster geometries.
+
+2026-11-04T00:06:40.781801+00:00 — P10 batch preparation
+Observation/evidence: Prepared /dais/fs/scratch/kshao/mlip/codes/X_semiactivelearning/batch_launches/p10_foundation_24h_10rep_2000dft_20261104T000640745461Z; ten distinct seeds; exactly 1950 acquisition +50 evaluation labels; no jobs submitted.
+Diagnosis/uncertainty: Foundation polar-1-l is explicitly selected. Its exact bytes must be frozen once before the ensemble; polar-1-l H200 runtime remains uncalibrated.
+Proposed next test: Cache/freeze foundation polar-1-l once; inspect the prepared 24 h jobs before any operator submission.
+Why informative: Freezes one model across independent seeds and preserves the 2000-label budget without mixing evaluation into training.
+One changed factor: MD seed/replica only within the ensemble; acquisition budget only for subsequent training; other settings retained.
+
+2026-11-04T00:07:11.589537+00:00 — P10 batch preparation
+Observation/evidence: Foundation polar-1-l frozen: {'model_mode': 'foundation', 'foundation_model': 'polar-1-l', 'model_relative': 'outputsfull/X_semiactivelearning/p10_foundation_24h_10rep_2000dft_20261104T000640745461Z/model/foundation_polar_1_l.model', 'sha256': '9f65f8dc6ddaff1d631e299cb531376a7da5e68d1bef04f34a2d5073d5ef114b', 'provenance_relative': 'outputsfull/X_semiactivelearning/p10_foundation_24h_10rep_2000dft_20261104T000640745461Z/model/foundation_provenance.json', 'provenance_sha256': '03a1ee86e694f5ca16ba5a744fa774a8a6ad5227f533c862472940824fc32e96'}
+Diagnosis/uncertainty: No model inference or MD run; all ten jobs will verify the same checkpoint bytes.
+Proposed next test: Inspect resources and run-code before any later submission.
+Why informative: Removes fine-tuned-model ambiguity and parallel download races.
+One changed factor: Foundation initialization selected by user; replica seed alone varies within this ensemble.
+
+2026-11-04T00:10:11.877189+00:00 — P10 batch preparation
+Observation/evidence: Prepared /dais/fs/scratch/kshao/mlip/codes/X_semiactivelearning/batch_launches/p10_foundation_24h_10rep_2000dft_20261104T001011858817Z; ten distinct seeds; exactly 1950 acquisition +50 evaluation labels; no jobs submitted.
+Diagnosis/uncertainty: Foundation polar-1-l is explicitly selected. Its exact bytes must be frozen once before the ensemble; polar-1-l H200 runtime remains uncalibrated.
+Proposed next test: Cache/freeze foundation polar-1-l once; inspect the prepared 24 h jobs before any operator submission.
+Why informative: Freezes one model across independent seeds and preserves the 2000-label budget without mixing evaluation into training.
+One changed factor: MD seed/replica only within the ensemble; acquisition budget only for subsequent training; other settings retained.
+
+2026-11-04T00:10:17.688489+00:00 — P10 batch preparation
+Observation/evidence: Foundation polar-1-l frozen: {'model_mode': 'foundation', 'foundation_model': 'polar-1-l', 'model_relative': 'outputsfull/X_semiactivelearning/p10_foundation_24h_10rep_2000dft_20261104T001011858817Z/model/foundation_polar_1_l.model', 'sha256': '9f65f8dc6ddaff1d631e299cb531376a7da5e68d1bef04f34a2d5073d5ef114b', 'provenance_relative': 'outputsfull/X_semiactivelearning/p10_foundation_24h_10rep_2000dft_20261104T001011858817Z/model/foundation_provenance.json', 'provenance_sha256': '03a1ee86e694f5ca16ba5a744fa774a8a6ad5227f533c862472940824fc32e96'}
+Diagnosis/uncertainty: No model inference or MD run; all ten jobs will verify the same checkpoint bytes.
+Proposed next test: Inspect resources and run-code before any later submission.
+Why informative: Removes fine-tuned-model ambiguity and parallel download races.
+One changed factor: Foundation initialization selected by user; replica seed alone varies within this ensemble.
+
+2026-11-04T00:15:16.247940+00:00 — Foundation P10, 24 h resource sizing and Viper cluster-quality audit.
+Observation/evidence: User explicitly superseded the fine-tuned-model request:
+use foundation MLIP for all ten runs, prepare 24 h GPU runtime/resources and
+production duration, audit Viper cluster quality, and synchronize Git. Existing
+preparation-only/no-submission instruction remains active. Active plan:
+codes/X_semiactivelearning/batch_launches/p10_foundation_24h_10rep_2000dft_20261104T001011858817Z/plan.json. Older unsubmitted bundles moved under deprecated/batch_launches;
+scientific output directories and model caches were preserved.
+Foundation evidence: downloaded once from ACEsuit mace-foundations release
+mace_polar_1/MACE-POLAR-1-L.model into outputsfull/.cache, froze snapshot and
+portable hash lock. SHA256=9f65f8dc6ddaff1d631e299cb531376a7da5e68d1bef04f34a2d5073d5ef114b.
+CPU-only deserialization confirmed mace.modules.extensions.PolarMACE, r_max=6.0
+Angstrom, H/N/O supported, PyTorch 2.8.0+cu128; checkpoint_inspection.json is
+under the active output model directory. No model forward, GPU MD, ORCA or
+optimization ran. Installed environment lacks optional cuequivariance acceleration;
+base PyTorch execution remains the intended path, and speed is uncalibrated.
+Resource/duration plan: each of ten independent array elements requests one H200,
+12 CPUs, 64G host RAM, 24:00:00. Host memory reservation changes from the inherited
+250000 MB request to 64G for this 350-atom prepared job; actual peak is unmeasured.
+Production increases from 37 to 176 ps; unchanged 2+2 ps ramps yield 360000 NPT
+steps at 0.5 fs (plus initial 100 NVT steps), saving every 176 steps =88 fs for
+2000 frames. Sizing proxy: 360000/108000*6.6h=22h, leaving nominal 2h overhead.
+Historical timing used different model/hardware, so this is not a benchmark or
+a guarantee of completion. User was asked fixed-length versus wall-clock-limited
+preference; fixed length is the documented default pending further steering.
+Replica seeds alone vary within the ensemble. T=1920 K, target=10 GPa, R1,
+initial density0.2 g/cm3, profile metadata0.344 g/cm3, NPT damping100/1000 fs,
+float32, PBC, charge0, singlet and model long-range settings remain explicit.
+Quality findings: previous atomwise MIC about a distant centre could split a
+whole neighbour molecule at the half-cell image surface and corrupt its centroid.
+cluster_quality.molecule_images now unwraps each molecule internally and applies
+one whole-molecule image translation before nearest-five selection. It checks
+all internal pair distances against original PBC distances at <=1e-8 Angstrom.
+Extraction retains six complete allowed molecules, finite geometry, no coincident
+atoms, explicit charge/spin, and reports shortest contacts without a new cutoff.
+Code audit also found sampling ignored analyzed start/stride; partition_frames
+now maps to actual source frame indices. Approval records include analysis SHA,
+old approvals are preserved when the reviewed window changes, and production
+DFT audits all source frames against that window and held-out partitions.
+Before 2000 production inputs: cluster_quality.json must pass, source keys must
+be unique, package/audit/input hashes must agree, and the ORCA method pilot must
+pass. No failed geometry is silently repaired and no old raw files are rewritten.
+Historical reference check: outputsfull/X_semiactivelearning/p10_foundation_24h_10rep_2000dft_20261104T001011858817Z/quality_review/reference_snapshot_audit.json records
+266/266 C6 frames passing finite geometry/labels, H-3N-2O charge, singlet/electron
+count and isolated-PBC checks. Atom counts17--24; minimum pair distance
+0.8155271019190783 Angstrom. Original parent MD is absent here, so whole-molecule
+preservation of those historical labels remains uncertified. This reference
+check is not validation of the future 2000-cluster set, which does not yet exist.
+Diagnosis/uncertainty: method pilot, new trajectory equilibration and measured
+polar-1-l H200 throughput remain open. Known short P10 compression transients
+must not be labelled equilibrium just because production duration is increased.
+Next test: retain the prepared code for operator review; after any future
+explicit submission instruction, measure throughput/pressure-volume stability
+and inspect a stationary tail, then select/validate 1950+50 DFT structures and
+run the one-geometry ORCA method pilot. Informative because it separates runtime,
+ensemble eligibility and electronic-method correctness before large DFT cost.
+One changed factor per future MD sibling: seed only. This is a new user-approved
+prepared deployment (foundation choice and duration/resource sizing), not a
+controlled training child; no optimizer/loss/split/model-training trial launched.
+Validation: 25 isolated regression checks passed, including torn-boundary bond
+preservation, nearest-five centroid ordering, analyzed start/stride, exact DFT
+budget, charge rejection, model/config/hash checks and Slurm visibility. Active
+check-md passed against the frozen actual foundation bytes. Python compilation
+and generated Slurm shell syntax checks are required before final Git push.
+Records and defaults synchronized in P10_BATCH.md, README, DATA_PROTOCOL,
+AGENTS.md, active plan and frozen configuration. Git HTTPS token is still invalid;
+read-only SSH remote verification succeeded, enabling the user-authorized push
+via SSH without exposing credentials or changing the global credential store.

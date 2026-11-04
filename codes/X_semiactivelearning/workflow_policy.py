@@ -21,6 +21,13 @@ def partition(frame):
     return 'training'
 
 
+def partition_frames(count, start=0, stride=1, evaluation=False):
+    if count<0 or start<0 or stride<1:
+        raise ValueError('Invalid analyzed frame window')
+    return [start+i*stride for i in range(count)
+            if (partition(start+i*stride)=='evaluation') == evaluation]
+
+
 def passes_force_gate(report, cfg=None):
     cfg = cfg or policy()
     value = report.get(cfg['force_metric'])

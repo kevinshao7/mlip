@@ -66,3 +66,20 @@ active workflow. Historical controllers/tournament scripts are reference-only.
 Do not commit/push unless explicitly requested by the user. Preserve generated
 scientific data and prior run directories. Validate code with py_compile and
 isolated workflow tests before finishing; report runtime/dependency blockers.
+
+## Current prepared P10 deployment (2026-11-04)
+
+The user explicitly selected foundation polar-1-l for the ten P10 replicas.
+Use p10_batch_active.json and P10_BATCH.md: one H200, 12 CPU cores, 64 GiB,
+24 h per replica; 176 ps production plus unchanged 4 ps ramps and 2000 frames.
+This runtime estimate is provisional, not a measured H200 benchmark. All jobs
+verify the same frozen foundation checkpoint SHA256. Do not revive the earlier
+fine-tuned-model binding requirement for this batch. No jobs are submitted.
+
+Before Viper DFT, unwrap every complete molecule internally and translate its
+whole image; atomwise wrapping about a distant centre can tear bonds. Require
+cluster_quality.json, <=1e-8 Angstrom preservation of intramolecular distances,
+correct source partitions and reviewed analysis window, and approval tied to
+the current analysis hash. Report contacts without inventing physical cutoffs.
+The exact Viper budget is 1950 acquisition +50 evaluation. The direct-method
+pilot and actual geometry audits remain required before production execution.

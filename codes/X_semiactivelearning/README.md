@@ -6,6 +6,16 @@ evidence remain intact. The old controller, launcher, policy and guide are in
 `deprecated/pre_wb97m_*`. Other dated workflows are historical studies or
 supporting dependencies, not alternative default launchers.
 
+## Prepared 10 GPa batch
+
+[P10_BATCH.md](P10_BATCH.md) describes ten independent one-GPU **foundation
+polar-1-l** replicas, each with a **24 h allocation and 176 ps production**
+(plus unchanged 4 ps ramps), and exactly 2,000 Viper DFT clusters (1,950
+acquisition +50 evaluation). Runtime sizing is provisional, not a measured H200
+benchmark. `p10_batch_active.json` points to the frozen, checkpoint-pinned plan.
+No jobs have been submitted. Whole-molecule PBC and reviewed-window quality
+checks are required before DFT; the target-site method pilot remains pending.
+
 ## Scientific loop
 
 1. Run periodic NPT MD from `polar-1-l` at 10 GPa, NH3/H2O R1; subsequent MD

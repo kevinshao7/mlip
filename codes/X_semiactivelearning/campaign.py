@@ -425,6 +425,14 @@ def command_md(args: argparse.Namespace) -> None:
     cfg, cdir = config(), cycle(args.pressure)
     md = cdir / "md"
     launch_root = ROOT / "md_launches" / (RUN_ID or "default") / tag(args.pressure)
+    replica_id = getattr(args, "replica_id", None)
+    if replica_id:
+        if not re.fullmatch(r"replica_[0-9]{2}", replica_id):
+            raise ValueError("Replica ID must be replica_00 through replica_99")
+        md = md / replica_id
+        launch_root = launch_root / replica_id
+        if md.exists() and any(md.iterdir()):
+            raise FileExistsError(f"Refusing to overwrite independent replica: {md}")
     if launch_root.exists() and any(launch_root.iterdir()):
         launch_history = ROOT / "md_launches" / "_history" / (RUN_ID or "default") / tag(args.pressure)
         launch_history.mkdir(parents=True, exist_ok=True)
@@ -451,6 +459,8 @@ def command_md(args: argparse.Namespace) -> None:
     text = replace_assignment(text, "MD_RESULTS_DIR", repr(str(md)))
     text = replace_assignment(text, "target_profile_densitygcm3", repr(rho))
     text = replace_assignment(text, "pressuregpa", repr(args.pressure))
+    text = replace_assignment(text, "MDtimestep", f"{cfg['md']['timestep_fs']}*units.fs")
+    text = replace_assignment(text, "densitygcm3", repr(cfg["md"]["initial_density_g_cm3"]))
     text = replace_assignment(text, "T_final", repr(temp))
     text = replace_assignment(text, "targetmolecules", repr(cfg["md"]["target_molecules"]))
     text = replace_assignment(text, "moleculemass", repr((18.01528 + 17.03052) / 2))
@@ -493,6 +503,20 @@ def command_md(args: argparse.Namespace) -> None:
     if n != 1: raise RuntimeError("Could not set production-only first save step")
     text, n = re.subn(r"if total_steps >= next_save_step:", "if stage == \"production_hold\" and total_steps >= next_save_step:", text, count=1)
     if n != 1: raise RuntimeError("Could not restrict trajectory saving to production hold")
+    if replica_id:
+        text, count = re.subn(
+            r"\nstagedMD\(\n",
+            "\nimport json\n"
+            "os.makedirs(MD_RESULTS_DIR, exist_ok=True)\n"
+            "with open(os.path.join(MD_RESULTS_DIR, 'model_runtime.json'), 'w') as runtime_file:\n"
+            "    json.dump({'model_neighbor_cutoff_angstrom': float(mace_calc.r_max), "
+            "'cutoff_policy': 'checkpoint/calculator settings retained, including long-range treatment', "
+            "'precision': 'float32', 'ensemble': 'IsotropicMTKNPT', 'periodic': True, "
+            "'charge': 0, 'spin_multiplicity': 1, 'torch_version': str(torch.__version__)}, runtime_file, indent=2)\n"
+            "\nstagedMD(\n", text, count=1)
+        if count != 1:
+            raise RuntimeError("Could not record the independent replica's model/runtime settings")
+
     if os.environ.get("SLURM_JOB_ID"):
         if args.gpus:
             raise ValueError("Slurm owns GPU visibility; omit --gpus inside the allocation")
@@ -529,7 +553,7 @@ def command_md(args: argparse.Namespace) -> None:
         code_dir.mkdir(parents=True, exist_ok=True)
         replica_text = replace_assignment(text, "MD_RESULTS_DIR", repr(str(result_dir)))
         replica_text, count = re.subn(
-            r"^RUN_SEED\s*=.*$", f"RUN_SEED = {seed}", replica_text, count=1, flags=re.M
+            r"^RUN_SEED\s*=.*$", f"RUN_SEED = {seed}\nimport random\nrandom.seed(RUN_SEED)\ntorch.manual_seed(RUN_SEED)", replica_text, count=1, flags=re.M
         )
         if count != 1:
             raise RuntimeError("Could not set an explicit reproducible MD replica seed")
@@ -691,6 +715,8 @@ def command_analyze(args: argparse.Namespace) -> None:
     for variable in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
         os.environ[variable] = "1"
     import numpy as np
+    if args.production_start_frame < 0:
+        raise ValueError("--production-start-frame must be non-negative")
     if args.production_frame_stride < 1:
         raise ValueError("--production-frame-stride must be positive")
     workers = args.workers if args.workers is not None else int(config()["analysis"]["workers"])
@@ -796,8 +822,15 @@ def command_analyze(args: argparse.Namespace) -> None:
 def command_approve(args: argparse.Namespace) -> None:
     if not args.reason.strip(): raise ValueError("--reason must state the human scientific basis for acquisition")
     path = cycle(args.pressure) / "approval_acquisition.json"
-    if path.exists(): raise FileExistsError(f"Approval already exists: {path}")
-    write_json(path, {"approved_utc": now(), "pressure_gpa": args.pressure, "reason": args.reason, "guide_energy_error_mev_per_atom": 50, "automatic_threshold": False})
+    summary=cycle(args.pressure) / "analysis" / "summary.json"
+    digest=sha(summary)
+    if path.exists():
+        previous=json.loads(path.read_text())
+        if previous.get("analysis_sha256")==digest:
+            raise FileExistsError(f"Approval already exists for this analysis: {path}")
+        history=cycle(args.pressure)/"approval_history"; history.mkdir(exist_ok=True)
+        shutil.copy2(path,history/f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')}.json")
+    write_json(path, {"analysis_sha256":digest,"approved_utc": now(), "pressure_gpa": args.pressure, "reason": args.reason, "guide_energy_error_mev_per_atom": 50, "automatic_threshold": False})
     event("acquisition_approved", args.pressure, [cycle(args.pressure) / "analysis" / "summary.json"], [path], reason=args.reason)
     print(f"Acquisition approved: {path}")
 
@@ -835,15 +868,12 @@ def build_cluster_worker(payload):
     # PBC-wrapping artefact that previously caused different event anchors to
     # select different neighbour sets for the same centre.
     anchor = frame.positions[components[centre_index][0]]
-    allowed_centres = {}
-    allowed_formulas = {}
-    for component_index, component in enumerate(components):
-        formula = species.component_formula(frame, component)
-        if formula not in allowed:
-            continue
-        vectors, _ = find_mic(frame.positions[component] - anchor, cell=frame.cell, pbc=True)
-        allowed_centres[component_index] = vectors.mean(axis=0)
-        allowed_formulas[component_index] = formula
+    from cluster_quality import molecule_images
+    allowed_formulas = {ci:species.component_formula(frame,component)
+                        for ci,component in enumerate(components)
+                        if species.component_formula(frame,component) in allowed}
+    whole_positions, allowed_centres, max_internal_error = molecule_images(
+        frame, components, centre_index, allowed_formulas)
 
     selected_centre = centre_index
     if len(allowed_centres) < molecule_count:
@@ -870,7 +900,8 @@ def build_cluster_worker(payload):
         raise AssertionError("DFT cluster is not exactly the requested allowed-molecule set")
 
     atom_indices = [atom for component_index in selected for atom in components[component_index]]
-    positions, _ = find_mic(frame.positions[atom_indices] - anchor, cell=frame.cell, pbc=True)
+    import numpy as np
+    positions = np.concatenate([whole_positions[ci] for ci in selected])
     atoms = Atoms([frame.symbols[index] for index in atom_indices], positions=positions, pbc=False)
     charge = formal_charge(atoms.get_chemical_symbols())
     electron_count = int(sum(atoms.numbers) - charge)
@@ -890,6 +921,10 @@ def build_cluster_worker(payload):
         "central_atom_count": len(components[selected_centre]),
         "cluster_kind": row["cluster_kind"],
         "molecules": len(selected),
+        "molecule_atom_counts": [len(components[ci]) for ci in selected],
+        "selected_formulas": ";".join(selected_formulas),
+        "whole_molecules_preserved": True,
+        "max_internal_distance_error_angstrom": max_internal_error,
         "allowed_molecules_only": True,
         "charge": charge,
         "multiplicity": 1,
@@ -897,6 +932,8 @@ def build_cluster_worker(payload):
         "formal_charge_verified": True,
     })
 
+    from cluster_quality import audit_cluster
+    geometry_audit = audit_cluster(atoms)
     dft_visualization = None
     preview_formulas = []
     if visualize:
@@ -926,7 +963,9 @@ def build_cluster_worker(payload):
                 if key not in {"source_pressure_gpa", "cluster_kind"}}
     metadata.update({"n_molecules": len(selected), "n_atoms": len(atoms),
                      "allowed_molecules_only": True,
-                     "selected_formulas": ";".join(selected_formulas)})
+                     "selected_formulas": ";".join(selected_formulas),
+                     "minimum_pair_distance_angstrom": geometry_audit["minimum_pair_distance_angstrom"],
+                     "max_internal_distance_error_angstrom": max_internal_error})
     return chosen_index, atoms, metadata, None, dft_visualization, preview_formulas
 
 
@@ -940,6 +979,10 @@ def command_clusters(args: argparse.Namespace) -> None:
     acquisition = args.kind.startswith("acquisition")
     if (acquisition or args.kind == "evaluation") and not (cdir / "approval_acquisition.json").is_file():
         raise PermissionError("Acquisition clusters require a recorded human approval: campaign.py approve")
+    if acquisition or args.kind == "evaluation":
+        approval=json.loads((cdir/"approval_acquisition.json").read_text())
+        if approval.get("analysis_sha256") != sha(analysis/"summary.json"):
+            raise ValueError("Extraction window/analysis changed: review the plots and record a new approval")
     selected_count = args.count if args.count is not None else config()["clusters"]["acquisition_count" if acquisition else "evaluation_count" if args.kind == "evaluation" else "diagnostic_count"]
     if selected_count < 1:
         raise ValueError("--count must be positive")
@@ -1000,8 +1043,10 @@ def command_clusters(args: argparse.Namespace) -> None:
     candidates_per_traj: dict = {}
     for traj_id, n_alloc in allocated.items():
         tf = replica_frames[traj_id]
-        from workflow_policy import partition
-        available = [i for i in range(tf) if (partition(i) == "evaluation") == (args.kind == "evaluation")]
+        from workflow_policy import partition_frames
+        start_frame=int(summary.get("production_start_frame_0based",0))
+        frame_stride=int(summary.get("production_frame_stride",1))
+        available = partition_frames(tf,start_frame,frame_stride,args.kind == "evaluation")
         if not available:
             raise ValueError("No frames available for the requested temporal partition")
         n_sample = min(len(available), n_alloc)
@@ -1140,6 +1185,9 @@ def command_clusters(args: argparse.Namespace) -> None:
         "allowed_species": sorted(allowed), "illegal_event_included": False,
         "all_clusters_allowed_only": True, "formal_charge_rule": FORMAL_CHARGES,
         "formal_charge_verified": True, "spin_multiplicity": 1,
+        "whole_molecules_preserved": True,
+        "minimum_pair_distance_angstrom": min(row["minimum_pair_distance_angstrom"] for row in metadata),
+        "max_internal_distance_error_angstrom": max(row["max_internal_distance_error_angstrom"] for row in metadata),
     })
     audit_clusters = [clusters[index] for index in sorted(visualized_indices)]
     gallery = write_cluster_gallery(audit_clusters, out)
@@ -1797,6 +1845,7 @@ def parser() -> argparse.ArgumentParser:
         q=sub.add_parser(name); q.add_argument("--pressure", type=float, required=True); q.set_defaults(func=func)
         if name == "md":
             q.add_argument("--run", action="store_true")
+            q.add_argument("--replica-id", help="Independent single-GPU output directory, e.g. replica_00.")
             q.add_argument("--gpus", help="Comma-separated CUDA devices; one independently seeded replica is prepared per GPU.")
             q.add_argument("--seeds", help="Optional comma-separated explicit seeds, one per GPU, for reproducible preparation.")
         if name == "analyze":
