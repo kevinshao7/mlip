@@ -462,3 +462,74 @@ equivalence without spending the production label budget.
 Changed factor: None; scientific settings and frozen launch sources retained.
 Git scope: reviewed X workflow guidance/environment records and pinned upstream
 MACE submodule; unrelated conversion outputs and pt_output remain excluded.
+
+2026-11-04 — Organize X source tree (user-requested preparation cleanup)
+Observation/evidence: Flat workflow mixed runtime modules, four test modules, three optional tools and explicitly deprecated controllers/launch bundles.
+Diagnosis: Directory layout obscured the production entry points; no scientific setting change is needed.
+Change: Runtime implementations moved to production/, optional tools to tools/, checks to tests/. Four root command adapters preserve launch commands. Deprecated code and its retired bundles removed at user request; scientific outputs and this notebook retained. Module roots, generated adapter paths, method-validator paths and source-freeze inventory now follow the layout.
+Next test: Run the isolated suite and command help checks, then prepare a fresh hashed P10 bundle and reuse the frozen model. This tests imports and launch generation without running production calculations.
+Changed factor: Source organization only; model, physical settings, charge/spin rules, training recipe and per-replica dependencies retained. No jobs submitted.
+
+2026-11-04T01:09:13.482278+00:00 — P10 batch preparation
+Observation/evidence: Prepared /dais/fs/scratch/kshao/mlip/codes/X_semiactivelearning/batch_launches/p10_foundation_1ns_10rep_2000dft_20261104T010913453878Z; ten distinct seeds; exactly 1950 acquisition +50 evaluation labels; no jobs submitted.
+Diagnosis/uncertainty: Foundation polar-1-l is explicitly selected. Its exact bytes must be frozen once before the ensemble; polar-1-l H200 runtime remains uncalibrated.
+Proposed next test: Cache/freeze foundation polar-1-l once; inspect the prepared 24 h jobs before any operator submission.
+Why informative: Freezes one model across independent seeds and preserves the 2000-label budget without mixing evaluation into training.
+One changed factor: MD seed/replica only within the ensemble; acquisition budget only for subsequent training; other settings retained.
+
+2026-11-04T01:09:14.327082+00:00 — P10 batch preparation
+Observation/evidence: Foundation polar-1-l frozen: {'model_mode': 'foundation', 'foundation_model': 'polar-1-l', 'model_relative': 'outputsfull/X_semiactivelearning/p10_foundation_1ns_10rep_2000dft_20261104T010913453878Z/model/foundation_polar_1_l.model', 'sha256': '9f65f8dc6ddaff1d631e299cb531376a7da5e68d1bef04f34a2d5073d5ef114b', 'provenance_relative': 'outputsfull/X_semiactivelearning/p10_foundation_1ns_10rep_2000dft_20261104T010913453878Z/model/foundation_provenance.json', 'provenance_sha256': '3f22d8b2b9afee2fee8419556f368650fa7177e65431de265b4b7eeae795f4b0'}
+Diagnosis/uncertainty: No model inference or MD run; all ten jobs will verify the same checkpoint bytes.
+Proposed next test: Inspect resources and run-code before any later submission.
+Why informative: Removes fine-tuned-model ambiguity and parallel download races.
+One changed factor: Foundation initialization selected by user; replica seed alone varies within this ensemble.
+
+2026-11-04T01:09:14.490099+00:00 — P10 batch preparation
+Observation/evidence: Organization validation passed: 29 isolated tests; command help and compilation checks passed. Fresh active bundle: codes/X_semiactivelearning/batch_launches/p10_foundation_1ns_10rep_2000dft_20261104T010913453878Z.
+Diagnosis/uncertainty: No scientific settings changed; compared replicas, MD parameters, ensemble, charge/spin and foundation SHA256 exactly with the prior plan.
+Proposed next test: Inspect the prepared bundle before a separately authorized launch; diagnose the reported GRES failure from its exact error.
+Why informative: Production execution remains unverified by preparation tests; changing resource settings without the error would be speculative.
+One changed factor: Source layout only. Prior bundle archived under /dais/fs/scratch/kshao/mlip/outputsfull/X_semiactivelearning/p10_foundation_1ns_10rep_2000dft_20261104T002949913331Z/code_archive/p10_foundation_1ns_10rep_2000dft_20261104T002949913331Z; its scientific outputs preserved. No jobs submitted.
+
+2026-11-04T01:12:07.057929+00:00 — User-authorized P10 MD submission
+Observation/evidence: On dais11, bash submit_md_dais.sh passed frozen-plan/model preflight and exited 0; Slurm accepted jobs 802983–803042 (ten replicas, six segments each). Immediate squeue showed first jobs pending Resources/Priority and continuation jobs pending Dependency. No existing user jobs were queued before submission.
+Diagnosis/uncertainty: Reported submission failure was not reproduced; scheduler acceptance does not establish GPU runtime success or throughput.
+Proposed next test: Inspect first-allocation Slurm stdout/stderr and model_runtime.json once jobs start.
+Why informative: Distinguishes queue waiting from environment/model/integrator failures and provides actual H200 timing evidence.
+One changed factor: Launch status only, explicitly authorized by user; no code, model, scientific or resource settings changed.
+Logs: outputsfull/X_semiactivelearning/p10_foundation_1ns_10rep_2000dft_20261104T010913453878Z/slurm/md_replica_XX_JOBID.out and .err.
+
+2026-11-04T01:12:22.994734+00:00 — User stopped P10 submission
+Observation/evidence: User clarified only ten jobs were intended and requested stop. Issued scancel for every just-submitted job, 802983–803042; command exited 0.
+Diagnosis/uncertainty: Prepared helper defaulted to six allocations per replica, exceeding user expectation of ten total jobs.
+Proposed next test: Review a ten-job submission before any new launch; no resubmission authorized by this stop request.
+Why informative: Confirms submission count and prevents unintended continuation allocations.
+One changed factor: Cancelled submitted allocations; scientific settings and sources unchanged.
+
+2026-11-04T01:13:54.613928+00:00 — P10 batch preparation
+Observation/evidence: User requires exactly ten independent jobs; focused P10 suite passed 8 tests, including fake sbatch with MD_SEGMENTS=6 yielding ten calls and no dependencies.
+Diagnosis/uncertainty: Automatic six-allocation chains exceeded intended submission count; 1 ns may require later restarts.
+Proposed next test: Prepare a fresh source-frozen bundle, reuse local foundation bytes, submit once and verify ten independent Slurm jobs.
+Why informative: Checks actual scheduler acceptance after verifying submission count without launching tests.
+One changed factor: Submission topology only: one allocation per replica per invocation; physical/model settings unchanged.
+
+2026-11-04T01:13:54.638689+00:00 — P10 batch preparation
+Observation/evidence: Prepared /dais/fs/scratch/kshao/mlip/codes/X_semiactivelearning/batch_launches/p10_foundation_1ns_10rep_2000dft_20261104T011354617137Z; ten distinct seeds; exactly 1950 acquisition +50 evaluation labels; no jobs submitted.
+Diagnosis/uncertainty: Foundation polar-1-l is explicitly selected. Its exact bytes must be frozen once before the ensemble; polar-1-l H200 runtime remains uncalibrated.
+Proposed next test: Cache/freeze foundation polar-1-l once; inspect the prepared 24 h jobs before any operator submission.
+Why informative: Freezes one model across independent seeds and preserves the 2000-label budget without mixing evaluation into training.
+One changed factor: MD seed/replica only within the ensemble; acquisition budget only for subsequent training; other settings retained.
+
+2026-11-04T01:13:55.487271+00:00 — P10 batch preparation
+Observation/evidence: Foundation polar-1-l frozen: {'model_mode': 'foundation', 'foundation_model': 'polar-1-l', 'model_relative': 'outputsfull/X_semiactivelearning/p10_foundation_1ns_10rep_2000dft_20261104T011354617137Z/model/foundation_polar_1_l.model', 'sha256': '9f65f8dc6ddaff1d631e299cb531376a7da5e68d1bef04f34a2d5073d5ef114b', 'provenance_relative': 'outputsfull/X_semiactivelearning/p10_foundation_1ns_10rep_2000dft_20261104T011354617137Z/model/foundation_provenance.json', 'provenance_sha256': 'f66efde6736aa137265ed222086451049d1abb02d44a091bea622274e012ce5e'}
+Diagnosis/uncertainty: No model inference or MD run; all ten jobs will verify the same checkpoint bytes.
+Proposed next test: Inspect resources and run-code before any later submission.
+Why informative: Removes fine-tuned-model ambiguity and parallel download races.
+One changed factor: Foundation initialization selected by user; replica seed alone varies within this ensemble.
+
+2026-11-04T01:14:28.292383+00:00 — Corrected ten-job MD launch
+Observation/evidence: Corrected helper exited 0 and submitted exactly ten jobs 803062–803071. squeue verified two running and eight pending Resources/Priority; scontrol for 803062 confirmed Dependency=(null), one H200, 24 h. Fresh active bundle ends 20261104T011354617137Z; model SHA256 remains 9f65f8dc6ddaff1d631e299cb531376a7da5e68d1bef04f34a2d5073d5ef114b.
+Diagnosis/uncertainty: Scheduler acceptance confirmed; MD completion and throughput remain unverified.
+Proposed next test: Inspect these jobs stdout/stderr and checkpoint progress before any restart decision.
+Why informative: Establishes actual GPU runtime and progress without prequeueing continuation jobs.
+One changed factor: Submission topology only, exactly one allocation per replica. Logs: outputsfull/X_semiactivelearning/p10_foundation_1ns_10rep_2000dft_20261104T011354617137Z/slurm/.

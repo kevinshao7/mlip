@@ -24,7 +24,7 @@ WillBaldwin0/graph_electrostatics tag v0.4.4, commit
 `6a86de5e3ed35fd86a55fc046aa085fe48a72764`, replacing 0.4.0.
 PyTorch 2.8.0+cu128, ASE 3.26.0 and NumPy 2.0.2 were preserved.
 
-No pip commands were used. `build_mace_source.py` uses setuptools PEP 517/660
+No pip commands were used. `tools/build_mace_source.py` uses setuptools PEP 517/660
 and PyPA installer. Standalone uv supplied isolated build tools (setuptools
 79.0.1, wheel, installer); dependency requirements were checked against the
 existing environment before installation. Use explicit target/source/output

@@ -1,10 +1,31 @@
 # X semi-active learning — active workflow
 
 This is the current campaign. Its default namespace is
-`outputsfull/X_semiactivelearning/wb97m_step5/`; earlier campaigns and their raw
-evidence remain intact. The old controller, launcher, policy and guide are in
-`deprecated/pre_wb97m_*`. Other dated workflows are historical studies or
+`outputsfull/X_semiactivelearning/wb97m_step5/`; earlier scientific outputs remain intact. The old controller, launcher, policy and guide are in
+Git history. Other dated workflows are historical studies or
 supporting dependencies, not alternative default launchers.
+
+## Code layout
+
+| Location | Purpose |
+| --- | --- |
+| `production/` | Active MD, DFT, training, controller, validation and dashboard implementations |
+| `tools/` | Optional source-environment build and historical comparison/visualization utilities |
+| `tests/` | Isolated preparation, scientific validation and CPU restart checks; no production jobs |
+| `batch_launches/` | Current prepared P10 launch bundle, selected by `p10_batch_active.json` |
+
+The four top-level Python files (`p10_batch.py`, `campaign.py`, `autonomous.py`
+and `launch_single_gpu.py`) are stable command adapters. Existing launch commands
+still work, including `python launch_single_gpu.py`. Edit their implementations
+in `production/`. Configuration and the single `hyperparameters.txt` notebook
+remain here. Deprecated controllers and retired launch bundles have been removed;
+committed versions remain available in Git history. Scientific outputs are preserved.
+
+Run all checks from this directory with:
+
+```bash
+python -m unittest discover -s tests -p 'test_*.py'
+```
 
 ## For agents: avoid repeating setup and broad debugging
 
@@ -21,8 +42,8 @@ polar-1-l** replicas, each with a **1 ns production through resumable 24 h alloc
 (plus unchanged 4 ps ramps), and exactly 2,000 Viper DFT clusters (1,950
 acquisition +50 evaluation). Runtime sizing is provisional, not a measured H200
 benchmark. `p10_batch_active.json` points to the frozen, checkpoint-pinned plan.
-The ten initial Slurm jobs are independent, with separate per-replica restart
-chains and no shared-node requirement. No jobs have been submitted. Whole-molecule PBC and reviewed-window quality
+Each helper invocation submits exactly ten independent jobs without dependencies.
+Further checkpoint restarts require a separate launch decision. Whole-molecule PBC and reviewed-window quality
 checks are required before DFT; the target-site method pilot remains pending.
 
 ## Scientific loop
@@ -180,7 +201,7 @@ inventory; preserve old files without importing them into the new training pool.
 ## Checks
 
 ```bash
-python -m unittest discover -s . -p test_active_workflow.py
+python -m unittest discover -s tests -p test_active_workflow.py
 python -m py_compile campaign.py autonomous.py launch_single_gpu.py training_bridge.py
 ```
 

@@ -16,8 +16,8 @@ reversible preparation. Report actual blockers plainly.
 
 The active P10 deployment is ten **foundation polar-1-l** replicas, 10 GPa,
 1920 K, R1, 1 ns production each plus 2+2 ps ramps, 0.5 fs and 2000 frames.
-Each Slurm job requests one H200/12 CPUs/64G/24 h; each replica has its own
-six-job continuation chain. No GPU array, shared-node/co-start requirement,
+Each Slurm job requests one H200/12 CPUs/64G/24 h; each invocation submits exactly ten independent jobs, one per replica.
+Further restarts require a separate launch decision. No GPU array, shared-node/co-start requirement,
 or dependencies on other replicas. Six segments are an uncalibrated estimate,
 not a guarantee that 1 ns fits; DAIS gpu1's observed maximum is 24 h per job.
 The foundation checkpoint is already cached and frozen; use its portable plan
@@ -27,22 +27,22 @@ hash. The old request for a fine-tuned checkpoint is superseded for this batch.
 
 | Task | Edit/read first | Narrow useful check |
 | --- | --- | --- |
-| P10 duration/resources/seeds/submission topology | `p10_batch.py:prepare`, `write_launchers` | `test_p10_batch.py` |
-| Generic MD code generation | `campaign.py:command_md` | preparation/AST test in `test_p10_batch.py` |
-| Restart state, progress, production integrator | `md_segments.py` | `test_md_segments.py` |
-| Whole-molecule PBC and geometry checks | `cluster_quality.py`, `campaign.py:build_cluster_worker` | `test_cluster_quality.py` |
-| Sampling partitions/window/pressure gate | `workflow_policy.py`, `campaign.py:command_clusters` | `test_cluster_quality.py`, relevant `test_active_workflow.py` cases |
-| ORCA input/output charge, spin, method, gradients | `orca_output_validation.py`, `campaign.py:dft_input` | `DFTValidationTests` in `test_active_workflow.py` |
-| Direct-method pilot | `method_pilot.py`, `require_method_verified` | existing pilot-package smoke test; target ORCA needs a real pilot |
-| Viper/BlueHive environment/resources | `site_profiles.json`, `site_dft.py`, P10 generator | shell syntax/site-package test |
-| Fine tuning and parent promotion | `launch_single_gpu.py`, `training_bridge.py`, `campaign.py:command_finetune` | pool/lineage tests; optimization only if authorized |
-| Generic pressure progression | `autonomous.py`, `autonomous_policy.json` | `ControllerTests` in `test_active_workflow.py` |
+| P10 duration/resources/seeds/submission topology | `production/p10_batch.py:prepare`, `write_launchers` | `test_p10_batch.py` |
+| Generic MD code generation | `production/campaign.py:command_md` | preparation/AST test in `test_p10_batch.py` |
+| Restart state, progress, production integrator | `production/md_segments.py` | `tests/test_md_segments.py` |
+| Whole-molecule PBC and geometry checks | `production/cluster_quality.py`, `production/campaign.py:build_cluster_worker` | `tests/test_cluster_quality.py` |
+| Sampling partitions/window/pressure gate | `production/workflow_policy.py`, `production/campaign.py:command_clusters` | `tests/test_cluster_quality.py`, relevant `tests/test_active_workflow.py` cases |
+| ORCA input/output charge, spin, method, gradients | `production/orca_output_validation.py`, `production/campaign.py:dft_input` | `DFTValidationTests` in `tests/test_active_workflow.py` |
+| Direct-method pilot | `production/method_pilot.py`, `require_method_verified` | existing pilot-package smoke test; target ORCA needs a real pilot |
+| Viper/BlueHive environment/resources | `site_profiles.json`, `production/site_dft.py`, P10 generator | shell syntax/site-package test |
+| Fine tuning and parent promotion | `production/launch_single_gpu.py`, `production/training_bridge.py`, `production/campaign.py:command_finetune` | pool/lineage tests; optimization only if authorized |
+| Generic pressure progression | `production/autonomous.py`, `autonomous_policy.json` | `ControllerTests` in `tests/test_active_workflow.py` |
 
-P10 uses `p10_batch.py` and its named output root. `autonomous.py` uses the
+Top-level command adapters preserve existing launch commands; implementations live in production/.
+P10 uses `production/p10_batch.py` and its named output root. `production/autonomous.py` uses the
 separate generic pressure campaign; do not run it to manage this P10 bundle.
 B's MD template and D2's training recipe remain supporting dependencies; do not
-move them without tracing callers. `deprecated/` is audit history, not an entry
-point. No new work uses polar-1-s or the retired learning-rate tournament.
+move them without tracing callers. Retired code is available in Git history. No new work uses polar-1-s or the retired learning-rate tournament.
 
 ## Edit, verify, finish
 
@@ -54,8 +54,7 @@ large trajectories when an existing hash-backed audit answers the question.
 Run the relevant focused test once after the final code edit. Use the full
 suite only for cross-cutting changes or unresolved failures. Code generation
 is tested by writing temporary files and compiling them, not launching MD.
-The submission test uses a fake `sbatch` and verifies all 60 prospective jobs'
-per-replica dependencies; never replace it with a real submission smoke test.
+The submission test uses a fake `sbatch` and verifies exactly ten independent submissions without dependencies; never replace it with a real submission smoke test.
 For docs-only work, check links/paths and whitespace; do not rerun code tests.
 
 `source_sha256` and config/model hashes intentionally freeze a launch plan.

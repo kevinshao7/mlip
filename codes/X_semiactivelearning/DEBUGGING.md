@@ -37,7 +37,7 @@ Let `<out>` be the plan's `output_relative`; P10 is `cycles/P10p0000GPa`.
 | --- | --- | --- |
 | Frozen scientific configuration | active bundle `campaign_config.json`, copied to `<out>/campaign_config.json` | Hashes must agree; don't fall back to generic 37 ps defaults |
 | Exact model identity | plan `foundation_checkpoint`, `<out>/model_binding.json`, `model/foundation_provenance.json` | Foundation polar-1-l; SHA-locked; weights intentionally ignored by Git |
-| Job code | active bundle `md_replica_00_dais.slurm` through `09`, `submit_md_dais.sh` | Ten independent one-GPU requests; six separate restart jobs per replica |
+| Job code | active bundle `md_replica_00_dais.slurm` through `09`, `submit_md_dais.sh` | Ten independent one-GPU requests; one job per replica per invocation |
 | Job stdout/stderr | `<out>/slurm/md_replica_XX_<jobid>.{out,err}` | Start at the first traceback/error; keep failed logs |
 | Physical progress | `<out>/cycles/P10p0000GPa/md/replica_XX/production_status.json` | Production time and complete flag, not just a Slurm exit code |
 | Exact restart | same replica directory: `restart.npz`, `resume_code.json` | Full MTK state and generated-code hash; don't load arbitrary pickle |
@@ -53,9 +53,8 @@ Let `<out>` be the plan's `output_relative`; P10 is `cycles/P10p0000GPa`.
 
 A successful Slurm segment can mean **checkpointed pause**, not 1 ns completed.
 The runner's exit 75 is handled as a clean pause by p10_batch.py. Read physical
-progress/complete markers before calling a replica finished. The helper's six
-segments are an estimate; no code should silently label an unfinished trajectory
-complete or admit it to cluster extraction.
+progress/complete markers before calling a replica finished. The helper submits one allocation per replica. Review progress before a separate
+restart launch; unfinished trajectories cannot enter cluster extraction.
 
 ## Symptom → targeted action
 
@@ -83,20 +82,20 @@ NaN, missing or stale metrics fail. Never mix V/D4rev total labels into this poo
 From `codes/X_semiactivelearning/`, using the known interpreter:
 
 ```bash
-"$MLIP_PY" -m unittest test_p10_batch
-"$MLIP_PY" -m unittest test_md_segments
-"$MLIP_PY" -m unittest test_cluster_quality
-"$MLIP_PY" -m unittest test_active_workflow.DFTValidationTests
+"$MLIP_PY" -m unittest discover -s tests -p "test_p10_batch.py"
+"$MLIP_PY" -m unittest discover -s tests -p "test_md_segments.py"
+"$MLIP_PY" -m unittest discover -s tests -p "test_cluster_quality.py"
+"$MLIP_PY" -m unittest discover -s tests -p "test_active_workflow.py"
 ```
 
 Choose the module matching the edit, not all four by default. P10 submission
-tests use a fake sbatch and prove independent predecessor chains. Restart tests
+tests use a fake sbatch and prove exactly ten submissions without dependencies. Restart tests
 use tiny CPU fixtures and compare complete NPT state, not MACE/GPU production.
 For generator edits also compile generated Python and `bash -n` the affected
 shell files. For cross-cutting changes, run the full suite once after final edits:
 
 ```bash
-"$MLIP_PY" -m unittest discover -s . -p 'test_*.py'
+"$MLIP_PY" -m unittest discover -s tests -p 'test_*.py'
 ```
 
 After passing focused checks, stop testing unless a new change/failure justifies

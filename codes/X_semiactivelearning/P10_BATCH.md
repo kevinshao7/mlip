@@ -30,17 +30,13 @@ The target is **1 ns (1,000 ps) production per replica**, plus unchanged
 100 initial NVT steps. Each replica saves 2,000 frames, every 1,000 steps
 (0.5 ps). The earlier 176 ps bundle is archived.
 
-DAIS `sinfo -p gpu1` reports a maximum allocation of **1 day**. The prepared
-MD submission helper therefore prepares **six separate 24-hour jobs per replica**.
-Each uses an `afterok` dependency only on that same replica's previous job.
-The first ten jobs are independent: no common node or simultaneous-start
-requirement, no GPU array, and no dependency on other replicas. Each allocation computes for at most 22 h and checkpoints before
-exiting; the next allocation resumes the same replica. Completed replicas skip
-later allocations. The historical timing proxy projects approximately 123 h per
-replica, so six segments provide 132 h of nominal compute budget. This remains
-uncalibrated for polar-1-l/H200; additional segments may be needed. No jobs have
-been submitted. Six allocations per replica would request up to 1,440 GPU-hours across ten
-replicas; jobs exit once their individual physical target is reached.
+DAIS `sinfo -p gpu1` reports a maximum allocation of **1 day**. Each invocation
+of `submit_md_dais.sh` submits exactly **ten independent jobs**, one per replica,
+with no arrays or dependencies. Each job requests 24 h and computes for at most
+22 h before checkpointing. The 1 ns target remains unchanged; the historical
+proxy estimates approximately 123 h per replica, so a single allocation may
+not finish it. Further restart submissions require a separate launch decision
+after reviewing progress. No continuation jobs are automatically queued.
 
 `md_segments.py` saves positions, momenta, cell, reference-cell/volume variables,
 thermostat and barostat chain coordinates/momenta, progress and output offsets
