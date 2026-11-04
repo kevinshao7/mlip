@@ -6,11 +6,35 @@ This repository supports molecular simulation, ORCA DFT, and MACE-POLAR workflow
 
 Use the local code and generated data as the source of truth. The project has moved beyond initial onboarding; avoid reviving old June planning notes unless they are directly relevant.
 
+## Start here for current work
+
+The active workflow is **`codes/X_semiactivelearning/`**. Read its `AGENTS.md`
+first, then only the relevant section of `DEBUGGING.md` or `P10_BATCH.md`.
+The prepared P10 ensemble is selected by `p10_batch_active.json`; resolve that
+pointer instead of choosing the newest-looking directory or a deprecated plan.
+The generic pressure controller (`autonomous.py`, default `wb97m_step5`) and the
+named P10 batch (`p10_batch.py`) are different entry points/output namespaces.
+
+Current user scope is **preparation only**: no job submission or production
+MD/DFT/training without a later explicit launch instruction. Ten GPU replicas
+must be separate one-GPU jobs, each with its own restart dependencies. Consult
+the active plan for physical settings; generic defaults are not batch overrides.
+
+Keep routine work narrow: inspect the relevant generator/function, make the
+requested change, run its focused check once, update the lab notebook, and
+report the result. Do not repeat onboarding, scan all generated data, download
+an already-pinned model again, or redesign adjacent workflows for a small edit.
+Report a separate scientific defect with evidence before expanding scope.
+For documentation-only edits, link/path checks and `git diff --check` suffice;
+do not regenerate launch bundles or rerun simulations/unit suites.
+
 ## Layout
 
 ```text
-codes/                  dated workflow scripts
-codes/7_7b_clustervalidation/
+codes/                  workflow source and supporting dated studies
+codes/X_semiactivelearning/           primary active workflow
+codes/C6_wb97m_nodisp/                supporting label/pilot evidence
+codes/7_7b_clustervalidation/         historical comparison tools
   extract_dft_sized_clusters.py       extracts roughly 18-20 atom clusters
   extract_small_cutoff_clusters.py    extracts smaller cutoff-defined clusters
   compare_mace_polar_orca_clusters.py compares MACE-POLAR energies/forces to ORCA DFT outputs
@@ -28,17 +52,27 @@ Large generated files belong under `outputsfull/` or dated workflow folders, not
 
 ## Environment
 
-The Windows Python used for recent local checks is:
+On the currently verified DAIS checkout, use:
 
 ```text
-C:\Users\shaoq\AppData\Local\Programs\Python\Python312\python.exe
+/dais/fs/scratch/kshao/mlipenv/bin/python
 ```
 
-The local MACE checkout is imported from `mlip/mace`. MACE-POLAR model downloads should cache inside `outputsfull/.cache` by setting `XDG_CACHE_HOME` rather than writing to the user home directory.
+It is Python 3.11 with ASE/NumPy/Torch/MACE available. Bare `python` was absent;
+`/usr/bin/python3` was Python 3.6 and cannot compile this workflow. Verify the
+interpreter once per host, then reuse it. The Windows Python mentioned in old
+notes is historical context, not the default here.
+
+`mace/` is the GitHub ACEsuit/mace v0.3.17 checkout, installed editable into
+mlipenv on 2026-11-04 without pip. Imports resolve to `mace/mace/__init__.py`.
+`aseMolec/` remains a checkout placeholder. Exact versions, source-build and
+rollback records: [DAIS environment](codes/X_semiactivelearning/DAIS_ENVIRONMENT.md).
+Keep model caches under `outputsfull/.cache` through `XDG_CACHE_HOME`.
 
 ## Machines and launch policy
 
-**ORCA DFT must be runnable on Viper (this host) or BlueHive.** Both use
+**ORCA DFT must be runnable on Viper or BlueHive.** Determine the actual host
+from the environment; do not infer it from an old README saying "here". Both use
 Slurm, but require separate site-specific `.slurm` templates or explicit site
 profiles. Adapt module/MPI setup, ORCA executable paths, filesystem roots,
 partitions, resource directives, and log paths for each site. Moving a
@@ -69,17 +103,15 @@ For MD analysis, do not treat correlated frames as independent. Prefer block ave
 
 ## Energy References
 
-MACE-POLAR cluster energies are compared to DFT cluster energies after subtracting DFT atomic reference energies from `codes/7_7b_clustervalidation/atomizationenergies.txt`.
+The active X/C6 wB97M-only labels use **absolute electronic `REF_energy` in eV**
+and `REF_forces` in eV/Angstrom. Do not subtract legacy atomic references from
+these labels. Matching E0s are explicitly audited/selected by the training path.
+ORCA `FINAL SINGLE POINT ENERGY` is in Hartree; conversion is mandatory.
 
-ORCA `FINAL SINGLE POINT ENERGY` values are in Hartree and must be converted to eV before comparison.
-
-For a cluster:
-
-```text
-DFT relative energy = ORCA total energy in eV - sum(DFT atomic reference energies)
-```
-
-Compare that value to the MACE-POLAR predicted cluster energy.
+Older `7_7b_clustervalidation` atomization comparisons use a different convention:
+ORCA total energy in eV minus the sum of their documented atomic references.
+Use that convention only for that legacy comparison, never as a repository-wide
+rule. Do not mix functional/dispersion reference methods or their E0 tables.
 
 ## ORCA Workflow
 

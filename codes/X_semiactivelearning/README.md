@@ -6,6 +6,14 @@ evidence remain intact. The old controller, launcher, policy and guide are in
 `deprecated/pre_wb97m_*`. Other dated workflows are historical studies or
 supporting dependencies, not alternative default launchers.
 
+## For agents: avoid repeating setup and broad debugging
+
+Start with [AGENTS.md](AGENTS.md) for the current entry point and a task-to-test
+map. Use [DEBUGGING.md](DEBUGGING.md) for evidence paths, failure-specific next
+steps, environment/Git notes and the smallest sufficient validation. The active
+P10 plan overrides generic campaign defaults; historical notebook entries do
+not select today's model, duration or launch scripts.
+
 ## Prepared 10 GPa batch
 
 [P10_BATCH.md](P10_BATCH.md) describes ten independent one-GPU **foundation
@@ -22,7 +30,9 @@ checks are required before DFT; the target-site method pilot remains pending.
 1. Run periodic NPT MD from `polar-1-l` at 10 GPa, NH3/H2O R1; subsequent MD
    uses the accepted campaign model. Temperatures follow the existing Uranus
    profile interpolated in log pressure. Retain 0.5 fs steps, 2 ps pressure and
-   temperature ramps, and the configured 37 ps production hold/2000 frames.
+   temperature ramps and 2000 saved frames. The generic campaign default is
+   37 ps; the active prepared P10 batch explicitly overrides it to 1 ns through
+   resumable 24 h jobs. Read its frozen plan rather than applying the generic default.
 2. Inspect pressure/volume stability and species plots. Record an acquisition
    approval with its evidence before cutting clusters. Select one allowed
    complete molecule plus five nearest allowed complete molecular neighbours
@@ -95,13 +105,17 @@ and `species_time_series.png`, then record the scientific decision:
 python campaign.py approve --pressure 10 --reason "State pressure/volume stability evidence and accepted production window"
 ```
 
-Once acquisition data are collected, the current prepared batch needs only:
+For the generic pressure-campaign namespace, once its acquisition data are
+collected, the training launcher needs only:
 
 ```bash
 python launch_single_gpu.py
 ```
 
-The launcher selects the first unpassed pressure, audits E0 references, and
+This launcher defaults to `wb97m_step5`; it does not automatically select the
+active named P10 batch. Do not start training on P10 data without selecting and
+documenting that namespace as the prepared experiment. The launcher selects
+the first unpassed pressure, audits E0 references, and
 uses its cumulative campaign pool. It never selects the old acquisition_p10
 D4rev package. Missing prerequisites fail explicitly. Each real launch creates
 an independent datetime-named run under the active namespace's `runs/`.

@@ -4,6 +4,11 @@ This repository contains several dated studies.  Directory names encode their
 creation history, not whether they are the current workflow.  Use this map
 before selecting code or training data.
 
+For the active X campaign, read [its agent entry point](X_semiactivelearning/AGENTS.md)
+and [targeted debugging guide](X_semiactivelearning/DEBUGGING.md). Its generic
+`wb97m_step5` controller and the P10 bundle selected by `p10_batch_active.json`
+are separate namespaces; the pointer/frozen plan selects the prepared P10 work.
+
 | Area | Purpose | Status | Dataset relationship |
 | --- | --- | --- | --- |
 | `X_semiactivelearning` | polar-1-l MD -> clusters -> dispersion-free wB97M DFT -> fine tuning -> force error | **Primary active campaign** | New wb97m_step5 namespace; held-out force-component RMSE <20 meV/Angstrom gates each +5 GPa step, starting at 10 GPa. |
@@ -22,7 +27,7 @@ before selecting code or training data.
 
 | Work | Machine | Required launch route |
 | --- | --- | --- |
-| ORCA DFT | Viper (current host) | Viper-specific `.slurm`, submitted with `sbatch`. |
+| ORCA DFT | Viper | Viper-specific `.slurm`, submitted with `sbatch`. |
 | ORCA DFT | BlueHive | BlueHive-specific `.slurm`, submitted with `sbatch`. |
 | MACE-POLAR simulation/inference | GPU host/allocation | CUDA GPU through the workflow launcher. |
 | MACE-POLAR fine tuning | dungeon | Direct Python `.py` workflow launcher. |
