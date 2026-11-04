@@ -13,7 +13,8 @@ polar-1-l** replicas, each with a **1 ns production through resumable 24 h alloc
 (plus unchanged 4 ps ramps), and exactly 2,000 Viper DFT clusters (1,950
 acquisition +50 evaluation). Runtime sizing is provisional, not a measured H200
 benchmark. `p10_batch_active.json` points to the frozen, checkpoint-pinned plan.
-No jobs have been submitted. Whole-molecule PBC and reviewed-window quality
+The ten initial Slurm jobs are independent, with separate per-replica restart
+chains and no shared-node requirement. No jobs have been submitted. Whole-molecule PBC and reviewed-window quality
 checks are required before DFT; the target-site method pilot remains pending.
 
 ## Scientific loop

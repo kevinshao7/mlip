@@ -42,17 +42,50 @@ class BatchTests(unittest.TestCase):
         for path in code.iterdir():
             if path.suffix in ['.sh','.slurm']:
                 subprocess.run(['bash','-n',str(path)],check=True)
-        md=(code/'md_10_replicas_dais.slurm').read_text()
-        self.assertIn('#SBATCH --array=0-9',md)
-        self.assertIn('--gres=gpu:h200:1',md)
-        self.assertIn('--time=24:00:00',md)
-        self.assertIn('--mem=64G',md)
+        scripts=sorted(code.glob('md_replica_*_dais.slurm'))
+        self.assertEqual(len(scripts),10)
+        for index,path in enumerate(scripts):
+            md=path.read_text()
+            self.assertNotIn('--array',md)
+            self.assertIn('--nodes=1',md)
+            self.assertIn('--gres=gpu:h200:1',md)
+            self.assertIn('--time=24:00:00',md)
+            self.assertIn('--mem=64G',md)
+            self.assertIn(f'run-md --index {index}',md)
+            self.assertNotIn('CUDA_VISIBLE_DEVICES=',md)
         self.assertEqual(self.plan['md']['production_duration_ps'],1000)
         self.assertEqual(self.plan['model_mode'],'foundation')
         self.assertEqual(self.plan['planned_segments_per_replica'],6)
-        self.assertIn('afterok:',(code/'submit_md_dais.sh').read_text())
-        self.assertNotIn('CUDA_VISIBLE_DEVICES=',md)
+        self.assertIn('previous_job[$replica]',(code/'submit_md_dais.sh').read_text())
         self.assertIn('#SBATCH --array=0-199%20',(code/'dft_2000_viper.slurm').read_text())
+
+    def test_submission_chains_are_independent_using_fake_sbatch(self):
+        import os,sys
+        fake=self.root/'fakebin'; fake.mkdir()
+        events=self.root/'fake_submission.json'
+        (fake/'python').write_text('#!/bin/bash\nexit 0\n')
+        (fake/'sbatch').write_text(f"#!{sys.executable}\n"+
+            "import json,os,sys\nfrom pathlib import Path\n"+
+            "p=Path(os.environ['BATCH_TEST_EVENTS'])\n"+
+            "rows=json.loads(p.read_text()) if p.exists() else []\n"+
+            "rows.append(sys.argv[1:]); p.write_text(json.dumps(rows))\n"+
+            "print(1000+len(rows))\n")
+        for path in fake.iterdir(): path.chmod(0o755)
+        envdir=self.root/'env/bin'; envdir.mkdir(parents=True); (envdir/'activate').write_text('')
+        env={**os.environ,'PATH':str(fake)+':'+os.environ['PATH'],
+             'MLIP_ROOT':str(self.root),'MLIP_ENV':str(self.root/'env'),
+             'BATCH_TEST_EVENTS':str(events),'MD_SEGMENTS':'6'}
+        helper=self.root/self.plan['code_relative']/'submit_md_dais.sh'
+        subprocess.run(['bash',str(helper)],env=env,check=True,capture_output=True,text=True)
+        rows=json.loads(events.read_text())
+        self.assertEqual(len(rows),60)
+        for segment in range(6):
+            for replica in range(10):
+                args=rows[segment*10+replica]
+                self.assertTrue(args[-1].endswith(f'md_replica_{replica:02d}_dais.slurm'))
+                deps=[arg for arg in args if arg.startswith('--dependency=')]
+                expected=[] if segment==0 else [f'--dependency=afterok:{1001+(segment-1)*10+replica}']
+                self.assertEqual(deps,expected)
 
     def test_missing_model_and_wrong_foundation_block(self):
         with self.assertRaises(FileNotFoundError): batch.binding(self.plan)

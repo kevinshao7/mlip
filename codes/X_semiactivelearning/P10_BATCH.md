@@ -8,9 +8,9 @@ superseded for these ten runs.
 
 ## MD model, 1 ns target and 24-hour segments
 
-Ten independently seeded replicas are prepared as Slurm array `0-9`, with
+Ten independently seeded replicas are prepared as **ten separate Slurm jobs**, each with
 **one H200, 12 CPU cores, 64 GiB host memory and a 24-hour limit per allocation**
-on DAIS. This is 240 GPU-hours of requested wall-clock allocation per array wave if all ten
+on DAIS. This is 240 GPU-hours of requested wall-clock allocation per set of ten independent jobs if all ten
 are later submitted. Slurm owns GPU visibility. Each replica has a distinct
 output directory and seeds NumPy, Python and Torch before packing/velocities.
 The working gcc/14, cuda/12.8, mlipenv setup is retained.
@@ -31,13 +31,15 @@ The target is **1 ns (1,000 ps) production per replica**, plus unchanged
 (0.5 ps). The earlier 176 ps bundle is archived.
 
 DAIS `sinfo -p gpu1` reports a maximum allocation of **1 day**. The prepared
-MD submission helper therefore chains **six 24-hour arrays** using `afterok`
-dependencies. Each allocation computes for at most 22 h and checkpoints before
+MD submission helper therefore prepares **six separate 24-hour jobs per replica**.
+Each uses an `afterok` dependency only on that same replica's previous job.
+The first ten jobs are independent: no common node or simultaneous-start
+requirement, no GPU array, and no dependency on other replicas. Each allocation computes for at most 22 h and checkpoints before
 exiting; the next allocation resumes the same replica. Completed replicas skip
 later allocations. The historical timing proxy projects approximately 123 h per
 replica, so six segments provide 132 h of nominal compute budget. This remains
-uncalibrated for polar-1-l/H200; additional segments may be needed. No array has
-been submitted. Six full waves would request up to 1,440 GPU-hours across ten
+uncalibrated for polar-1-l/H200; additional segments may be needed. No jobs have
+been submitted. Six allocations per replica would request up to 1,440 GPU-hours across ten
 replicas; jobs exit once their individual physical target is reached.
 
 `md_segments.py` saves positions, momenta, cell, reference-cell/volume variables,
@@ -130,7 +132,7 @@ pilot must reproduce the audited C6 electronic labels before production DFT.
 That target-site pilot has not run. Failed or partial ORCA jobs, stdout, exit
 codes, scratch and property files are preserved without automatic SCF retries.
 
-Prepared files include `md_10_replicas_dais.slurm`, `dft_2000_viper.slurm` and
+Prepared files include `md_replica_00_dais.slurm` through `md_replica_09_dais.slurm`, `dft_2000_viper.slurm` and
 separate submission helpers. The helpers perform preflight and create Slurm
 log directories before sbatch; none has been invoked. To inspect readiness:
 

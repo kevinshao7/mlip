@@ -363,3 +363,38 @@ comparison on tiny CPU Lennard-Jones fixtures (positions/momenta/cell and chain
 variables agree to1e-12), segmented output with no duplicate frames, and archive/
 rollback of uncommitted output tails. No campaign GPU MD, ORCA, or training ran.
 Docs/defaults/active launch plan, restart module and experiment log synchronized.
+
+2026-11-04T00:29:49.938081+00:00 — P10 batch preparation
+Observation/evidence: Prepared /dais/fs/scratch/kshao/mlip/codes/X_semiactivelearning/batch_launches/p10_foundation_1ns_10rep_2000dft_20261104T002949913331Z; ten distinct seeds; exactly 1950 acquisition +50 evaluation labels; no jobs submitted.
+Diagnosis/uncertainty: Foundation polar-1-l is explicitly selected. Its exact bytes must be frozen once before the ensemble; polar-1-l H200 runtime remains uncalibrated.
+Proposed next test: Cache/freeze foundation polar-1-l once; inspect the prepared 24 h jobs before any operator submission.
+Why informative: Freezes one model across independent seeds and preserves the 2000-label budget without mixing evaluation into training.
+One changed factor: MD seed/replica only within the ensemble; acquisition budget only for subsequent training; other settings retained.
+
+2026-11-04T00:29:54.686968+00:00 — P10 batch preparation
+Observation/evidence: Foundation polar-1-l frozen: {'model_mode': 'foundation', 'foundation_model': 'polar-1-l', 'model_relative': 'outputsfull/X_semiactivelearning/p10_foundation_1ns_10rep_2000dft_20261104T002949913331Z/model/foundation_polar_1_l.model', 'sha256': '9f65f8dc6ddaff1d631e299cb531376a7da5e68d1bef04f34a2d5073d5ef114b', 'provenance_relative': 'outputsfull/X_semiactivelearning/p10_foundation_1ns_10rep_2000dft_20261104T002949913331Z/model/foundation_provenance.json', 'provenance_sha256': '03a1ee86e694f5ca16ba5a744fa774a8a6ad5227f533c862472940824fc32e96'}
+Diagnosis/uncertainty: No model inference or MD run; all ten jobs will verify the same checkpoint bytes.
+Proposed next test: Inspect resources and run-code before any later submission.
+Why informative: Removes fine-tuned-model ambiguity and parallel download races.
+One changed factor: Foundation initialization selected by user; replica seed alone varies within this ensemble.
+
+2026-11-04T00:30:45.327033+00:00 — Ten separate single-GPU job submissions.
+Observation/evidence: User explicitly wants each of the ten replicas submitted
+as its own job, avoiding a combined node/GPU request. Prior code used ten one-GPU
+array elements; new code emits md_replica_00_dais.slurm through replica_09.
+Each requests nodes=1, ntasks=1, gpu:h200:1,12 CPUs,64G,24h. No --array,
+exclusive-node request, same-node/co-start constraint or cross-replica dependency.
+Active bundle: codes/X_semiactivelearning/batch_launches/p10_foundation_1ns_10rep_2000dft_20261104T002949913331Z. Superseded bundle archived; scientific outputs retained.
+Diagnosis/uncertainty: Independent replicas must not share a continuation barrier.
+The helper submits ten independent initial jobs, then creates afterok links
+only between successive segments of the same replica. 1 ns target, six planned
+segments, all model/configuration/seed/physical settings are retained.
+Next test: operator review, then actual submission only on separate instruction;
+check that queued job requests each expose exactly one GPU. Informative because
+it validates scheduling independence without changing the scientific ensemble.
+Changed factor: submission/dependency topology only; no scientific/training factor.
+Validation: 8 focused tests passed, including ten distinct scripts with one GPU
+and no array directive. A fake sbatch recorded all60 prospective submissions and
+verified that each continuation points only to its own replica's predecessor.
+No real sbatch was called. Python compilation and shell syntax passed. README,
+P10_BATCH.md, AGENTS, DATA_PROTOCOL and active plan/log updated together.

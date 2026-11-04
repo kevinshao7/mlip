@@ -127,6 +127,7 @@ def prepare(args):
                                 ROOT/'method_pilot.py',ROOT/'orca_output_validation.py',ROOT/'site_dft.py',ROOT/'site_profiles.json',ROOT/'cluster_quality.py',ROOT/'md_segments.py',
                                 (ROOT/cfg['profile_csv']).resolve()]},
             'model_mode':'foundation', 'model_requirement':'frozen_foundation_polar_1_l_checkpoint',
+            'md_submission_mode':'ten_separate_single_gpu_jobs_with_per_replica_dependencies',
             'gpu_walltime_hours':24, 'estimated_compute_hours':122.71111111111111, 'planned_segments_per_replica':6, 'runtime_estimate_is_calibrated':False,
             'cluster_source':'ten_new_MD_replicas'}
     write_json(code/'plan.json', plan)
@@ -159,7 +160,6 @@ cd "$MLIP_ROOT"
     md = f'''#!/bin/bash -l
 #SBATCH --job-name=X_P10_foundation_replica
 #SBATCH --partition=gpu1
-#SBATCH --array=0-9
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=12
@@ -169,9 +169,14 @@ cd "$MLIP_ROOT"
 #SBATCH --output=/dais/fs/scratch/kshao/mlip/{plan['output_relative']}/slurm/md_%A_%a.out
 #SBATCH --error=/dais/fs/scratch/kshao/mlip/{plan['output_relative']}/slurm/md_%A_%a.err
 {common}
-srun --ntasks=1 --kill-on-bad-exit=1 python codes/X_semiactivelearning/p10_batch.py --plan "$MLIP_ROOT/{relative}" run-md --index "${{SLURM_ARRAY_TASK_ID}}"
+srun --ntasks=1 --kill-on-bad-exit=1 python codes/X_semiactivelearning/p10_batch.py --plan "$MLIP_ROOT/{relative}" run-md --index REPLICA_INDEX
 '''
-    (code/'md_10_replicas_dais.slurm').write_text(md)
+    for replica in plan['replicas']:
+        index=replica['index']; tag=f"{index:02d}"
+        text=md.replace('REPLICA_INDEX',str(index))
+        text=text.replace('X_P10_foundation_replica',f'X_P10_replica_{tag}')
+        text=text.replace('md_%A_%a',f'md_replica_{tag}_%j')
+        (code/f'md_replica_{tag}_dais.slurm').write_text(text)
     profile=json.loads((ROOT/'site_profiles.json').read_text())['viper']
     vroot=profile['mlip_root']
     dft=f'''#!/bin/bash -l
@@ -195,7 +200,7 @@ cd "$MLIP_ROOT"
 "$PYTHON_COMMAND" codes/X_semiactivelearning/p10_batch.py --plan "$MLIP_ROOT/{relative}" run-dft-group --index "${{SLURM_ARRAY_TASK_ID}}"
 '''
     (code/'dft_2000_viper.slurm').write_text(dft)
-    for name, script, root in [('submit_md_dais.sh','md_10_replicas_dais.slurm','/dais/fs/scratch/kshao/mlip'),('submit_dft_viper.sh','dft_2000_viper.slurm',vroot)]:
+    for name, script, root in [('submit_dft_viper.sh','dft_2000_viper.slurm',vroot)]:
         stage='check-md' if name.startswith('submit_md') else 'check-dft'
         command='python' if stage=='check-md' else '"${PYTHON_COMMAND:-python3}"'
         env='source "${MLIP_ENV:-/dais/fs/scratch/kshao/mlipenv}/bin/activate"\n' if stage=='check-md' else ''
@@ -215,12 +220,19 @@ source "${{MLIP_ENV:-/dais/fs/scratch/kshao/mlipenv}}/bin/activate"
 cd "$MLIP_ROOT"
 python codes/X_semiactivelearning/p10_batch.py --plan "$MLIP_ROOT/{relative}" check-md
 mkdir -p "$MLIP_ROOT/{plan['output_relative']}/slurm"
-dependency=()
+declare -a previous_job
 for segment in $(seq 1 "${{MD_SEGMENTS:-6}}"); do
-    job=$(sbatch --parsable "${{dependency[@]}}" "$MLIP_ROOT/{plan['code_relative']}/md_10_replicas_dais.slurm")
-    job=${{job%%;*}}
-    echo "Prepared segment $segment submitted as array $job"
-    dependency=(--dependency=afterok:$job)
+    for replica in $(seq 0 9); do
+        printf -v replica_tag '%02d' "$replica"
+        dependency=()
+        if [[ -n "${{previous_job[$replica]:-}}" ]]; then
+            dependency=(--dependency=afterok:${{previous_job[$replica]}})
+        fi
+        job=$(sbatch --parsable "${{dependency[@]}}" "$MLIP_ROOT/{plan['code_relative']}/md_replica_${{replica_tag}}_dais.slurm")
+        job=${{job%%;*}}
+        echo "Replica $replica_tag segment $segment submitted as independent job $job"
+        previous_job[$replica]=$job
+    done
 done
 ''')
 
