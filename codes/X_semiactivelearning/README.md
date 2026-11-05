@@ -5,7 +5,19 @@ This is the current campaign. Its default namespace is
 Git history. Other dated workflows are historical studies or
 supporting dependencies, not alternative default launchers.
 
+The local Viper checkout was outdated before synchronization on 2026-11-05.
+The newer remote dataset release is the current source for cluster availability;
+older local notes reporting missing clusters are historical. Resolve
+`partial_clusters_active.json` for the released data and its original MD source plan.
+
 ## Code layout
+
+Data is indexed by pressure and computation stage under
+`outputsfull/X_semiactivelearning/P10GPa/`: `gpu_md_results/`,
+`intermediate_cut_clusters/`, and `cpu_dft_results/`. The active portable
+2,000-cluster dataset is selected by `partial_clusters_active.json` and can be
+tracked in Git. Runtime code remains shared across pressures; it is not copied
+into each data folder.
 
 | Location | Purpose |
 | --- | --- |
@@ -40,6 +52,11 @@ recorded in [VIPER_ENVIRONMENT.md](VIPER_ENVIRONMENT.md). DAIS keeps its separat
 [environment record](DAIS_ENVIRONMENT.md).
 
 ## Prepared 10 GPa batch
+
+For the 2026-11-05 **2,000-cluster extraction from unfinished replicas**, follow
+[PARTIAL_CLUSTER_EXTRACTION.md](PARTIAL_CLUSTER_EXTRACTION.md). It preserves
+the original launch plan and snapshots only checkpoint-committed data before
+review, selection and geometry audit.
 
 [P10_BATCH.md](P10_BATCH.md) describes ten independent one-GPU **foundation
 polar-1-l** replicas, each with a **1 ns production through resumable 24 h allocations**

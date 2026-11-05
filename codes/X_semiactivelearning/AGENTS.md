@@ -14,6 +14,24 @@ reversible preparation. Report actual blockers plainly.
 4. Use `DEBUGGING.md` only for the symptom you are diagnosing; the append-only
    `hyperparameters.txt` holds historical evidence, not active defaults.
 
+The 2026-11-05 user-authorized task is extraction of **2,000 total clusters**
+from the possibly incomplete ten P10 runs; it supersedes preparation-only scope
+for analysis/extraction, not MD/DFT/training launches. Follow
+[PARTIAL_CLUSTER_EXTRACTION.md](PARTIAL_CLUSTER_EXTRACTION.md), using
+`tools/extract_partial_clusters.py` and an exact immutable snapshot workspace.
+Keep the completion gate of the named P10 launcher intact. Review total pressure
+from committed thermo logs (including kinetic contribution), not the virial-only
+extxyz plot. Preserve original source-frame indices and temporal partitions.
+Before starting Python for extraction/analysis, export OPENBLAS_NUM_THREADS=1,
+OMP_NUM_THREADS=1, MKL_NUM_THREADS=1 and NUMEXPR_NUM_THREADS=1. Worker count
+does not limit BLAS threads initialized by an earlier NumPy import.
+For the completed dataset, resolve `partial_clusters_active.json`: its `file`
+and `dataset_directory` select the portable Git-ready P10GPa release; `workspace`
+retains the local extraction workspace. Data stages are `gpu_md_results`,
+`intermediate_cut_clusters`, and `cpu_dft_results`. Preserve existing raw MD
+paths/restart signatures; pressure/stage indexes provide organization without
+moving live files. CPU DFT has not run for this dataset.
+
 The active P10 deployment is ten **foundation polar-1-l** replicas, 10 GPa,
 1920 K, R1, 1 ns production each plus 2+2 ps ramps, 0.5 fs and 2000 frames.
 Each Slurm job requests one H200/12 CPUs/64G/24 h; each invocation submits exactly ten independent jobs, one per replica.
@@ -116,9 +134,15 @@ trajectories, raw scratch or unrelated untracked outputs.
 - Preserve all raw ORCA/stdout/property/Slurm/checkpoint evidence. Failed DFT
   is skipped without SCF tweaks or retries. GPU visibility belongs to Slurm.
 
-## Current validation limits (2026-11-04)
+## Historical Viper validation limits (2026-11-04)
 
-No production jobs were submitted. The selected D4rev subtraction code passed
+The local Viper checkout was outdated before the 2026-11-05 Git sync. The newer
+remote release includes 2000 audited clusters selected by
+`partial_clusters_active.json`; its `source_plan` preserves the original MD
+provenance independently of the prepared D4rev launch plan. Earlier statements
+below describe November 4 Viper availability, not current dataset availability.
+
+At that local validation step, no production jobs were submitted. The selected D4rev subtraction code passed
 focused regressions; the actual reviewed 2000-cluster package is still absent. All
 266 historical C6 frames passed basic finite/charge/spin/PBC checks, but missing
 parent MD prevents certifying their whole-molecule extraction. CPU restart tests
