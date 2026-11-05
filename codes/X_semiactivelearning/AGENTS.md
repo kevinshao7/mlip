@@ -87,6 +87,10 @@ Append one dated entry to `hyperparameters.txt` with observation/evidence,
 diagnosis/uncertainty, next test, why informative, and the changed factor.
 Update the relevant README/default in the same task when procedure changes.
 Do not repeat the entire notebook in each entry. Record no launch if none ran.
+**Use SSH, not HTTPS, for Git fetch/pull/push.** Repository `origin` must be
+`git@github.com:kevinshao7/mlip.git`; reuse existing SSH authentication instead
+of requesting HTTPS credentials. See `DEBUGGING.md` for synchronization steps.
+
 Commit/push only under explicit user authorization; don't include cached models,
 trajectories, raw scratch or unrelated untracked outputs.
 

@@ -122,17 +122,20 @@ Do not rescan the 16 GB legacy P10 trajectory just to rediscover its inventory.
 
 Check status/fetch/divergence first. Leave unrelated untracked checkpoints,
 pt_output and conversion outputs untouched. Commit only the reviewed source and
-notebook changes. On 2026-11-04 HTTPS fetch worked, its saved push token was
-invalid, and existing SSH auth worked for this same repository:
+notebook changes. **Use SSH, not HTTPS, for both fetch and push.** Existing
+SSH authentication works for this repository; HTTPS push credentials failed on
+2026-11-04 and were unavailable on Viper on 2026-11-05. Set the remote once:
 
 ```bash
+git remote set-url origin git@github.com:kevinshao7/mlip.git
+git fetch origin
+# Use a fast-forward pull only when compatible with the inspected local history.
 git pull --ff-only origin main
-git push git@github.com:kevinshao7/mlip.git main:main
+git push origin main
 git fetch origin
 git rev-list --left-right --count HEAD...origin/main
 ```
 
 Use those commands only when sync is authorized and history is understood;
-resolve incoming overlap rather than forcing. Fetch after a URL-based push to
-refresh origin/main. Don't inspect/print tokens or repeat an unnecessary login
+resolve incoming overlap rather than forcing. Verify origin/main after pushing. Don't inspect/print tokens or repeat an unnecessary login
 flow when verified SSH already works. Explain any actual auth rejection.

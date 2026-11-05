@@ -158,6 +158,15 @@ ORCA TERMINATED NORMALLY
 
 Generated Slurm output and ORCA stdout should go under `mlip/outputsfull`, not the source tree, unless the user explicitly asks for local interactive runs.
 
+## Git synchronization
+
+**Use SSH, not HTTPS, for this repository.** Set `origin` to
+`git@github.com:kevinshao7/mlip.git` for both fetch and push. Existing SSH
+authentication is available; do not request HTTPS tokens or start a new login
+flow when SSH works. Inspect status and remote divergence before syncing,
+preserve local work, and never force-push shared history. Commit/push only
+when the user authorizes it.
+
 ## Coding Guidelines
 
 Prefer small, explicit functions and conservative edits. Add comments only for non-obvious physical assumptions, units, reference-energy conventions, or workflow traps.
