@@ -533,3 +533,67 @@ Diagnosis/uncertainty: Scheduler acceptance confirmed; MD completion and through
 Proposed next test: Inspect these jobs stdout/stderr and checkpoint progress before any restart decision.
 Why informative: Establishes actual GPU runtime and progress without prequeueing continuation jobs.
 One changed factor: Submission topology only, exactly one allocation per replica. Logs: outputsfull/X_semiactivelearning/p10_foundation_1ns_10rep_2000dft_20261104T011354617137Z/slurm/.
+
+2026-11-05T15:33:15.203199+00:00 — P10 batch preparation
+Observation/evidence: Partial-run snapshots: /dais/fs/scratch/kshao/mlip/outputsfull/X_semiactivelearning/p10_foundation_1ns_10rep_2000dft_20261104T011354617137Z/cluster_extractions/partial_5000_20261105T153312921521Z; frame counts [185, 185, 184, 185, 184, 182, 183, 183, 184, 182].
+Diagnosis/uncertainty: All ten checkpoints verified; incomplete runs are not 1 ns completion evidence.
+Proposed next test: Review pressure including kinetic contribution, volume and species before selecting a window.
+Why informative: Immutable committed prefixes prevent live writes and restart rollbacks changing the extraction.
+One changed factor: Extraction budget requested at 5000; MD settings/model retained. No jobs submitted.
+
+2026-11-05T15:34:13.823986+00:00 — P10 batch preparation
+Observation/evidence: Partial-run snapshots: /dais/fs/scratch/kshao/mlip/outputsfull/X_semiactivelearning/p10_foundation_1ns_10rep_2000dft_20261104T011354617137Z/cluster_extractions/partial_2000_20261105T153411805462Z; frame counts [185, 185, 184, 185, 184, 182, 183, 183, 184, 182].
+Diagnosis/uncertainty: All ten checkpoints verified; incomplete runs are not 1 ns completion evidence.
+Proposed next test: Review pressure including kinetic contribution, volume and species before selecting a window.
+Why informative: Immutable committed prefixes prevent live writes and restart rollbacks changing the extraction.
+One changed factor: Extraction budget 2000; MD settings/model retained. No jobs submitted.
+2026-11-05 — Partial P10 extraction review and performance diagnosis
+Observation/evidence: Active plan p10_foundation_1ns_10rep_2000dft_20261104T011354617137Z;
+ten restart-committed prefixes contain 1837 frames, 182-185 frames/replica,
+91-92.5 ps production at 0.5 ps/frame, all incomplete. Source model SHA256
+9f65f8dc6ddaff1d631e299cb531376a7da5e68d1bef04f34a2d5073d5ef114b.
+User reduced requested budget from 5000 to 2000, then requested one .xyz file.
+Exact selected workspace: outputsfull/X_semiactivelearning/p10_foundation_1ns_10rep_2000dft_20261104T011354617137Z/cluster_extractions/partial_2000_20261105T153411805462Z.
+Review: first 10 ps excluded; original source frames >=20, 10.5 ps onward,
+1637 analyzed frames. Agent-reviewed per-replica mean total pressure 9.8699-10.1854 GPa;
+four chronological block volume means 2264.711-2276.950 Angstrom^3;
+36 illegal-component events / sampled components =0.0002198795548660567,
+below 0.05; illegal molecules never included. These exploratory block means
+do not establish equilibrium or independent samples. Preserve temporal partitions.
+Scientific diagnostic defect: existing campaign analysis derives pressure from
+extxyz virial stress and omits kinetic pressure; it reports mean 5.933710562 GPa
+over the original full snapshots while runner thermo includes ideal-gas pressure
+and gives replica means 9.9270-10.1796 GPa. New tool separately plots/reports
+the committed thermo pressure and original production clock. Production physics,
+frozen campaign source and restart hashes were not altered to fix this diagnostic.
+Performance evidence: extraction PID147158 showed 5663% CPU after NumPy initialized
+BLAS ahead of campaign's environment settings; --workers=4 alone was insufficient.
+Interrupted only extraction with SIGINT, preserved and audited 50 evaluation
+clusters, resumed acquisition with OPENBLAS/OMP/MKL/NUMEXPR threads=1 before Python.
+Repeated bwrap namespace ENOSPC failures were tool-sandbox failures, not MD-data errors.
+Next test: independent geometry audit and exact-count/role-preserving XYZ packaging;
+why informative: confirms the requested output without claiming DFT or equilibrium.
+Changed factor: extraction budget/window only under user request; original MD model,
+temperature, pressure, timestep, ensemble, charge/spin and snapshots preserved.
+
+
+2026-11-05T15:53:55.754301+00:00 — P10 batch preparation
+Observation/evidence: Extracted/audited 2000 clusters and packaged /dais/fs/scratch/kshao/mlip/outputsfull/X_semiactivelearning/p10_foundation_1ns_10rep_2000dft_20261104T011354617137Z/cluster_extractions/partial_2000_20261105T153411805462Z/clusters_2000.xyz; 1950 acquisition +50 evaluation.
+Diagnosis/uncertainty: Incomplete 91-92.5 ps runs; original frames >=20 (10.5 ps onward), no equilibrium/IID claim. Initial extraction interrupted for BLAS oversubscription; completed evaluation preserved and audited before resuming acquisition with single-threaded numerical libraries.
+Proposed next test: Inspect packaged manifest/gallery before separately authorized method-pilot/DFT work.
+Why informative: Geometry validation and sampling provenance do not replace electronic-method verification.
+One changed factor: Geometry extraction only; no simulations or training launched.
+
+2026-11-05T15:54:54.416794+00:00 — P10 batch preparation
+Observation/evidence: Packaged XYZ final verification: /dais/fs/scratch/kshao/mlip/outputsfull/X_semiactivelearning/p10_foundation_1ns_10rep_2000dft_20261104T011354617137Z/cluster_extractions/partial_2000_20261105T153411805462Z/clusters_2000.xyz; manifest=/dais/fs/scratch/kshao/mlip/outputsfull/X_semiactivelearning/p10_foundation_1ns_10rep_2000dft_20261104T011354617137Z/cluster_extractions/partial_2000_20261105T153411805462Z/clusters_2000_manifest.json; pointer=/dais/fs/scratch/kshao/mlip/codes/X_semiactivelearning/partial_clusters_active.json; SHA256=c70f8e7a4d967bed3553988d1abb1b0769495418102561f3268a07e1d12be76e.
+Diagnosis/uncertainty: Exactly 2000 audited unique frame/centre records, 1950 acquisition and 50 evaluation; minimum pair distance 0.80849519 Angstrom; maximum intramolecular placement error 2.19824159e-14 Angstrom. Unlabelled geometries, correlated partial-run data.
+Proposed next test: Use the pointer, manifest and PARTIAL_CLUSTER_EXTRACTION.md to inspect or transfer this existing dataset; do not regenerate it by directory date.
+Why informative: Exact paths/hashes and persistent procedures avoid repeating snapshots/analysis and preserve evaluation segregation.
+One changed factor: Requested extracted geometry dataset only; five snapshot/packaging tests and four existing geometry tests passed; no MD/DFT/training submitted.
+
+2026-11-05 — Pressure/stage organization and Git-ready cluster release
+Observation/evidence: Portable dataset at outputsfull/X_semiactivelearning/P10GPa/intermediate_cut_clusters/polar1l_2000_20261105T153411805462Z; 2000 geometries (1950 acquisition +50 evaluation), XYZ SHA256 c70f8e7a4d967bed3553988d1abb1b0769495418102561f3268a07e1d12be76e. 14 compact release files, 5560733 bytes total; copied bytes and all package checksums verified.
+Diagnosis: Prior dataset lived under ignored runtime output; pressure/stage names and a narrow curated-release exception make the scientific artifact portable without tracking raw trajectories.
+Change: P10GPa/gpu_md_results holds a repository-relative index and local link to original MD; intermediate_cut_clusters holds the Git-trackable XYZ/manifest/audit/provenance release; cpu_dft_results explicitly records not-run status. Production source stays shared across pressures, with stage mapping in production/README.md. Original MD, restarts and extraction workspace remain intact.
+Validation: five focused snapshot/packaging tests passed; exported XYZ checksum unchanged; Git ignore checks include every release file and exclude original raw MD. No extraction, MD, DFT or training rerun.
+Next test: review Git dry-run selection before an explicitly requested commit/push. Why informative: verifies only the portable dataset/indexes are published, preserving external raw-data provenance. Changed factor: storage/navigation/export only; no geometries, splits or physical settings changed.

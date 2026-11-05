@@ -7,6 +7,13 @@ supporting dependencies, not alternative default launchers.
 
 ## Code layout
 
+Data is indexed by pressure and computation stage under
+`outputsfull/X_semiactivelearning/P10GPa/`: `gpu_md_results/`,
+`intermediate_cut_clusters/`, and `cpu_dft_results/`. The active portable
+2,000-cluster dataset is selected by `partial_clusters_active.json` and can be
+tracked in Git. Runtime code remains shared across pressures; it is not copied
+into each data folder.
+
 | Location | Purpose |
 | --- | --- |
 | `production/` | Active MD, DFT, training, controller, validation and dashboard implementations |
@@ -36,6 +43,11 @@ P10 plan overrides generic campaign defaults; historical notebook entries do
 not select today's model, duration or launch scripts.
 
 ## Prepared 10 GPa batch
+
+For the 2026-11-05 **2,000-cluster extraction from unfinished replicas**, follow
+[PARTIAL_CLUSTER_EXTRACTION.md](PARTIAL_CLUSTER_EXTRACTION.md). It preserves
+the original launch plan and snapshots only checkpoint-committed data before
+review, selection and geometry audit.
 
 [P10_BATCH.md](P10_BATCH.md) describes ten independent one-GPU **foundation
 polar-1-l** replicas, each with a **1 ns production through resumable 24 h allocations**
