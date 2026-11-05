@@ -8,6 +8,15 @@ User-authorized read-only Slurm queries, model preparation and isolated CPU test
 are distinct from production launches. Do not ask again for already authorized
 reversible preparation. Report actual blockers plainly.
 
+For published-cluster CPU DFT, start with `dft/README.md`,
+`cpu_dft_active.json` and `dft/viper_cpu.py`. The prepared helper is
+`bash submitcpu.sh`: 200 separate Viper CPU jobs, 20 CPUs each and 10 serial
+clusters per job. Preparation/check/dry-run never submits; do not invoke the
+helper without `--dry-run` unless launch is explicitly authorized. Do not use
+the older P10 DFT array for this dataset too. Task folders are `md/`,
+`clustering/`, `dft/` and `visualization/`; shared frozen implementations and
+compatibility entry points remain for existing plans and snapshot hashes.
+
 1. Read `p10_batch_active.json` and its `plan.json` for the prepared P10 batch.
 2. Read `P10_BATCH.md` for its physical/resource settings and prerequisites.
 3. Open the relevant function/test from the routing table below.

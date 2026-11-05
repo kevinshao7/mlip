@@ -1,6 +1,11 @@
 # Shared production code
 
-These modules serve all pressures. Pressure/site/run names belong in generated
+Task entry points and standalone tools are organized in `../md/`,
+`../clustering/`, `../dft/` and `../visualization/`. The published-cluster CPU
+pipeline is `../dft/viper_cpu.py`; its `../submitcpu.sh` submits 200 separate
+jobs only when explicitly invoked.
+
+These shared modules serve all pressures. Pressure/site/run names belong in generated
 launch bundles and data folders, not duplicate source trees.
 
 | Pipeline stage | Main implementation |

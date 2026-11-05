@@ -1,4 +1,4 @@
-# Optional tools
+# Supporting utilities and compatibility paths
 
 Run from the workflow directory with `python tools/<script>.py --help`.
 
@@ -15,3 +15,8 @@ Run from the workflow directory with `python tools/<script>.py --help`.
 The comparison/environment tools are optional; partial extraction reuses the
 production pipeline without launching simulations. Outputs and
 Matplotlib caches go under `outputsfull/`.
+
+Task folders are now `../md/`, `../clustering/`, `../dft/` and
+`../visualization/`. Packaging and force-outlier implementations moved to their
+task folders; their old paths still import and run. The original extractor
+remains here because historical snapshot manifests freeze its exact hash.

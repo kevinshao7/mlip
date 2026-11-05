@@ -1,3 +1,11 @@
+> **2026-11-05 current CPU DFT preparation:** the published 2000-cluster release
+> now exists. Use [dft/README.md](dft/README.md), `cpu_dft_active.json` and
+> `bash submitcpu.sh` for 200 separate Viper jobs with 20 CPUs and 10 clusters
+> each. The old 120-hour array description below is historical and exceeds
+> Viper's current 24-hour partition limit. No CPU jobs were submitted during
+> this preparation. Earlier statements about absent geometries describe local
+> November 4 availability; preserve the original MD source-plan provenance.
+
 > **2026-11-04 selected and implemented path:** calculate
 > `wB97M-D4rev def2-TZVPD EnGrad RIJCOSX` and subtract both printed D4 energy
 > and forces for electronic-only labels. Generation, collection and provenance

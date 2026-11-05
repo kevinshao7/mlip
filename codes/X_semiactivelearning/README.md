@@ -21,10 +21,14 @@ into each data folder.
 
 | Location | Purpose |
 | --- | --- |
-| `production/` | Active MD, DFT, training, controller, validation and dashboard implementations |
-| `tools/` | Optional source-environment build and historical comparison/visualization utilities |
-| `tests/` | Isolated preparation, scientific validation and CPU restart checks; no production jobs |
-| `batch_launches/` | Current prepared P10 launch bundle, selected by `p10_batch_active.json` |
+| `md/` | Named P10 MD entry point and restart guidance |
+| `clustering/` | Partial extraction entry point and dataset packaging |
+| `dft/` | Published-cluster Viper CPU pipeline and dated 200-job packages |
+| `visualization/` | Dashboard entry point and force-outlier visualization |
+| `production/` | Shared implementations retained for frozen MD/extraction provenance; training and policy |
+| `tools/` | Environment/comparison utilities and compatibility paths |
+| `tests/` | Isolated preparation, scientific validation and CPU restart checks |
+| `batch_launches/` | Frozen MD/legacy DFT plans selected by `p10_batch_active.json` |
 
 The four top-level Python files (`p10_batch.py`, `campaign.py`, `autonomous.py`
 and `launch_single_gpu.py`) are stable command adapters. Existing launch commands
@@ -50,6 +54,16 @@ not select today's model, duration or launch scripts.
 Viper's Python 3.11 environment and latest GitHub-source MACE installation are
 recorded in [VIPER_ENVIRONMENT.md](VIPER_ENVIRONMENT.md). DAIS keeps its separate
 [environment record](DAIS_ENVIRONMENT.md).
+
+## Published-cluster CPU DFT
+
+The current Viper CPU package is selected by `cpu_dft_active.json`. See
+[dft/README.md](dft/README.md): **200 separate jobs, 20 CPUs each, 10 sequential
+clusters each**, using the published 1950 acquisition + 50 evaluation release.
+From this directory, `bash submitcpu.sh --dry-run` checks and lists the jobs;
+`bash submitcpu.sh` submits them when you choose to launch. No jobs were
+submitted during preparation. This route does not use the legacy DFT array
+or require completed 1 ns MD runs.
 
 ## Prepared 10 GPa batch
 
