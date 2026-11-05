@@ -28,15 +28,8 @@ def next_action():
     cfg = policy()
     if not (campaign.OUT / 'model_lineage.json').exists():
         return ['init']
-    if not (campaign.OUT / 'method_verified.json').exists():
-        pilot = campaign.OUT / 'method_pilot'
-        if not (pilot / 'reference.json').exists():
-            return ['prepare-method-pilot']
-        if not (pilot / 'outputs/pilot.out').exists():
-            return ['await-method-pilot']
-        return ['verify-method-pilot']
-    from workflow_policy import require_method_verified
-    require_method_verified()
+    from workflow_policy import require_label_route
+    require_label_route()
     pressures = campaign.config()['pressures_gpa']
     expected = list(range(cfg['start_pressure_gpa'], int(pressures[-1])+1, cfg['pressure_increment_gpa']))
     if pressures != expected:

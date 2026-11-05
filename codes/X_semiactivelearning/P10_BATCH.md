@@ -1,3 +1,11 @@
+> **2026-11-04 selected and implemented path:** calculate
+> `wB97M-D4rev def2-TZVPD EnGrad RIJCOSX` and subtract both printed D4 energy
+> and forces for electronic-only labels. Generation, collection and provenance
+> implement this route in the fresh plan selected by `p10_batch_active.json`.
+> The old direct-route bundle is superseded and preserved. Submission preflight
+> now stops at missing `dft_package.json`; no production jobs were submitted.
+> See [DFT provenance](DFT_PROVENANCE.md).
+
 # Prepared foundation polar-1-l P10 ensemble and Viper DFT batch
 
 No jobs have been submitted and no MD, ORCA, or training has run. The current
@@ -122,10 +130,10 @@ layout come from the Viper profile. The array runner requires Python >=3.10;
 the standard library; NumPy/ASE are required for preparation/collection.
 
 Labels are dispersion-free wB97M/def2-TZVPD EnGrad RIJCOSX, isolated clusters,
-absolute energies in eV and forces in eV/Angstrom. The LibXC component name
-contains `_v`; evaluating VV10 or D4 is not allowed. The single-geometry method
-pilot must reproduce the audited C6 electronic labels before production DFT.
-That target-site pilot has not run. Failed or partial ORCA jobs, stdout, exit
+absolute energies in eV and forces in eV/Angstrom. ORCA evaluates D4rev; collection removes its printed energy and gradient,
+checks reconstruction, and retains total/D4 audit labels. VV10 labels and
+unsubtracted D4rev total labels are excluded. The direct LibXC equivalence
+pilot is no longer required for this selected C6 subtraction route. Failed or partial ORCA jobs, stdout, exit
 codes, scratch and property files are preserved without automatic SCF retries.
 
 Prepared files include `md_replica_00_dais.slurm` through `md_replica_09_dais.slurm`, `dft_2000_viper.slurm` and
@@ -136,19 +144,16 @@ log directories before sbatch; none has been invoked. To inspect readiness:
 python p10_batch.py check-md
 ```
 
-After the method pilot and future reviewed extraction, these prepare/check
+After the future reviewed extraction, these prepare/check
 commands do not submit anything:
 
 ```bash
-python p10_batch.py prepare-method-pilot
-# Operator runs/transfers the one-geometry pilot separately.
-python p10_batch.py verify-method-pilot
 python p10_batch.py prepare-dft
 python p10_batch.py check-dft
 ```
 
 Transfer code, the active dated plan/config, ORCA inputs/manifests,
-`method_verified.json`, the geometry audit and package index to the same relative
+the D4rev subtraction provenance, geometry audit and package index to the same relative
 locations on Viper. Model weights/MD trajectories are unnecessary for already
 prepared ORCA jobs. Transfer completed output stages back before collection:
 

@@ -66,3 +66,12 @@ def require_method_verified():
             raise ValueError('Method validator changed; revalidate the preserved pilot')
     if record['method'] != campaign.config()['dft']['functional_basis']:
         raise ValueError('Verified pilot method disagrees with current method')
+
+
+def require_label_route():
+    """Require explicit selection of the C6 subtraction convention."""
+    import campaign
+    cfg = campaign.config()['dft']
+    if (cfg['functional_basis'] != 'wB97M/def2-TZVPD'
+            or cfg.get('label_route') != 'orca_d4rev_subtraction'):
+        raise ValueError('Prepare a new plan selecting orca_d4rev_subtraction; do not bypass a frozen direct-route plan')

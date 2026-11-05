@@ -35,6 +35,10 @@ steps, environment/Git notes and the smallest sufficient validation. The active
 P10 plan overrides generic campaign defaults; historical notebook entries do
 not select today's model, duration or launch scripts.
 
+Viper's Python 3.11 environment and latest GitHub-source MACE installation are
+recorded in [VIPER_ENVIRONMENT.md](VIPER_ENVIRONMENT.md). DAIS keeps its separate
+[environment record](DAIS_ENVIRONMENT.md).
+
 ## Prepared 10 GPa batch
 
 [P10_BATCH.md](P10_BATCH.md) describes ten independent one-GPU **foundation
@@ -44,7 +48,8 @@ acquisition +50 evaluation). Runtime sizing is provisional, not a measured H200
 benchmark. `p10_batch_active.json` points to the frozen, checkpoint-pinned plan.
 Each helper invocation submits exactly ten independent jobs without dependencies.
 Further checkpoint restarts require a separate launch decision. Whole-molecule PBC and reviewed-window quality
-checks are required before DFT; the target-site method pilot remains pending.
+checks are required before DFT. The selected D4rev subtraction path and the
+frozen launcher migration status are documented below and in [DFT_PROVENANCE.md](DFT_PROVENANCE.md).
 
 ## Scientific loop
 
@@ -80,31 +85,41 @@ It averages squared errors over Cartesian force components, in meV/Angstrom.
 This is an adaptive validation gate, not an untouched final test. Consecutive
 MD frames and adjacent blocks can remain correlated.
 
-## Direct wB97M method pilot
+## Selected DFT path: D4rev calculation, electronic-only training labels
 
-ORCA's documented named wB97M keywords include dispersion. The proposed route
-uses its explicit LibXC component block, without a D3/D4/NL keyword:
+As selected by the user on 2026-11-04, retain the established C6 ORCA input:
 
 ```text
-! def2-TZVPD EnGrad RIJCOSX
-%method
-  Method DFT
-  Functional hyb_mgga_xc_wb97m_v
-end
+! wB97M-D4rev def2-TZVPD EnGrad RIJCOSX
 ```
 
-The component's name contains `_v`; this does not authorize VV10 labels.
-Output validation rejects evaluated dispersion terms. **This direct route has
-not yet been run on the target ORCA installation.** Before production DFT, the
-controller prepares one geometry from the audited C6 release. Run that pilot
-on Viper/BlueHive, transfer its output, then verify against the C6 wB97M-only
-energy/forces (1e-3 eV cluster energy and 1e-4 eV/Angstrom maximum force-component
-tolerances). A mismatch blocks production; do not change the functional or
-loosen tolerances automatically.
+Calculate D4rev, then explicitly subtract its printed energy **and gradient**
+from the total labels. Merely ignoring the dispersion output section leaves
+D4rev in the total energy and forces. Training uses absolute electronic
+`REF_energy` in eV and `REF_forces` in eV/Angstrom; no atomic reference is
+subtracted. Preserve total and D4 labels and verify reconstruction.
+See [DFT_PROVENANCE.md](DFT_PROVENANCE.md) and the
+[C6 converter](../C6_wb97m_nodisp/prepare_data.py).
 
-Reference: [ORCA 6.1 LibXC interface](https://www.faccts.de/docs/orca/6.1/manual/contents/modelchemistries/DensityFunctionalTheory.html).
-C6's preserved subtraction labels remain supporting audit evidence; no old
-D4rev-inclusive dataset is imported into the new campaign automatically.
+This selection supersedes the proposed direct LibXC production route. Its
+single-geometry equivalence pilot was intended to validate that alternative
+against C6; it is not evidence that D4 subtraction is invalid or mandatory
+physics in the training target.
+
+**Execution status:** generation, strict collection, controller gates and
+provenance now implement the selected C6 subtraction route. A fresh dated
+bundle is selected by `p10_batch_active.json`; the earlier direct-route bundle
+is preserved as superseded history. The direct-method pilot is no longer a
+production prerequisite for this route. The submission helper now passes the
+route check and stops because `dft_package.json` is absent. The reviewed
+2,000-cluster selection and geometry audit are still required.
+
+The refreshed GitHub tree and local checkout contain 1,000 old ORCA input
+geometries under `dft_launches/p10_2gpu_6h/P10p0000GPa/acquisition/inputs/`
+and the 266 accepted historical labels. These belong to the old transient
+campaign, not the new 1,950 acquisition +50 evaluation batch. No new replica
+production trajectories or batch package were found in the filename inventory
+of `codes/` and `outputsfull/`, including ignored files.
 
 ## Commands
 
@@ -186,7 +201,7 @@ atomization subtraction is applied to `REF_energy`.
 | --- | --- |
 | `autonomous.py`, `autonomous_policy.json` | Sequential loop and force/pressure decision |
 | `campaign.py`, `workflow_species.py` | MD, analysis, PBC cluster selection, collection and parity |
-| `method_pilot.py`, `orca_output_validation.py` | Direct-method calibration, strict DFT validation |
+| `method_pilot.py`, `orca_output_validation.py` | Historical direct-method calibration, strict D4rev subtraction validation |
 | `site_dft.py`, `site_profiles.json` | Viper/BlueHive Slurm packages |
 | `launch_single_gpu.py`, `training_bridge.py` | Active launcher and shared D2 recipe adapter |
 | `atomic_references.py`, `atomic_references/` | Audited matching E0s and evidence |

@@ -73,7 +73,7 @@ done
                           f'mkdir -p "$MLIP_DIR/{relative}/slurm_logs" "$MLIP_DIR/{relative}/outputs"\n'
                           'cd "$(dirname "$0")"\n' + '\n'.join(f'sbatch {shlex.quote(path.name)}' for path in scripts)+'\n')
         all_scripts.extend(scripts)
-    campaign.write_json(launch_root / 'site_package.json', {'functional_basis': cfg['functional_basis'], 'input_count': len(records), 'sites': profiles, 'outputs_relative_to_mlip': str(ddir.relative_to(campaign.MLIP)), 'input_sha256': {row['stem']: campaign.sha(launch_root / 'inputs' / f'{row["stem"]}.inp') for row in records}})
+    campaign.write_json(launch_root / 'site_package.json', {'functional_basis': cfg['functional_basis'], 'label_route': cfg.get('label_route'), 'source_method': 'wB97M-D4rev def2-TZVPD EnGrad RIJCOSX' if cfg.get('label_route') == 'orca_d4rev_subtraction' else cfg['functional_basis'], 'dispersion_removed': 'ORCA_printed_D4rev' if cfg.get('label_route') == 'orca_d4rev_subtraction' else None, 'input_count': len(records), 'sites': profiles, 'outputs_relative_to_mlip': str(ddir.relative_to(campaign.MLIP)), 'input_sha256': {row['stem']: campaign.sha(launch_root / 'inputs' / f'{row["stem"]}.inp') for row in records}})
     return all_scripts
 
 

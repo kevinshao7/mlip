@@ -27,6 +27,9 @@ class BatchTests(unittest.TestCase):
         shutil.copytree(batch.ROOT/'production',self.code/'production',ignore=shutil.ignore_patterns('__pycache__'))
         for name in ['autonomous.py','launch_single_gpu.py']:
             shutil.copy2(batch.ROOT/name if (batch.ROOT/name).is_file() else batch.ROOT/'production'/name,self.code/name)
+        converter=self.root/'codes/C6_wb97m_nodisp/prepare_data.py'
+        converter.parent.mkdir(parents=True)
+        shutil.copy2(batch.ROOT.parent/'C6_wb97m_nodisp/prepare_data.py',converter)
         profile=Path(json.loads((self.code/'campaign_config.json').read_text())['profile_csv'])
         target=(self.code/profile).resolve(); target.parent.mkdir(parents=True)
         shutil.copy2((batch.ROOT/profile).resolve(),target)

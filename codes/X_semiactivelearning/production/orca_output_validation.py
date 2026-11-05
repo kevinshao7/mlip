@@ -45,6 +45,8 @@ def parse_input(path: Path) -> tuple[int, int, list[str], np.ndarray, str]:
     if functional_basis == "def2-TZVPD" and re.search(
             r"%method\s+Method DFT\s+Functional hyb_mgga_xc_wb97m_v\s+end", text, re.I):
         functional_basis = "wB97M/def2-TZVPD"
+    if functional_basis.lower() == 'wb97m-d4rev def2-tzvpd':
+        functional_basis = 'wB97M/def2-TZVPD'
     match = XYZ_RE.search(text)
     if match is None:
         raise ValueError("missing * xyz charge multiplicity declaration")
@@ -121,6 +123,7 @@ def process(job: Job) -> tuple[dict[str, object], Atoms | None]:
     output_charge = output_input_charge = output_input_spin = energy_hartree = None
     normal = False
     gradient = None
+    electronic = None
     if not job.output_path.is_file():
         issues.append("missing_output")
     else:
@@ -135,11 +138,27 @@ def process(job: Job) -> tuple[dict[str, object], Atoms | None]:
         else:
             issues.append("missing_output_input_provenance")
         if job.expected_functional_basis == "wB97M/def2-TZVPD":
-            from workflow_policy import validate_nodisp_output
             try:
-                validate_nodisp_output(text, job.input_path.read_text())
-            except ValueError as exc:
-                issues.append(str(exc))
+                # Reuse the audited C6 converter, including printed D4 gradients.
+                import importlib.util
+                converter = Path(__file__).resolve().parents[2] / 'C6_wb97m_nodisp/prepare_data.py'
+                spec = importlib.util.spec_from_file_location('c6_d4_labels', converter)
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+                echoed = re.findall(r'^\s*\|\s*\d+> ?(.*)$', text, re.M)
+                normalize = lambda lines: [' '.join(line.split()).lower() for line in lines if line.strip()]
+                if normalize(echoed) != normalize(job.input_path.read_text().splitlines()):
+                    raise ValueError('echoed_input_mismatch')
+                if re.search(r'Non-local correlation energy|NL Correlation|VV10.*(?:energy|correction)',text,re.I):
+                    raise ValueError('unexpected_nonlocal_dispersion')
+                electronic = module.convert(job.output_path)
+                module.verify(electronic)
+                if list(electronic.symbols) != symbols or not np.allclose(electronic.positions, positions, rtol=0, atol=1e-8):
+                    raise ValueError('converted_geometry_mismatch')
+                if electronic.info['spin'] != 1:
+                    raise ValueError('non_singlet_multiplicity')
+            except (ValueError, AssertionError) as exc:
+                issues.append(f'd4rev_subtraction:{exc}')
         output_spins = re.findall(r"Multiplicity\s+Mult\s+\.+\s+(\d+)", text)
         if not output_spins or int(output_spins[-1]) != input_spin:
             issues.append("output_multiplicity_mismatch")
@@ -188,6 +207,11 @@ def process(job: Job) -> tuple[dict[str, object], Atoms | None]:
             "dft_functional_basis": functional_basis,
         })
         atoms.arrays["REF_forces"] = -gradient * HARTREE_PER_BOHR_TO_EV_PER_ANGSTROM
+        if electronic is not None:
+            atoms.info.update(electronic.info)
+            for key, value in electronic.arrays.items():
+                if key not in ('numbers', 'positions'):
+                    atoms.arrays[key] = value.copy()
 
     row: dict[str, object] = {
         "frame": job.frame, "stem": job.stem,

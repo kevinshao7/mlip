@@ -49,9 +49,16 @@ Total Charge Charge .... 0
 Multiplicity Mult .... 1
 FINAL SINGLE POINT ENERGY -76.0
 CARTESIAN GRADIENT
-0 O : 0.001 0.0 0.0
-1 H : -0.001 0.0 0.0
-2 H : 0.0 0.0 0.0
+1 O : 0.001 0.0 0.0
+2 H : -0.001 0.0 0.0
+3 H : 0.0 0.0 0.0
+Difference to translation invariance:
+Dispersion correction -0.001
+DISPERSION GRADIENT
+1 O : 0.0001 0.0 0.0
+2 H : -0.0001 0.0 0.0
+3 H : 0.0 0.0 0.0
+Difference to translation invariance:
 ORCA TERMINATED NORMALLY
 '''
 
@@ -65,11 +72,12 @@ ORCA TERMINATED NORMALLY
         self.assertIsNotNone(atoms, report)
         self.assertEqual(atoms.info['charge'],0)
         self.assertFalse(atoms.pbc.any())
-        self.assertAlmostEqual(atoms.info['REF_energy'], -76*27.211386245988)
+        self.assertAlmostEqual(atoms.info['REF_energy'], (-76+.001)*27.211386245988)
         self.assertLess(atoms.arrays['REF_forces'][0,0],0)
 
     def test_rejects_dispersion_stale_charge_spin_and_failed_jobs(self):
         bad = [self.output+'\nDispersion correction -0.001\n',
+               self.output.replace('DISPERSION GRADIENT','MISSING GRADIENT'),
                self.output.replace('Charge .... 0','Charge .... 1'),
                self.output.replace('Mult .... 1','Mult .... 3'),
                self.output.replace('ORCA TERMINATED NORMALLY','FAILED'),
@@ -78,6 +86,20 @@ ORCA TERMINATED NORMALLY
         for text in bad:
             report, atoms = self.result(text)
             self.assertIsNone(atoms, report)
+
+    def test_preserved_c6_output_matches_subtracted_labels(self):
+        import re
+        source = campaign.MLIP/'outputsfull/acquisition/outputs/cluster_010.out'
+        text = source.read_text()
+        echoed = '\n'.join(re.findall(r'^\s*\|\s*\d+> ?(.*)$', text, re.M))
+        self.inp.write_text(echoed+'\n')
+        charge, spin, symbols, _, _ = parse_input(self.inp)
+        report, atoms = process(Job(0,'real',self.inp,source,charge,spin,len(symbols),campaign.WB97M_REFERENCE_METHOD))
+        self.assertIsNotNone(atoms, report)
+        self.assertAlmostEqual(atoms.info['REF_energy'],(-438.585767442637+.006295804)*27.211386245988)
+        self.assertAlmostEqual(atoms.arrays['REF_forces'][0,0],-(-.009577013-.000092074)*27.211386245988/.529177210903)
+        np.testing.assert_allclose(atoms.arrays['REF_forces']+atoms.arrays['D4_forces'],atoms.arrays['total_forces'])
+        self.assertEqual(atoms.info['dispersion_removed'],'ORCA_printed_D4rev')
 
     def test_refuses_input_charge_guess(self):
         with self.assertRaises(ValueError):
@@ -133,7 +155,7 @@ class ControllerTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
         self.root=Path(self.temp.name)
-        patches=[patch.object(campaign,'OUT',self.root),patch.object(campaign,'event'),patch.object(autonomous,'note'),patch.object(workflow_policy,'require_method_verified')]
+        patches=[patch.object(campaign,'OUT',self.root),patch.object(campaign,'event'),patch.object(autonomous,'note'),patch.object(workflow_policy,'require_label_route')]
         for p in patches: p.start(); self.addCleanup(p.stop)
         self.model=self.root/'model.model'; self.model.write_text('saved model')
         campaign.write_json(self.root/'model_lineage.json', {'current_model':str(self.model),'history':[]})

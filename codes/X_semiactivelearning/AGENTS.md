@@ -46,7 +46,8 @@ move them without tracing callers. Retired code is available in Git history. No 
 
 ## Edit, verify, finish
 
-Use the verified Python 3.11 mlipenv (root AGENTS.md); don't rediscover or install
+Use the verified site-specific Python 3.11 environment (root AGENTS.md and
+VIPER_ENVIRONMENT.md on Viper); don't rediscover or install
 an environment for each edit. Search source with scoped `rg`, and read narrow
 function ranges. Avoid listing thousands of generated ORCA inputs or scanning
 large trajectories when an existing hash-backed audit answers the question.
@@ -77,10 +78,14 @@ trajectories, raw scratch or unrelated untracked outputs.
   and extxyz exactly. Verify multiplicity separately (singlet/even electrons).
   Unsupported molecular elements fail. Neutral isolated E0 atoms are a distinct
   reference-state exception with explicit charge 0 and verified multiplicities.
+- User decision 2026-11-04: select the established C6 wB97M-D4rev calculation
+  with explicit subtraction of both printed D4 energy and gradient. See
+  DFT_PROVENANCE.md. The fresh active plan implements this route. Preserve
+  superseded direct-route bundles; do not fabricate records or alter hashes.
 - Active labels are dispersion-free wB97M/def2-TZVPD absolute energies in eV
   and forces in eV/Angstrom. Exclude V/D4rev total labels. A direct LibXC input
   is not certified merely because its syntax passes: require the one-geometry
-  pilot against preserved C6 labels before production DFT. Do not invent a
+  pilot against preserved C6 labels before using that direct route in production DFT. Do not invent a
   plain !wB97M alias or loosen tolerances automatically.
 - Exactly 2000 P10 DFT structures: 1950 acquisition +50 evaluation. Six allowed
   complete molecules per cluster; one centre plus five nearest allowed molecular
@@ -113,8 +118,8 @@ trajectories, raw scratch or unrelated untracked outputs.
 
 ## Current validation limits (2026-11-04)
 
-No production jobs were submitted in this preparation session. The direct-method
-ORCA pilot and actual 2000-cluster set remain pending future MD/DFT work. All
+No production jobs were submitted. The selected D4rev subtraction code passed
+focused regressions; the actual reviewed 2000-cluster package is still absent. All
 266 historical C6 frames passed basic finite/charge/spin/PBC checks, but missing
 parent MD prevents certifying their whole-molecule extraction. CPU restart tests
 are not a polar-1-l H200 throughput or GPU execution benchmark. See DEBUGGING.md

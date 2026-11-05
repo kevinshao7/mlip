@@ -1,5 +1,10 @@
 # Dispersion-free wB97M labels
 
+The user selected this D4rev calculation plus explicit energy/force subtraction
+path for future X/P10 labels on 2026-11-04. See
+[X/P10 provenance and deployment status](../X_semiactivelearning/DFT_PROVENANCE.md).
+This decision does not modify this historical release or certify a new batch.
+
 ## Scientific significance and released dataset
 
 This release separates the learnable wB97M electronic energy/force surface from

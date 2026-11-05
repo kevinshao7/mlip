@@ -1342,10 +1342,8 @@ def dft_input(
         raise ValueError(f"Unsafe ORCA functional/basis route: {functional_basis!r}")
     route = functional_basis
     if functional_basis == WB97M_REFERENCE_METHOD:
-        route = "def2-TZVPD"
+        route = "wB97M-D4rev def2-TZVPD"
     lines = [f"! {route} EnGrad RIJCOSX", f"%pal nprocs {nprocs} end", f"* xyz {charge} {multiplicity}"]
-    if functional_basis == WB97M_REFERENCE_METHOD:
-        lines[1:1] = ["%method", "  Method DFT", "  Functional hyb_mgga_xc_wb97m_v", "end"]
     lines += [f"{symbol} {x:.12f} {y:.12f} {z:.12f}" for symbol, (x,y,z) in zip(atoms.symbols, atoms.positions, strict=True)]
     return "\n".join(lines) + "\n*\n"
 
@@ -1600,8 +1598,8 @@ def command_dft(args: argparse.Namespace) -> None:
         run_local_orca(args, ddir)
         return
     if config()["dft"]["functional_basis"] == WB97M_REFERENCE_METHOD:
-        from workflow_policy import require_method_verified
-        require_method_verified()
+        from workflow_policy import require_label_route
+        require_label_route()
     from ase.io import read
     if not clusters.is_file(): raise FileNotFoundError(f"Generate clusters first: {clusters}")
     if ddir.exists() and any(ddir.iterdir()):

@@ -1,5 +1,8 @@
 # DAIS Python and GitHub MACE
 
+This record describes DAIS only. For the later Viper installation of latest
+GitHub development MACE, see [VIPER_ENVIRONMENT.md](VIPER_ENVIRONMENT.md).
+
 Verified 2026-11-04 on dais11.mpcdf.mpg.de. Use this existing environment:
 
 ```bash

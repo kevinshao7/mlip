@@ -52,6 +52,13 @@ Large generated files belong under `outputsfull/` or dated workflow folders, not
 
 ## Environment
 
+On Viper, use `/viper/ptmp1/kshao/mlip/.venv/bin/python` (Python 3.11.11).
+MACE is installed editable from the official GitHub develop checkout, version
+0.3.18, commit `7215fadd3b591444ab2c07634e84419685a48e87`. This supersedes
+DAIS-only paths when working on Viper. See
+[Viper environment](codes/X_semiactivelearning/VIPER_ENVIRONMENT.md).
+The site-specific DAIS record below remains unchanged for that host.
+
 On the currently verified DAIS checkout, use:
 
 ```text

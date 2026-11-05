@@ -125,11 +125,15 @@ def prepare(args):
                                [*sorted((ROOT/'production').glob('*.py')),
                                 ROOT/'campaign.py',ROOT/'p10_batch.py',ROOT/'autonomous.py',ROOT/'launch_single_gpu.py',
                                 ROOT.parent/'B_conditionsproduction/NPTMACEproduction_base.py',
-                                ROOT/'site_profiles.json',(ROOT/cfg['profile_csv']).resolve()]},
+                                ROOT/'site_profiles.json', ROOT.parent/'C6_wb97m_nodisp/prepare_data.py',
+                                (ROOT/cfg['profile_csv']).resolve()]},
             'model_mode':'foundation', 'model_requirement':'frozen_foundation_polar_1_l_checkpoint',
             'md_submission_mode':'ten_independent_single_gpu_jobs',
             'gpu_walltime_hours':24, 'estimated_compute_hours':122.71111111111111, 'planned_segments_per_replica':1, 'runtime_estimate_is_calibrated':False,
-            'cluster_source':'ten_new_MD_replicas'}
+            'cluster_source':'ten_new_MD_replicas',
+            'dft_label_provenance':{'source_method':'wB97M-D4rev def2-TZVPD EnGrad RIJCOSX',
+                'label_route':'orca_d4rev_subtraction', 'dispersion_removed':'ORCA_printed_D4rev',
+                'energy_reference':'absolute', 'energy_units':'eV', 'force_units':'eV/Angstrom'}}
     write_json(code/'plan.json', plan)
     write_json(ACTIVE_PLAN, {'plan':plan['plan_relative']})
     write_launchers(plan)
@@ -374,8 +378,8 @@ def clusters(plan):
 
 def prepare_dft(plan):
     campaign=configure(plan)
-    from workflow_policy import require_method_verified
-    require_method_verified()
+    from workflow_policy import require_label_route
+    require_label_route()
     from cluster_quality import audit_sets
     paths={role:campaign.cycle(10)/'clusters'/role/'clusters.extxyz' for role in ['acquisition','evaluation']}
     analysis_path=campaign.cycle(10)/'analysis/summary.json'
@@ -401,15 +405,18 @@ def prepare_dft(plan):
                 entries.append({'role':role,**row,'input_relative':str(inp.relative_to(MLIP)),'input_sha256':sha(inp)})
     if len(entries)!=2000:
         raise ValueError('DFT package must contain exactly 2000 inputs')
-    write_json(campaign.OUT/'dft_package.json',{'entries':entries,'total':2000,'batch_config_sha256':plan['config_sha256'], 'cluster_quality_sha256':sha(audit_path)})
+    write_json(campaign.OUT/'dft_package.json',{'entries':entries,'total':2000,'batch_config_sha256':plan['config_sha256'], 'cluster_quality_sha256':sha(audit_path),
+        'label_provenance':plan['dft_label_provenance']})
     print('Prepared exactly 2000 Viper DFT inputs. No submission performed.')
 
 
 def check_dft(plan):
     campaign=configure(plan)
-    from workflow_policy import require_method_verified
-    require_method_verified()
+    from workflow_policy import require_label_route
+    require_label_route()
     package=json.loads((campaign.OUT/'dft_package.json').read_text())
+    if package.get('label_provenance') != plan['dft_label_provenance']:
+        raise ValueError('DFT label provenance mismatch')
     quality_path=campaign.OUT/'cluster_quality.json'
     if sha(quality_path)!=package.get('cluster_quality_sha256'):
         raise ValueError('Cluster quality audit changed or is missing')
@@ -421,15 +428,16 @@ def check_dft(plan):
         raise ValueError('Expected exactly 2000 DFT inputs')
     for entry in package['entries']:
         validate_input(entry)
-    print('2000 inputs and method pilot verified; Viper submission is a separate action.')
+    print('2000 inputs, geometry audit and D4rev subtraction route verified; Viper submission is a separate action.')
 
 
 def validate_input(entry):
     path=MLIP/entry['input_relative']; text=path.read_text()
     if sha(path)!=entry['input_sha256']:
         raise ValueError(f'Changed ORCA input: {path}')
-    if '! def2-TZVPD EnGrad RIJCOSX' not in text or 'Functional hyb_mgga_xc_wb97m_v' not in text:
-        raise ValueError('Wrong direct wB97M route')
+    routes=re.findall(r'^! (.+)$',text,re.M)
+    if routes != ['wB97M-D4rev def2-TZVPD EnGrad RIJCOSX'] or '%method' in text.lower():
+        raise ValueError('Wrong wB97M-D4rev subtraction route')
     match=re.search(r'^\* xyz ([+-]?\d+) (\d+)\n(.*?)^\*\s*$',text,re.M|re.S)
     if match is None: raise ValueError('Missing explicit ORCA charge/spin/geometry')
     coordinate_rows=[line.split() for line in match[3].splitlines() if line.strip()]
@@ -446,11 +454,13 @@ def validate_input(entry):
 
 def run_dft_group(args, plan):
     campaign=configure(plan)
-    from workflow_policy import require_method_verified
-    require_method_verified()
+    from workflow_policy import require_label_route
+    require_label_route()
     if not 0<=args.index<200: raise ValueError('DFT group index must be 0..199')
     package=json.loads((campaign.OUT/'dft_package.json').read_text())
     if len(package['entries'])!=2000: raise ValueError('Wrong DFT budget')
+    if package.get('label_provenance') != plan['dft_label_provenance']:
+        raise ValueError('DFT label provenance mismatch')
     if sha(campaign.OUT/'cluster_quality.json')!=package.get('cluster_quality_sha256'):
         raise ValueError('Production DFT requires its unchanged geometry audit')
     entries=package['entries'][args.index*10:(args.index+1)*10]
