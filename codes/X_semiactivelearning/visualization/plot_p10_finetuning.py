@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plot the interrupted published P10 run and epoch-9 parity; never train."""
+"""Plot P10 foundation or epoch-9 parity and saved evaluations; never train."""
 import argparse
 import hashlib
 import json
@@ -19,9 +19,32 @@ def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def plot_parity(destination, re_, pe, rf, pf, counts, roles, metadata):
+def resolve_model(selection):
+    if selection == 'finet':
+        model = OUT / 'p15_finetuned_epoch9_1ns_10rep_20261110T102256817401Z/model/fine_tuned.model'
+        expected = '481be9d938237e75fa71362adc3601a89e1c4c3626c9ab3094314b09681a43f0'
+    else:
+        workflow = Path(__file__).resolve().parents[1]
+        pointer = json.loads((workflow / 'partial_clusters_active.json').read_text())
+        plan = json.loads((ROOT / pointer['source_plan']).read_text())
+        record = json.loads((ROOT / plan['output_relative'] / 'model_binding.json').read_text())
+        if plan.get('model_mode') != 'foundation' or record.get('model_mode') != 'foundation' or record.get('foundation_model') != 'polar-1-l':
+            raise ValueError('Dataset source binding must select foundation polar-1-l')
+        expected = plan['foundation_checkpoint']['sha256']
+        if record['sha256'] != expected:
+            raise ValueError('Foundation binding disagrees with checkpoint lock')
+        model = ROOT / record['model_relative']
+        if sha(ROOT / record['provenance_relative']) != record['provenance_sha256']:
+            raise ValueError('Foundation provenance hash mismatch')
+    if sha(model) != expected:
+        raise ValueError(f'{selection} model hash mismatch')
+    return model
+
+
+def plot_parity(destination, re_, pe, rf, pf, counts, roles, metadata, atom_symbols):
     import numpy as np
     import matplotlib.pyplot as plt
+    model_label = 'Foundation polar-1-l' if metadata.get('model_selection') == 'found' else 'Fine-tuned epoch 9'
     metrics = {}
     for name, cluster_mask in [('all_2000', np.ones(len(counts), dtype=bool)), ('acquisition_1950', np.array(roles) == 'acquisition'), ('held_out_50', np.array(roles) == 'evaluation')]:
         atom_mask = np.repeat(cluster_mask, counts)
@@ -29,20 +52,48 @@ def plot_parity(destination, re_, pe, rf, pf, counts, roles, metadata):
         force_error = pf[atom_mask] - rf[atom_mask]
         metrics[name] = {'clusters': int(cluster_mask.sum()), 'energy_rmse_meV_per_atom': float(1000*np.sqrt(np.mean(energy_error**2))),
                          'force_component_rmse_meV_per_A': float(1000*np.sqrt(np.mean(force_error**2)))}
-    for filename, x, y, label, masks in [
-        ('energy_parity.png', re_, pe, 'Absolute electronic energy (eV)', np.array(roles) == 'evaluation'),
-        ('force_parity.png', rf.ravel(), pf.ravel(), 'Force component (eV/Å)', np.repeat(np.array(roles) == 'evaluation', counts * 3))]:
-        fig, axis = plt.subplots(figsize=(7, 7))
-        for mask, label_role in [(~masks, 'Acquisition (includes train/validation)'), (masks, 'Held-out evaluation')]:
-            axis.scatter(x[mask], y[mask], s=3, alpha=.3, rasterized=True, label=label_role)
-        low, high = min(x.min(), y.min()), max(x.max(), y.max())
-        axis.plot([low, high], [low, high], 'k--', lw=1)
-        axis.set(xlabel='DFT ' + label, ylabel='Epoch-9 prediction ' + label,
-                 title='P10 epoch 9: all 2000 clusters (mixed splits)', aspect='equal')
-        axis.legend(markerscale=3)
-        fig.tight_layout()
-        fig.savefig(destination / filename, dpi=220)
-        plt.close(fig)
+    atom_symbols = np.asarray(atom_symbols)
+    if atom_symbols.shape != (len(rf),) or not set(atom_symbols) <= {'H', 'N', 'O'}:
+        raise ValueError('Expected one supported atom symbol per force vector')
+    fig, axis = plt.subplots(figsize=(7, 7))
+    held_out = np.array(roles) == 'evaluation'
+    for mask, label in [(~held_out, 'Acquisition (includes train/validation)'), (held_out, 'Held-out evaluation')]:
+        axis.scatter(1000 * re_[mask], 1000 * (pe[mask] - re_[mask]),
+                     s=3, alpha=.3, rasterized=True, label=label)
+    energy_errors = 1000 * (pe - re_)
+    axis.text(.03, .97,
+              f'All clusters: RMSE = {np.sqrt(np.mean(energy_errors**2)):.2f} meV\n'
+              f'MAE = {np.mean(np.abs(energy_errors)):.2f} meV',
+              transform=axis.transAxes, va='top', fontsize=9,
+              bbox=dict(facecolor='white', alpha=.85, edgecolor='.8'))
+    axis.axhline(0, color='k', ls='--', lw=1)
+    axis.set(xlabel='DFT absolute electronic energy (meV)',
+             ylabel='MLIP − DFT energy (meV)',
+             title=f'P10 {model_label}: all {len(counts)} clusters (mixed splits)')
+    axis.legend(markerscale=3, loc='lower right')
+    fig.tight_layout()
+    fig.savefig(destination / 'energy_parity.png', dpi=220)
+    plt.close(fig)
+    fig, axis = plt.subplots(figsize=(7, 7))
+    dft_magnitude = 1000 * np.linalg.norm(rf, axis=1)
+    error_magnitude = 1000 * np.linalg.norm(pf - rf, axis=1)
+    force_statistics = [f'All atoms: RMSE = {np.sqrt(np.mean(error_magnitude**2)):.2f}, MAE = {np.mean(error_magnitude):.2f}']
+    for symbol, color in [('H', 'tab:blue'), ('N', 'tab:green'), ('O', 'tab:red')]:
+        mask = atom_symbols == symbol
+        if mask.any():
+            force_statistics.append(f'{symbol}: RMSE = {np.sqrt(np.mean(error_magnitude[mask]**2)):.2f}, MAE = {np.mean(error_magnitude[mask]):.2f}')
+            axis.scatter(dft_magnitude[mask], error_magnitude[mask], s=3, alpha=.3,
+                         color=color, rasterized=True, label=symbol)
+    axis.text(.03, .97, 'Vector errors (meV/Å)\n' + '\n'.join(force_statistics),
+              transform=axis.transAxes, va='top', fontsize=9,
+              bbox=dict(facecolor='white', alpha=.85, edgecolor='.8'))
+    axis.set(xlabel='DFT force magnitude (meV/Å)',
+             ylabel='Force error magnitude ‖MLIP − DFT‖ (meV/Å)',
+             title=f'P10 {model_label}: all {len(counts)} clusters (mixed splits)')
+    axis.legend(title='Atom type', markerscale=3, loc='lower right')
+    fig.tight_layout()
+    fig.savefig(destination / 'force_parity.png', dpi=220)
+    plt.close(fig)
     (destination / 'metrics.json').write_text(json.dumps({**metadata, 'metrics': metrics,
         'note': 'All-data parity is descriptive; correlated acquisition frames are not independent test samples.'}, indent=2) + '\n')
 
@@ -66,61 +117,98 @@ def plot_history(destination, curves):
     plt.close(fig)
 
 
-def replot(source, destination):
+def recover_atom_symbols(reference_energy, reference_forces, counts, roles):
+    """Recover atom order for older archives, requiring exact reference agreement."""
+    import numpy as np
+    from ase.io import read
+    published = json.loads((OUT / 'p10_published_polar1l_500epochs/published_dataset.json').read_text())
+    collection = Path(published['collection'])
+    summary = json.loads((collection / 'summary.json').read_text())
+    frames, expected_roles = [], []
+    for role, filename in [('acquisition', 'finetuning.xyz'), ('evaluation', 'evaluation.xyz')]:
+        path = collection / filename
+        if sha(path) != summary['files'][role]['sha256']:
+            raise ValueError('Dataset hash mismatch while recovering atom symbols')
+        subset = read(path, ':')
+        frames.extend(subset)
+        expected_roles.extend([role] * len(subset))
+    if (not np.array_equal(counts, [len(a) for a in frames])
+            or not np.array_equal(roles, expected_roles)
+            or not np.array_equal(reference_energy, [a.info['REF_energy'] for a in frames])
+            or not np.array_equal(reference_forces, np.concatenate([a.arrays['REF_forces'] for a in frames]))):
+        raise ValueError('Saved evaluation does not match audited dataset atom order')
+    return np.array([symbol for a in frames for symbol in a.get_chemical_symbols()])
+
+
+def replot(source, destination, selection=None):
     import numpy as np
     source = source.resolve()
     with np.load(source / 'predictions.npz', allow_pickle=False) as saved:
         arrays = [saved[key] for key in ('reference_energy', 'predicted_energy',
                   'reference_forces', 'predicted_forces', 'atom_counts', 'roles')]
+        atom_symbols = saved['atom_symbols'] if 'atom_symbols' in saved else None
     metadata = json.loads((source / 'metrics.json').read_text())
+    saved_selection = metadata.get('model_selection', 'finet')
+    if selection is not None and selection != saved_selection:
+        raise ValueError('--model conflicts with saved evaluation model')
+    metadata['model_selection'] = saved_selection
     metadata.pop('metrics', None)
     metadata['evaluation_directory'] = str(source)
-    plot_parity(destination, *arrays, metadata)
-    curves = np.loadtxt(source / 'validation_history.csv', delimiter=',', skiprows=1, ndmin=2)
-    plot_history(destination, curves)
+    if atom_symbols is None:
+        atom_symbols = recover_atom_symbols(arrays[0], arrays[2], arrays[4], arrays[5])
+    plot_parity(destination, *arrays, metadata, atom_symbols)
+    np.savez_compressed(destination / 'predictions.npz',
+                        **dict(zip(('reference_energy', 'predicted_energy', 'reference_forces',
+                                    'predicted_forces', 'atom_counts', 'roles'), arrays)),
+                        atom_symbols=atom_symbols)
+    if (source / 'validation_history.csv').exists():
+        curves = np.loadtxt(source / 'validation_history.csv', delimiter=',', skiprows=1, ndmin=2)
+        plot_history(destination, curves)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--model', choices=['found', 'finet'], default=None,
+                        help='Foundation polar-1-l or fine-tuned epoch 9 (default: finet; saved model when replotting)')
     parser.add_argument('--device', choices=['cuda', 'cpu'], default='cuda')
     parser.add_argument('--curves-only', action='store_true')
     parser.add_argument('--output', type=Path)
     parser.add_argument('--from-evaluation', type=Path, metavar='DIRECTORY',
                         help='Regenerate plots from saved evaluation; no inference')
     args = parser.parse_args()
+    if args.model == 'found' and args.curves_only:
+        parser.error('--curves-only describes fine tuning; use --model finet')
     import numpy as np
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
     from datetime import datetime, timezone
-    destination = args.output or OUT / 'visualization' / ('p10_epoch9_' + datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ'))
+    destination = args.output or OUT / 'visualization' / ('p10_' + (args.model or ('saved' if args.from_evaluation else 'finet')) + '_' + datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ'))
     destination.mkdir(parents=True, exist_ok=False)
     if args.from_evaluation:
-        replot(args.from_evaluation, destination)
+        replot(args.from_evaluation, destination, args.model)
         print(destination)
         return
+    selection = args.model or 'finet'
     log = ROOT / 'outputsfull/slurm/X_P10_polar1l_500ep_833733.out'
-    pattern = r'(Initial|Epoch\s+\d+):.*?loss=\s*([\d.eE+-]+), RMSE_E_per_atom=\s*([\d.eE+-]+) meV, RMSE_F=\s*([\d.eE+-]+)'
-    rows = [[-1 if epoch == 'Initial' else int(epoch.split()[1]), float(loss), float(energy), float(force)]
-            for epoch, loss, energy, force in re.findall(pattern, log.read_text())]
-    if not rows:
-        raise ValueError('No validation records in training log')
-    curves = np.asarray(rows)
-    plot_history(destination, curves)
-    if args.curves_only:
-        print(destination)
-        return
+    if selection == 'finet':
+        pattern = r'(Initial|Epoch\s+\d+):.*?loss=\s*([\d.eE+-]+), RMSE_E_per_atom=\s*([\d.eE+-]+) meV, RMSE_F=\s*([\d.eE+-]+)'
+        rows = [[-1 if epoch == 'Initial' else int(epoch.split()[1]), float(loss), float(energy), float(force)]
+                for epoch, loss, energy, force in re.findall(pattern, log.read_text())]
+        if not rows:
+            raise ValueError('No validation records in training log')
+        curves = np.asarray(rows)
+        plot_history(destination, curves)
+        if args.curves_only:
+            print(destination)
+            return
     from ase.io import read
     from mace.calculators import mace_polar
     campaign = OUT / 'p10_published_polar1l_500epochs'
     published = json.loads((campaign / 'published_dataset.json').read_text())
     collection = Path(published['collection'])
     summary = json.loads((collection / 'summary.json').read_text())
-    # Pin the previously verified epoch-9 export, independently of future P15 pointers.
-    model_dir = OUT / 'p15_finetuned_epoch9_1ns_10rep_20261110T102256817401Z/model'
-    model = model_dir / 'fine_tuned.model'
-    if sha(model) != '481be9d938237e75fa71362adc3601a89e1c4c3626c9ab3094314b09681a43f0':
-        raise ValueError('Epoch-9 model hash mismatch')
+    model = resolve_model(selection)
     frames, roles = [], []
     for role, filename, count in [('acquisition', 'finetuning.xyz', 1950), ('evaluation', 'evaluation.xyz', 50)]:
         path = collection / filename
@@ -162,11 +250,13 @@ def main():
     if not all(np.isfinite(a).all() for a in (re_, pe, rf, pf)):
         raise ValueError('Nonfinite predictions')
     counts = np.array([len(a) for a in frames])
+    atom_symbols = np.array([symbol for a in frames for symbol in a.get_chemical_symbols()])
     np.savez_compressed(destination / 'predictions.npz', reference_energy=re_, predicted_energy=pe,
-                        reference_forces=rf, predicted_forces=pf, atom_counts=counts, roles=roles)
+                        reference_forces=rf, predicted_forces=pf, atom_counts=counts, roles=roles, atom_symbols=atom_symbols)
     plot_parity(destination, re_, pe, rf, pf, counts, roles,
                 {'model': str(model), 'model_sha256': sha(model), 'log': str(log),
-                 'status': 'source training timed out; epoch-9 export'})
+                 'model_selection': selection,
+                 'status': 'unmodified foundation polar-1-l' if selection == 'found' else 'source training timed out; epoch-9 export'}, atom_symbols)
     print(destination)
 
 
