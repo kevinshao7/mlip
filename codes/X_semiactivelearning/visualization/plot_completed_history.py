@@ -1,4 +1,4 @@
-"""Plot logged validation loss and RMSEs without model inference."""
+"""Plot logged validation loss, RMSE and MAE without model inference."""
 import argparse
 import csv
 import hashlib
@@ -48,30 +48,42 @@ def main():
         record = evaluations[epoch]
         if abs(record['loss'] - loss) > 1e-7:
             raise ValueError(f'Log/results mismatch at epoch {epoch}')
-        values = (record['loss'], 1000 * record['rmse_e_per_atom'], 1000 * record['rmse_f'])
+        values = (record['loss'], 1000 * record['rmse_e_per_atom'], 1000 * record['rmse_f'],
+                  1000 * record['mae_e_per_atom'], 1000 * record['mae_f'])
+        if abs(values[3] - energy) > .0051 or abs(values[4] - force) > .0051:
+            raise ValueError(f'Log/results MAE mismatch at epoch {epoch}')
         if not all(math.isfinite(value) and value >= 0 for value in values):
             raise ValueError(f'Invalid metric at epoch {epoch}')
         rmse_rows.append((epoch, *values))
     rows = rmse_rows
     best_energy = min(rows, key=lambda row: row[2])
     best_force = min(rows, key=lambda row: row[3])
+    best_energy_mae = min(rows, key=lambda row: row[4])
+    best_force_mae = min(rows, key=lambda row: row[5])
     annotation = (f'Best validation energy RMSE: {best_energy[2]:.2f} meV/atom (epoch {best_energy[0]})\n'
-                  f'Best validation force RMSE: {best_force[3]:.2f} meV/Å (epoch {best_force[0]})')
+                  f'Best validation force RMSE: {best_force[3]:.2f} meV/Å (epoch {best_force[0]})\n'
+                  f'Best validation energy MAE: {best_energy_mae[4]:.2f} meV/atom (epoch {best_energy_mae[0]})\n'
+                  f'Best validation force MAE: {best_force_mae[5]:.2f} meV/Å (epoch {best_force_mae[0]})')
+    columns = ['epoch', 'validation_loss', 'energy_RMSE_meV_per_atom', 'force_RMSE_meV_per_A',
+               'energy_MAE_meV_per_atom', 'force_MAE_meV_per_A']
     args.output.mkdir(parents=True, exist_ok=True)
     with (args.output / 'validation_history.csv').open('w') as handle:
         writer = csv.writer(handle, lineterminator='\n')
-        writer.writerow(['epoch', 'validation_loss', 'energy_RMSE_meV_per_atom', 'force_RMSE_meV_per_A'])
+        writer.writerow(columns)
         writer.writerows(rows)
     plt.rcParams.update({'font.size': 11, 'axes.spines.top': False, 'axes.spines.right': False})
     specifications = [('loss', 'Validation weighted loss', 'Weighted loss (log scale)', 1),
-                      ('energy_error', 'Validation energy error', 'Energy RMSE (meV/atom)', 2),
-                      ('force_error', 'Validation force error', 'Force-component RMSE (meV/Å)', 3)]
+                      ('energy_error', 'Validation energy error', 'Energy error (meV/atom)', 2),
+                      ('force_error', 'Validation force error', 'Force-component error (meV/Å)', 3)]
     for name, title, ylabel, column in specifications:
         fig, ax = plt.subplots(figsize=(9, 5), constrained_layout=True)
         for stage, color, select in [('Stage one', '#2563a6', lambda e: e < args.stage_two),
                                      ('Stage two', '#d05d20', lambda e: e >= args.stage_two)]:
             subset = [r for r in rows if select(r[0])]
-            ax.plot([r[0] for r in subset], [r[column] for r in subset], color=color, label=stage, linewidth=1.8)
+            metrics = [('Loss', column, '-')] if column == 1 else [('RMSE', column, '-'), ('MAE', column + 2, '--')]
+            for metric, index, style in metrics:
+                ax.plot([r[0] for r in subset], [r[index] for r in subset], color=color,
+                        linestyle=style, label=f'{stage} · {metric}', linewidth=1.8)
         ax.axvline(args.stage_two, color='gray', linestyle='--', linewidth=1, label=f'Stage two starts: {args.stage_two}')
         ax.set(xlabel='Epoch (logged every 4 epochs)', ylabel=ylabel,
                title=f'{model} · {title}\nCompleted {completion[1]} · seed 123')
@@ -80,6 +92,8 @@ def main():
         else:
             best = best_energy if column == 2 else best_force
             ax.scatter(best[0], best[column], marker='*', s=130, color='#187344', zorder=5)
+            best_mae = best_energy_mae if column == 2 else best_force_mae
+            ax.scatter(best_mae[0], best_mae[column + 2], marker='D', s=45, color='#187344', zorder=5)
         note = annotation
         if column == 1:
             note += '\nLoss weights change at stage two; cross-stage loss is not comparable.'
@@ -95,7 +109,9 @@ def main():
         'stage_two_epoch': args.stage_two, 'logged_epochs': len(rows),
         'best_energy_RMSE': {'epoch': best_energy[0], 'meV_per_atom': best_energy[2]},
         'best_force_component_RMSE': {'epoch': best_force[0], 'meV_per_A': best_force[3]},
-        'last_logged_metrics': dict(zip(['epoch', 'loss', 'energy_RMSE_meV_per_atom', 'force_RMSE_meV_per_A'], rows[-1]))
+        'best_energy_MAE': {'epoch': best_energy_mae[0], 'meV_per_atom': best_energy_mae[4]},
+        'best_force_component_MAE': {'epoch': best_force_mae[0], 'meV_per_A': best_force_mae[5]},
+        'last_logged_metrics': dict(zip(columns, rows[-1]))
     }, indent=2) + '\n')
     print(f'{len(rows)} validation records; final logged metrics: {rows[-1]}')
 
