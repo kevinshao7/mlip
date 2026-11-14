@@ -22,6 +22,13 @@ def main():
     raw = args.log.read_text()
     if 'Training complete' not in raw or not raw.rstrip().endswith('Done'):
         raise ValueError('Expected a completed training and final evaluation log')
+    model_match = re.match(r'polar1([sml])_', args.log.name)
+    if not model_match:
+        raise ValueError('Expected a POLAR-1-S/M/L run log filename')
+    model = 'POLAR-1-' + model_match[1].upper()
+    completion = re.search(r'(\d{4}-\d{2}-\d{2})[^\n]*INFO: Done\s*$', raw)
+    if not completion:
+        raise ValueError('Missing dated completion record')
     pattern = r'Epoch (\d+): head: Default, loss=([\d.eE+-]+), MAE_E_per_atom=\s*([\d.eE+-]+) meV, MAE_F=\s*([\d.eE+-]+) meV / A'
     rows = [(int(e), float(l), float(en), float(f)) for e, l, en, f in re.findall(pattern, raw)]
     if not rows or len({r[0] for r in rows}) != len(rows):
@@ -43,7 +50,7 @@ def main():
             ax.plot([r[0] for r in subset], [r[column] for r in subset], color=color, label=stage, linewidth=1.8)
         ax.axvline(args.stage_two, color='gray', linestyle='--', linewidth=1, label=f'Stage two starts: {args.stage_two}')
         ax.set(xlabel='Epoch (logged every 4 epochs)', ylabel=ylabel,
-               title=f'POLAR-1-L · {title}\nCompleted 14 November 2026 · seed 123')
+               title=f'{model} · {title}\nCompleted {completion[1]} · seed 123')
         if column == 1:
             ax.set_yscale('log')
             ax.text(.98, .97, 'Loss weights change at stage two;\nloss values across stages are not comparable.',
