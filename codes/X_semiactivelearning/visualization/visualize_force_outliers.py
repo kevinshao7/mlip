@@ -103,6 +103,7 @@ def render_outlier_gif(
     fps: int,
     force_scale: float | None,
     model_label: str,
+    highlight_indices=None,
 ) -> None:
     import matplotlib
     matplotlib.use("Agg")
@@ -127,7 +128,7 @@ def render_outlier_gif(
     anchor = pos[centre_idx]
     delta  = pos - anchor
     cell_mat = np.array(cell)
-    if np.linalg.matrix_rank(cell_mat) == 3:
+    if atoms_dft.pbc.all() and np.linalg.matrix_rank(cell_mat) == 3:
         try:
             inv  = np.linalg.inv(cell_mat.T)
             frac = delta @ inv
@@ -150,6 +151,7 @@ def render_outlier_gif(
 
     marker_sizes = [max(80, 4000 * ATOM_RADII.get(s, DEFAULT_RADIUS) ** 2) for s in show_syms]
     colors       = [ATOM_COLORS.get(s, DEFAULT_COLOR) for s in show_syms]
+    highlighted = {centre_idx} if highlight_indices is None else {int(i) for i in highlight_indices}
 
     dft_err_mag  = float(np.linalg.norm(F_err_mev))
     dft_mag_val  = float(np.linalg.norm(F_dft_mev))
@@ -171,7 +173,7 @@ def render_outlier_gif(
         # Atoms
         xs, ys, zs = show_pos[:, 0], show_pos[:, 1], show_pos[:, 2]
         # All atoms except the outlier
-        other = [i for i in range(len(show_pos)) if i != centre_idx]
+        other = [i for i in range(len(show_pos)) if i not in highlighted]
         if other:
             ax.scatter(xs[other], ys[other], zs[other],
                        s=[marker_sizes[i] for i in other],
@@ -181,6 +183,11 @@ def render_outlier_gif(
         ax.scatter([show_pos[centre_idx, 0]], [show_pos[centre_idx, 1]], [show_pos[centre_idx, 2]],
                    s=marker_sizes[centre_idx], c=colors[centre_idx],
                    edgecolors=OUTLIER_COLOR, linewidths=2.5, depthshade=False, zorder=5)
+        for index in sorted(highlighted):
+            if index != centre_idx:
+                ax.scatter(*show_pos[index], s=marker_sizes[index], c=colors[index],
+                           edgecolors=OUTLIER_COLOR, linewidths=2.5, depthshade=False)
+            ax.text(*show_pos[index], f' {index}', fontsize=8, color='black')
 
         # Force arrows originate from the outlier atom (always at origin after wrapping)
         ox, oy, oz = show_pos[centre_idx]   # should be (0,0,0) but use directly for safety

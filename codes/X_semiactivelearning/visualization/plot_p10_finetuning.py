@@ -41,61 +41,7 @@ def resolve_model(selection):
     return model
 
 
-def plot_parity(destination, re_, pe, rf, pf, counts, roles, metadata, atom_symbols):
-    import numpy as np
-    import matplotlib.pyplot as plt
-    model_label = 'Foundation polar-1-l' if metadata.get('model_selection') == 'found' else 'Fine-tuned epoch 9'
-    metrics = {}
-    for name, cluster_mask in [('all_2000', np.ones(len(counts), dtype=bool)), ('acquisition_1950', np.array(roles) == 'acquisition'), ('held_out_50', np.array(roles) == 'evaluation')]:
-        atom_mask = np.repeat(cluster_mask, counts)
-        energy_error = (pe[cluster_mask] - re_[cluster_mask]) / counts[cluster_mask]
-        force_error = pf[atom_mask] - rf[atom_mask]
-        metrics[name] = {'clusters': int(cluster_mask.sum()), 'energy_rmse_meV_per_atom': float(1000*np.sqrt(np.mean(energy_error**2))),
-                         'force_component_rmse_meV_per_A': float(1000*np.sqrt(np.mean(force_error**2)))}
-    atom_symbols = np.asarray(atom_symbols)
-    if atom_symbols.shape != (len(rf),) or not set(atom_symbols) <= {'H', 'N', 'O'}:
-        raise ValueError('Expected one supported atom symbol per force vector')
-    fig, axis = plt.subplots(figsize=(7, 7))
-    held_out = np.array(roles) == 'evaluation'
-    for mask, label in [(~held_out, 'Acquisition (includes train/validation)'), (held_out, 'Held-out evaluation')]:
-        axis.scatter(1000 * re_[mask], 1000 * (pe[mask] - re_[mask]),
-                     s=3, alpha=.3, rasterized=True, label=label)
-    energy_errors = 1000 * (pe - re_)
-    axis.text(.03, .97,
-              f'All clusters: RMSE = {np.sqrt(np.mean(energy_errors**2)):.2f} meV\n'
-              f'MAE = {np.mean(np.abs(energy_errors)):.2f} meV',
-              transform=axis.transAxes, va='top', fontsize=9,
-              bbox=dict(facecolor='white', alpha=.85, edgecolor='.8'))
-    axis.axhline(0, color='k', ls='--', lw=1)
-    axis.set(xlabel='DFT absolute electronic energy (meV)',
-             ylabel='MLIP − DFT energy (meV)',
-             title=f'P10 {model_label}: all {len(counts)} clusters (mixed splits)')
-    axis.legend(markerscale=3, loc='lower right')
-    fig.tight_layout()
-    fig.savefig(destination / 'energy_parity.png', dpi=220)
-    plt.close(fig)
-    fig, axis = plt.subplots(figsize=(7, 7))
-    dft_magnitude = 1000 * np.linalg.norm(rf, axis=1)
-    error_magnitude = 1000 * np.linalg.norm(pf - rf, axis=1)
-    force_statistics = [f'All atoms: RMSE = {np.sqrt(np.mean(error_magnitude**2)):.2f}, MAE = {np.mean(error_magnitude):.2f}']
-    for symbol, color in [('H', 'tab:blue'), ('N', 'tab:green'), ('O', 'tab:red')]:
-        mask = atom_symbols == symbol
-        if mask.any():
-            force_statistics.append(f'{symbol}: RMSE = {np.sqrt(np.mean(error_magnitude[mask]**2)):.2f}, MAE = {np.mean(error_magnitude[mask]):.2f}')
-            axis.scatter(dft_magnitude[mask], error_magnitude[mask], s=3, alpha=.3,
-                         color=color, rasterized=True, label=symbol)
-    axis.text(.03, .97, 'Vector errors (meV/Å)\n' + '\n'.join(force_statistics),
-              transform=axis.transAxes, va='top', fontsize=9,
-              bbox=dict(facecolor='white', alpha=.85, edgecolor='.8'))
-    axis.set(xlabel='DFT force magnitude (meV/Å)',
-             ylabel='Force error magnitude ‖MLIP − DFT‖ (meV/Å)',
-             title=f'P10 {model_label}: all {len(counts)} clusters (mixed splits)')
-    axis.legend(title='Atom type', markerscale=3, loc='lower right')
-    fig.tight_layout()
-    fig.savefig(destination / 'force_parity.png', dpi=220)
-    plt.close(fig)
-    (destination / 'metrics.json').write_text(json.dumps({**metadata, 'metrics': metrics,
-        'note': 'All-data parity is descriptive; correlated acquisition frames are not independent test samples.'}, indent=2) + '\n')
+from parity_standard import plot_parity
 
 
 def plot_history(destination, curves):
@@ -166,6 +112,26 @@ def replot(source, destination, selection=None):
         plot_history(destination, curves)
 
 
+def validate_frames(frames):
+    import numpy as np
+    # Validate every record before any inference; absolute electronic labels only.
+    for atoms in frames:
+        symbols = atoms.get_chemical_symbols()
+        if set(symbols) - {'H', 'N', 'O'}:
+            raise ValueError('Unsupported formal-charge convention')
+        charge = symbols.count('H') - 3 * symbols.count('N') - 2 * symbols.count('O')
+        if any(atoms.info.get(k) != charge for k in ('charge', 'orca_input_charge', 'orca_output_charge')):
+            raise ValueError('Formal charge mismatch')
+        if (any(atoms.info.get(k) != 1 for k in ('spin', 'multiplicity', 'orca_input_multiplicity', 'orca_output_multiplicity'))
+                or not atoms.info.get('formal_charge_verified') or (sum(atoms.numbers) - charge) % 2
+                or atoms.info.get('energy_reference') != 'absolute'
+                or atoms.info.get('dft_functional_basis') != 'wB97M/def2-TZVPD' or atoms.pbc.any()
+                or not np.isfinite(atoms.positions).all()
+                or not np.isfinite(atoms.info['REF_energy'])
+                or not np.isfinite(atoms.arrays['REF_forces']).all()):
+            raise ValueError('Invalid reference, geometry, charge or spin provenance')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--model', choices=['found', 'finet'], default=None,
@@ -219,22 +185,7 @@ def main():
             raise ValueError(f'Expected {count} {role} clusters')
         frames.extend(subset)
         roles.extend([role] * count)
-    # Validate every record before any inference; absolute electronic labels only.
-    for atoms in frames:
-        symbols = atoms.get_chemical_symbols()
-        if set(symbols) - {'H', 'N', 'O'}:
-            raise ValueError('Unsupported formal-charge convention')
-        charge = symbols.count('H') - 3 * symbols.count('N') - 2 * symbols.count('O')
-        if any(atoms.info.get(k) != charge for k in ('charge', 'orca_input_charge', 'orca_output_charge')):
-            raise ValueError('Formal charge mismatch')
-        if (any(atoms.info.get(k) != 1 for k in ('spin', 'multiplicity', 'orca_input_multiplicity', 'orca_output_multiplicity'))
-                or not atoms.info.get('formal_charge_verified') or (sum(atoms.numbers) - charge) % 2
-                or atoms.info.get('energy_reference') != 'absolute'
-                or atoms.info.get('dft_functional_basis') != 'wB97M/def2-TZVPD' or atoms.pbc.any()
-                or not np.isfinite(atoms.positions).all()
-                or not np.isfinite(atoms.info['REF_energy'])
-                or not np.isfinite(atoms.arrays['REF_forces']).all()):
-            raise ValueError('Invalid reference, geometry, charge or spin provenance')
+    validate_frames(frames)
     calc = mace_polar(model=str(model), device=args.device, default_dtype='float32')
     reference_e, predicted_e, reference_f, predicted_f = [], [], [], []
     for index, atoms in enumerate(frames):

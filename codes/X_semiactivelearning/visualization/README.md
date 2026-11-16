@@ -1,5 +1,88 @@
 # Visualization tasks
 
+## Shared standard and swappable sources
+
+**Remake all three models' plots and five outlier GIFs each with one command:**
+
+```bash
+python visualization/remake_parity.py
+```
+
+This automatically finds the latest complete saved s/m/l evaluation, prints its
+path, and writes all new figures/GIFs to one fresh dated directory. CPU only;
+no model inference or DFT. Optional `--evaluation DIRECTORY` selects a saved
+evaluation root explicitly.
+
+Energy residual axes and RMSE/MAE annotations now use **meV/atom**: x is
+1000×DFT total energy/N; y is 1000×(MLIP−DFT total energy)/N. The five largest
+absolute per-atom energy residuals are circled and labelled `rank: #cluster_index`
+(zero-based saved prediction order), with the same ranking in `energy_outliers.json`.
+Force units and definitions are unchanged. This supersedes historical total-energy
+plot conventions below; saved predictions remain in eV and eV/Angstrom.
+
+To redraw one model and render its five worst energy clusters from saved data:
+
+```bash
+python visualization/plot_parity.py --from-evaluation /path/to/evaluation/m
+python visualization/visualize_saved_outliers.py /path/to/evaluation/m --output /new/path/to/m_outliers
+```
+
+The GIF adapter reuses `visualize_force_outliers.py`, verifies dataset hashes
+and exact reference-energy/force/count/symbol/split order, and never loads a model.
+It shows the whole nonperiodic cluster. Gold rings mark the largest force-error
+atom by default (`--highlight-atoms 3` selects three); atom indices are shown,
+with DFT/MLIP/error arrows on the worst force-error atom. These highlights are
+force diagnostics, not atomwise attribution of cluster energy error. Each output
+includes a GIF, extxyz with saved MLIP forces and atom errors, and `outliers.json`
+with original source/frame/centre identity and prediction hash. Defaults are
+60 rotation frames at10fps. Existing files are never overwritten.
+
+All future energy/force parity plots must use `parity_standard.py`, shared by
+`plot_parity.py` and the historical `plot_p10_finetuning.py`. Change the data-source
+manifest rather than copying or changing the renderer for a new model/dataset.
+The established plots are energy residual and force vector-error plots, with
+the conventions described below; compatibility filenames contain `parity`.
+
+`parity_sources.json` pins the latest completed local fine-tuned POLAR-1-S/M/L
+foundation/SWA runs (November 13–14): stage-two exported models, float64, and
+the same frozen 1000-structure validation split. Validation is descriptive,
+not an independent test estimate. The 50 held-out evaluation structures are
+excluded. No new model or training experiment is selected by these plots.
+
+Run these yourself from the X workflow directory on your allocated GPU:
+
+```bash
+# Evaluate all three models and save predictions plus plots
+python visualization/plot_parity.py --device cuda
+# Alternatively, save evaluations first without rendering any plots
+python visualization/plot_parity.py --device cuda --evaluate-only
+# Redraw a saved model evaluation without GPU, MACE loading or inference
+python visualization/plot_parity.py --from-evaluation /path/to/evaluation/m
+```
+
+DFT ground truth is read from the existing audited labels; no DFT calculations
+are rerun. Each model's `predictions.npz` saves DFT and MLIP energies (eV),
+DFT and MLIP forces (eV/Angstrom), atom counts, split roles and atom symbols.
+It and provenance in `metrics.json` are written **before** plotting, so a plot
+failure or later style change needs no repeat inference. `--evaluate-only`
+writes these same reusable files; numerical plot metrics are added on redraw.
+Outputs use a fresh dated directory under
+`outputsfull/X_semiactivelearning/visualization`, with `s/`, `m/`, `l/` folders
+and a source-manifest copy. Existing outputs are preserved.
+
+Use `--models m` to select one source or `--sources /path/to/sources.json`
+to swap sources. Each manifest source has `label`, `model` (`path`, `sha256`),
+`dtype`, and `datasets` (each with `path`, `sha256`, `count`, `role`). Paths
+are repository-relative or absolute. Supported labels are audited nonperiodic
+H/N/O absolute dispersion-free wB97M/def2-TZVPD `REF_energy`/`REF_forces`,
+with verified formal charge and singlet metadata. A different chemistry or
+reference convention requires an explicitly validated adapter. No E0 subtraction.
+`--check` verifies source hashes, counts and reference provenance on CPU without
+inference or rendering. Split metrics are per-atom energy RMSE and force-component
+RMSE; figure annotations retain total-energy and force-vector RMSE/MAE.
+
+## Historical entry points
+
 - `plot_p10_finetuning.py`: published P10 training validation curves and energy/force residual plots for all 2000 audited labelled clusters. The local
   run timed out after epoch 195; this script uses the hash-pinned epoch-9 export,
   not a completed 500-epoch model. It writes a new dated directory under
