@@ -2,6 +2,18 @@
 import json
 
 
+def cluster_formal_charges(atom_symbols, counts):
+    """Project H/N/O formal charge H - 3N - 2O in saved cluster order."""
+    import numpy as np
+    symbols, counts = np.asarray(atom_symbols), np.asarray(counts)
+    if (counts.ndim != 1 or not len(counts) or counts.dtype.kind not in 'iu'
+            or (counts <= 0).any() or symbols.shape != (int(counts.sum()),)
+            or not set(symbols) <= {'H', 'N', 'O'}):
+        raise ValueError('Invalid H/N/O cluster composition or atom counts')
+    atom_charges = np.array([{'H': 1, 'N': -3, 'O': -2}[s] for s in symbols])
+    return np.add.reduceat(atom_charges, np.r_[0, np.cumsum(counts)[:-1]])
+
+
 def plot_parity(destination, re_, pe, rf, pf, counts, roles, metadata, atom_symbols):
     import numpy as np
     import matplotlib.pyplot as plt
@@ -25,10 +37,20 @@ def plot_parity(destination, re_, pe, rf, pf, counts, roles, metadata, atom_symb
     if atom_symbols.shape != (len(rf),) or not set(atom_symbols) <= {'H', 'N', 'O'}:
         raise ValueError('Expected one supported atom symbol per force vector')
     fig, axis = plt.subplots(figsize=(7, 7))
+    charges = cluster_formal_charges(atom_symbols, counts)
+    charge_limit = max(1, int(np.max(np.abs(charges))))
+    charge_colors = plt.get_cmap('coolwarm')
     held_out = np.array(roles) == 'evaluation'
-    for mask, label in [(~held_out, metadata.get('dataset_label', 'Acquisition (includes train/validation)')), (held_out, 'Held-out evaluation')]:
+    for charge in np.unique(charges):
+        mask = charges == charge
         axis.scatter(1000 * re_[mask] / counts[mask], np.ma.masked_less_equal(1000 * np.abs(pe[mask] - re_[mask]) / counts[mask], 0),
-                     s=3, alpha=.3, rasterized=True, label=label)
+                     s=7, alpha=.55, rasterized=True,
+                     color=charge_colors((int(charge) + charge_limit) / (2 * charge_limit)),
+                     label=f'q = {charge:+d} e (n={int(mask.sum())})')
+    if held_out.any():
+        axis.scatter(1000 * re_[held_out] / counts[held_out],
+                     np.ma.masked_less_equal(1000 * np.abs(pe[held_out] - re_[held_out]) / counts[held_out], 0),
+                     s=12, marker='x', color='black', linewidths=.5, label='Held-out evaluation')
     energy_errors = 1000 * (pe - re_) / counts
     worst = np.argsort(-np.abs(energy_errors), kind='stable')[:5]
     axis.scatter(1000 * re_[worst] / counts[worst], np.ma.masked_less_equal(np.abs(energy_errors[worst]), 0),
@@ -50,13 +72,13 @@ def plot_parity(destination, re_, pe, rf, pf, counts, roles, metadata, atom_symb
     axis.set(xlabel='DFT absolute electronic energy (meV/atom)',
              ylabel='|MLIP − DFT| energy (meV/atom; log scale)',
              title=f'P10 {model_label}: all {len(counts)} clusters')
-    axis.legend(markerscale=3, loc='lower right')
+    axis.legend(title='Cluster formal charge (H − 3N − 2O)', markerscale=2, loc='lower right', fontsize=8)
     fig.tight_layout()
     fig.savefig(destination / 'energy_parity.png', dpi=220)
     plt.close(fig)
     (destination / 'energy_outliers.json').write_text(json.dumps([
         {'rank': rank, 'cluster_index': int(index), 'index_convention': 'zero-based saved prediction order',
-         'atom_count': int(counts[index]), 'role': str(roles[index]),
+         'atom_count': int(counts[index]), 'role': str(roles[index]), 'formal_charge': int(charges[index]),
          'energy_error_meV_per_atom': float(energy_errors[index])}
         for rank, index in enumerate(worst, 1)], indent=2) + '\n')
     fig, axis = plt.subplots(figsize=(7, 7))
@@ -85,5 +107,7 @@ def plot_parity(destination, re_, pe, rf, pf, counts, roles, metadata, atom_symb
     plt.close(fig)
     (destination / 'metrics.json').write_text(json.dumps({**metadata, 'metrics': metrics,
         'plot_conventions': {'error_axis': 'log', 'energy_error': 'absolute meV/atom',
+                             'energy_color': 'cluster formal charge H - 3N - 2O (e)',
+                             'formal_charge_counts': {str(q): int((charges == q).sum()) for q in np.unique(charges)},
                              'force_error': 'vector norm meV/Angstrom', 'exact_zeros': 'omitted from plots; retained in metrics'},
         'note': 'All-data parity is descriptive; correlated acquisition frames are not independent test samples.'}, indent=2) + '\n')

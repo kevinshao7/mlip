@@ -23,6 +23,12 @@ evaluation root explicitly.
 Both error axes now use **logarithmic scales**. Energy x is
 1000×DFT total energy/N; y is 1000×|MLIP−DFT total energy|/N in **meV/atom**.
 Force y remains the vector-error norm in meV/Angstrom. The x axes remain linear.
+Energy points are colored by cluster formal charge, recomputed from saved atom
+symbols as H−3N−2O in the exact saved cluster order. The legend lists each charge
+in elementary-charge units and its cluster count. Negative charges are blue,
+positive charges red, with a symmetric scale about zero. Held-out structures,
+when present, also have black crosses. Force colors remain H/N/O colors.
+Charge counts are saved in metrics and each energy outlier records its charge.
 Exact zero errors are omitted from logarithmic plots and counted in the figure;
 they remain included in RMSE/MAE. Signed energy errors remain in saved data and
 outlier JSON. The five largest
