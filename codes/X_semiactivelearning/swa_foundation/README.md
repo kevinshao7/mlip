@@ -1,5 +1,11 @@
 # Separate foundation/SWA baseline
 
+Launcher options are listed vertically, one option per line, in
+`launch_single_gpu.py`. The2026-11-16 formatting update preserves every argument
+and value; the original launcher/plan are under
+`history/20261116T190658783762Z/`. A fresh prepared bundle refreshes source hashes
+and output paths only; no optimization or job submission accompanied the update.
+
 Prepared 2026-11-13 at the user's request. Starts from the original cached
 polar-1-s, polar-1-m and polar-1-l foundations, each in a separate job. Existing training jobs,
 low-LR pointers and launchers are unchanged. No submission occurred.

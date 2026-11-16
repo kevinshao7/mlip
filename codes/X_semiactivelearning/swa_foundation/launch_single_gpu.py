@@ -95,17 +95,35 @@ def main():
             stream.write('mace_defaults=' + json.dumps(actual, sort_keys=True) + '\n')
     recipe.append_experiment_log = log
     paths = {key: MLIP / item['path'] for key, item in plan['inputs'].items()}
-    sys.argv = [str(path), '--name', f'polar1{options.model}_wb97m_no_disp_foundation_swa300',
-                '--foundation-model', str(paths['foundation']),
-                '--train-file', str(paths['train_file']), '--valid-file', str(paths['valid_file']),
-                '--e0s', str(paths['e0s']), '--reference-method', 'wB97M/def2-TZVPD',
-                '--atomic-numbers', '[1, 7, 8, 16]', '--runs-root', str(MLIP / plan['runs_root']),
-                '--energy-weight', '10', '--forces-weight', '1000',
-                '--batch-size', '2', '--valid-batch-size', '4', '--max-num-epochs', '300',
-                '--start-swa', '150', '--swa', '--ema', '--seed', '123',
-                '--default-dtype', 'float64', '--device', 'cuda', '--restart-latest',
-                '--changed-parameter', 'recipe_baseline', '--change-note',
-                'User-requested new foundation baseline: docs recipe, 300epochs/SWA150, audited dispersion-free wB97M E0s; upstream unspecified defaults, fixed P10 split; multiple factors differ from prior runs.']
+    sys.argv = [
+        str(path),
+        '--name', f'polar1{options.model}_wb97m_no_disp_foundation_swa300',
+        '--foundation-model', str(paths['foundation']),
+        '--train-file', str(paths['train_file']),
+        '--valid-file', str(paths['valid_file']),
+        '--e0s', str(paths['e0s']),
+        '--reference-method', 'wB97M/def2-TZVPD',
+        '--atomic-numbers', '[1, 7, 8, 16]',
+        '--runs-root', str(MLIP / plan['runs_root']),
+        '--energy-weight', '10',
+        '--forces-weight', '1000',
+        '--batch-size', '2',
+        '--valid-batch-size', '4',
+        '--max-num-epochs', '300',
+        '--start-swa', '150',
+        '--swa',
+        '--ema',
+        '--seed', '123',
+        '--default-dtype', 'float64',
+        '--device', 'cuda',
+        '--restart-latest',
+        '--changed-parameter', 'recipe_baseline',
+        '--change-note', (
+            'User-requested new foundation baseline: docs recipe, 300epochs/SWA150, '
+            'audited dispersion-free wB97M E0s; upstream unspecified defaults, '
+            'fixed P10 split; multiple factors differ from prior runs.'
+        ),
+    ]
     if options.dry_run:
         sys.argv.append('--dry-run')
     recipe.main()
