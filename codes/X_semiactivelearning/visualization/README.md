@@ -9,15 +9,26 @@ python visualization/remake_parity.py
 ```
 
 This automatically finds the latest complete saved s/m/l evaluation, prints its
-path, and writes all new figures/GIFs to one fresh dated directory. CPU only;
+path, and updates plots in that same evaluation folder. Predictions, plots,
+outlier JSON and `outlier_gifs/` stay together under each model's s/m/l folder.
+Prior plot versions are preserved under `plot_history/` inside that folder.
+Finished matching GIFs from the old separate `energy_outliers_*` folders are
+copied into the evaluation folder and reused. The deprecated separate
+`energy_outliers_20261116T175919824655Z` release was removed after verifying its
+GIFs and cluster records were retained in the unified evaluation folder.
+Missing GIFs are generated only when needed. CPU only;
 no model inference or DFT. Optional `--evaluation DIRECTORY` selects a saved
 evaluation root explicitly.
 
-Energy residual axes and RMSE/MAE annotations now use **meV/atom**: x is
-1000×DFT total energy/N; y is 1000×(MLIP−DFT total energy)/N. The five largest
+Both error axes now use **logarithmic scales**. Energy x is
+1000×DFT total energy/N; y is 1000×|MLIP−DFT total energy|/N in **meV/atom**.
+Force y remains the vector-error norm in meV/Angstrom. The x axes remain linear.
+Exact zero errors are omitted from logarithmic plots and counted in the figure;
+they remain included in RMSE/MAE. Signed energy errors remain in saved data and
+outlier JSON. The five largest
 absolute per-atom energy residuals are circled and labelled `rank: #cluster_index`
 (zero-based saved prediction order), with the same ranking in `energy_outliers.json`.
-Force units and definitions are unchanged. This supersedes historical total-energy
+Force units and definitions are unchanged. This supersedes historical signed/total-energy
 plot conventions below; saved predictions remain in eV and eV/Angstrom.
 
 To redraw one model and render its five worst energy clusters from saved data:

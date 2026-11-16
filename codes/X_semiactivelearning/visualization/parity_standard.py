@@ -27,23 +27,28 @@ def plot_parity(destination, re_, pe, rf, pf, counts, roles, metadata, atom_symb
     fig, axis = plt.subplots(figsize=(7, 7))
     held_out = np.array(roles) == 'evaluation'
     for mask, label in [(~held_out, metadata.get('dataset_label', 'Acquisition (includes train/validation)')), (held_out, 'Held-out evaluation')]:
-        axis.scatter(1000 * re_[mask] / counts[mask], 1000 * (pe[mask] - re_[mask]) / counts[mask],
+        axis.scatter(1000 * re_[mask] / counts[mask], np.ma.masked_less_equal(1000 * np.abs(pe[mask] - re_[mask]) / counts[mask], 0),
                      s=3, alpha=.3, rasterized=True, label=label)
     energy_errors = 1000 * (pe - re_) / counts
     worst = np.argsort(-np.abs(energy_errors), kind='stable')[:5]
-    axis.scatter(1000 * re_[worst] / counts[worst], energy_errors[worst],
+    axis.scatter(1000 * re_[worst] / counts[worst], np.ma.masked_less_equal(np.abs(energy_errors[worst]), 0),
                  s=55, facecolors='none', edgecolors='black', label='Five largest |ΔE|/atom')
     for rank, index in enumerate(worst, 1):
-        axis.annotate(f'{rank}: #{index}', (1000 * re_[index] / counts[index], energy_errors[index]),
+        if energy_errors[index] == 0:
+            continue
+        axis.annotate(f'{rank}: #{index}', (1000 * re_[index] / counts[index], abs(energy_errors[index])),
                       xytext=(7, 7 if rank % 2 else -14), textcoords='offset points', fontsize=8)
     axis.text(.03, .97,
               f'All clusters: RMSE = {np.sqrt(np.mean(energy_errors**2)):.2f} meV/atom\n'
-              f'MAE = {np.mean(np.abs(energy_errors)):.2f} meV/atom',
+              f'MAE = {np.mean(np.abs(energy_errors)):.2f} meV/atom\n'
+              f'Exact zeros omitted on log axis: {np.count_nonzero(energy_errors == 0)}',
               transform=axis.transAxes, va='top', fontsize=9,
               bbox=dict(facecolor='white', alpha=.85, edgecolor='.8'))
-    axis.axhline(0, color='k', ls='--', lw=1)
+    axis.set_yscale('log')
+    if not np.any(energy_errors):
+        axis.set_ylim(1e-6, 1)
     axis.set(xlabel='DFT absolute electronic energy (meV/atom)',
-             ylabel='MLIP − DFT energy (meV/atom)',
+             ylabel='|MLIP − DFT| energy (meV/atom; log scale)',
              title=f'P10 {model_label}: all {len(counts)} clusters')
     axis.legend(markerscale=3, loc='lower right')
     fig.tight_layout()
@@ -62,17 +67,23 @@ def plot_parity(destination, re_, pe, rf, pf, counts, roles, metadata, atom_symb
         mask = atom_symbols == symbol
         if mask.any():
             force_statistics.append(f'{symbol}: RMSE = {np.sqrt(np.mean(error_magnitude[mask]**2)):.2f}, MAE = {np.mean(error_magnitude[mask]):.2f}')
-            axis.scatter(dft_magnitude[mask], error_magnitude[mask], s=3, alpha=.3,
+            axis.scatter(dft_magnitude[mask], np.ma.masked_less_equal(error_magnitude[mask], 0), s=3, alpha=.3,
                          color=color, rasterized=True, label=symbol)
-    axis.text(.03, .97, 'Vector errors (meV/Å)\n' + '\n'.join(force_statistics),
+    axis.text(.03, .97, 'Vector errors (meV/Å)\n' + '\n'.join(force_statistics)
+              + f'\nExact zeros omitted on log axis: {np.count_nonzero(error_magnitude == 0)}',
               transform=axis.transAxes, va='top', fontsize=9,
               bbox=dict(facecolor='white', alpha=.85, edgecolor='.8'))
+    axis.set_yscale('log')
+    if not np.any(error_magnitude):
+        axis.set_ylim(1e-6, 1)
     axis.set(xlabel='DFT force magnitude (meV/Å)',
-             ylabel='Force error magnitude ‖MLIP − DFT‖ (meV/Å)',
+             ylabel='Force error magnitude ‖MLIP − DFT‖ (meV/Å; log scale)',
              title=f'P10 {model_label}: all {len(counts)} clusters')
     axis.legend(title='Atom type', markerscale=3, loc='lower right')
     fig.tight_layout()
     fig.savefig(destination / 'force_parity.png', dpi=220)
     plt.close(fig)
     (destination / 'metrics.json').write_text(json.dumps({**metadata, 'metrics': metrics,
+        'plot_conventions': {'error_axis': 'log', 'energy_error': 'absolute meV/atom',
+                             'force_error': 'vector norm meV/Angstrom', 'exact_zeros': 'omitted from plots; retained in metrics'},
         'note': 'All-data parity is descriptive; correlated acquisition frames are not independent test samples.'}, indent=2) + '\n')
